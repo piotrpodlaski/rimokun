@@ -20,6 +20,12 @@ void MotorStats::setCurrentPosition(const double value) const {
 void MotorStats::setTargetPosition(const double value) const {
   ui->targetPosition->display(value);
 }
+void MotorStats::setBrake(const utl::ELEDState value) const {
+  ui->brakeLED->setState(value);
+}
+void MotorStats::setEnabled(const utl::ELEDState value) const {
+  ui->enaLED->setState(value);
+}
 void MotorStats::setMotorName(const QString& name) const {
   ui->groupBox->setTitle(name);
 }

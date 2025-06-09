@@ -2,6 +2,7 @@
 
 #include <QColor>
 #include <QWidget>
+#include "CommonDefinitions.hpp"
 
 class LedIndicator final : public QWidget {
   Q_OBJECT
@@ -11,16 +12,15 @@ class LedIndicator final : public QWidget {
 
   ~LedIndicator() override = default;
 
-  enum class State { Off, On, Error };
 
-  void setState(State state);
-  [[nodiscard]] State state() const;
+  void setState(utl::ELEDState state);
+  [[nodiscard]] utl::ELEDState state() const;
 
  protected:
   void paintEvent(QPaintEvent* event) override;
   [[nodiscard]] QSize sizeHint() const override;
 
  private:
-  State m_state;
+  utl::ELEDState m_state;
   [[nodiscard]] QColor currentColor() const;
 };

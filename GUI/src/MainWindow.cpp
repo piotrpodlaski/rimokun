@@ -30,6 +30,8 @@ MainWindow::MainWindow(QWidget* parent)
     motStat->setSpeed(2137);
     motStat->setTargetPosition(420);
     motStat->setTorque(69);
+    motStat->setBrake(utl::ELEDState::Off);
+    motStat->setEnabled(utl::ELEDState::Error);
   }
 }
 

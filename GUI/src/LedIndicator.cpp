@@ -3,27 +3,29 @@
 #include <QPainter>
 
 LedIndicator::LedIndicator(QWidget* parent)
-    : QWidget(parent), m_state(State::Off) {
+    : QWidget(parent), m_state(utl::ELEDState::Off) {
   setMinimumSize(16, 16);
 }
 
-void LedIndicator::setState(const State state) {
+void LedIndicator::setState(const utl::ELEDState state) {
   if (m_state != state) {
     m_state = state;
     update();  // trigger repaint
   }
 }
 
-LedIndicator::State LedIndicator::state() const { return m_state; }
+utl::ELEDState LedIndicator::state() const { return m_state; }
 
 QColor LedIndicator::currentColor() const {
   switch (m_state) {
-    case State::On:
+    case utl::ELEDState::On:
       return Qt::green;
-    case State::Error:
+    case utl::ELEDState::Error:
       return Qt::red;
+    case utl::ELEDState::Off:
+      return Qt::transparent;
     default:
-      return Qt::darkYellow;
+      return Qt::transparent;
   }
 }
 

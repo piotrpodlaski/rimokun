@@ -20,6 +20,8 @@ class MotorStats : public QWidget, VMotorStats {
   void setSpeed(double value) const override;
   void setCurrentPosition(double value) const override;
   void setTargetPosition(double value) const override;
+  void setBrake(utl::ELEDState value) const override;
+  void setEnabled(utl::ELEDState value) const override;
   void setMotorName(const QString& name) const;
 
  private:

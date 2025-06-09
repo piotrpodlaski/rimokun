@@ -7,15 +7,32 @@
 
 #include "MainWindow.hpp"
 
-#include "ui_MainWindow.h"
 #include <print>
 
-MainWindow::MainWindow(QWidget *parent)
+#include "ui_MainWindow.h"
+
+MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent), ui(new Ui::MainWindow) {
   ui->setupUi(this);
-  connect(ui->pushButton_2, &QPushButton::released, this, &MainWindow::on_pushButton_clicked);
+  connect(ui->pushButton_2, &QPushButton::released, this,
+          &MainWindow::on_pushButton_clicked);
+
+  motorStats[utl::EMotor::XLeft] = ui->mot1;
+  motorStats[utl::EMotor::XRight] = ui->mot2;
+  motorStats[utl::EMotor::YLeft] = ui->mot3;
+  motorStats[utl::EMotor::YRight] = ui->mot4;
+  motorStats[utl::EMotor::ZLeft] = ui->mot5;
+  motorStats[utl::EMotor::ZRight] = ui->mot6;
+
+  for (auto& [eMot, motStat] : motorStats) {
+    motStat->setMotorName(magic_enum::enum_name(eMot).data());
+    motStat->setCurrentPosition(4010.2);
+    motStat->setSpeed(2137);
+    motStat->setTargetPosition(420);
+    motStat->setTorque(69);
+  }
 }
 
 MainWindow::~MainWindow() { delete ui; }
 
-void MainWindow::on_pushButton_clicked() {std::print("dupa\n");}
+void MainWindow::on_pushButton_clicked() { std::print("dupa\n"); }

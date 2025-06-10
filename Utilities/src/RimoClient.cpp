@@ -23,17 +23,16 @@ void RimoClient::spawn() {
 }
 
 void RimoClient::subscriberThread() {
+  std::this_thread::sleep_for(500ms);
   zmq::socket_t subscriber(_context, zmq::socket_type::sub);
   subscriber.connect("ipc:///tmp/rimo_server");
   subscriber.set(zmq::sockopt::subscribe, "");
-
-  std::this_thread::sleep_for(300ms);
   while (m_running) {
     zmq::message_t message;
     auto result = subscriber.recv(message);
     if (!result) continue;
     auto msg_str = message.to_string();
-    std::print("received:\n\t result: {} \n\tmessage {}\n", *result, msg_str);
+    //std::print("received:\n\t result: {} \n\tmessage {}\n", *result, msg_str);
     auto [motors] = YAML::Load(msg_str).as<RobotStatus>();
     if (!_motorStats)
       continue;

@@ -1,4 +1,6 @@
 #include "MotorStats.hpp"
+#include <format>
+#include <print>
 
 #include <QMetaObject>
 
@@ -9,18 +11,24 @@ MotorStats::MotorStats(QWidget* parent)
   ui->setupUi(this);
 }
 
+namespace {
+QString formatNumber(const double value) {
+    return QString::number(value,'f',1);
+  }
+}
+
 MotorStats::~MotorStats() { delete ui; }
 void MotorStats::setTorque(const int value) const {
   ui->torquePercent->setValue(value);
 }
 void MotorStats::setSpeed(const double value) const {
-  ui->speedCms->display(value);
+  ui->speedCms->display(formatNumber(value));
 }
 void MotorStats::setCurrentPosition(const double value) const {
-  ui->curentPosition->display(value);
+  ui->curentPosition->display(formatNumber(value));
 }
 void MotorStats::setTargetPosition(const double value) const {
-  ui->targetPosition->display(value);
+  ui->targetPosition->display(formatNumber(value));
 }
 void MotorStats::setBrake(const utl::ELEDState value) const {
   ui->brakeLED->setState(value);

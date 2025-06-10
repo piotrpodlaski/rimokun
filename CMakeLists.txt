@@ -15,9 +15,17 @@ FetchContent_Declare(
         GIT_TAG v0.9.7
 )
 
+FetchContent_Declare(
+        cppzmq
+        GIT_REPOSITORY https://github.com/zeromq/cppzmq.git
+        GIT_TAG v4.10.0
+)
+
 FetchContent_MakeAvailable(yaml-cpp)
 FetchContent_MakeAvailable(magic_enum)
+FetchContent_MakeAvailable(cppzmq)
 
 
 add_subdirectory(Utilities)
 add_subdirectory(GUI)
+add_subdirectory(Server)

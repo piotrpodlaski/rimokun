@@ -10,6 +10,8 @@
 #include "CommonDefinitions.hpp"
 #include "MotorStats.hpp"
 
+#include "RimoClient.h"
+
 QT_BEGIN_NAMESPACE
 namespace Ui {
 class MainWindow;
@@ -27,6 +29,7 @@ class MainWindow : public QMainWindow {
   static void on_pushButton_clicked();
 
  private:
+  utl::RimoClient client;
   Ui::MainWindow *ui;
   std::map<utl::EMotor, MotorStats *> motorStats;
 };

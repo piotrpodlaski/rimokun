@@ -28,4 +28,4 @@ target_include_directories(rimokunControl
         ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-target_link_libraries(rimokunControl PRIVATE Qt6::Widgets magic_enum utilities PUBLIC yaml-cpp::yaml-cpp)
+target_link_libraries(rimokunControl PRIVATE Qt6::Widgets magic_enum utilities cppzmq PUBLIC yaml-cpp::yaml-cpp)

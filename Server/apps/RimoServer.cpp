@@ -1,6 +1,7 @@
-#include <iostream>
-#include "RimoServer.h"
+#include "RimoServer.hpp"
+
 #include <chrono>
+#include <iostream>
 
 int main(int argc, char** argv) {
   std::cout << "Hello World!\n";

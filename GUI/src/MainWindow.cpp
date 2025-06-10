@@ -33,6 +33,7 @@ MainWindow::MainWindow(QWidget* parent)
     motStat->setBrake(utl::ELEDState::Off);
     motStat->setEnabled(utl::ELEDState::Error);
   }
+  client.setMotorStatsPtr(&motorStats);
   client.spawn();
 }
 

@@ -1,5 +1,7 @@
 #include "MotorStats.hpp"
 
+#include <QMetaObject>
+
 #include "ui_motorstats.h"
 
 MotorStats::MotorStats(QWidget* parent)
@@ -26,6 +28,11 @@ void MotorStats::setBrake(const utl::ELEDState value) const {
 void MotorStats::setEnabled(const utl::ELEDState value) const {
   ui->enaLED->setState(value);
 }
-void MotorStats::setMotorName(const QString& name) const {
-  ui->groupBox->setTitle(name);
+void MotorStats::setMotorName(const std::string& name) const {
+  ui->groupBox->setTitle(name.c_str());
+}
+
+void MotorStats::configure(const utl::SingleMotorStatus& s) {
+  QMetaObject::invokeMethod(
+      this, [&]() { configure_backend(s); }, Qt::QueuedConnection);
 }

@@ -1,12 +1,12 @@
 #include <QApplication>
-
+#include <logger.hpp>
 #include "MainWindow.hpp"
 int main(int argc, char* argv[]) {
-
+  utl::configure_logger();
   QApplication a(argc, argv);
   QApplication::setStyle("Fusion");
   MainWindow w;
   w.show();
-  auto retCode =QApplication::exec();
+  const auto retCode =QApplication::exec();
   return retCode;
 }

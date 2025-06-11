@@ -3,9 +3,10 @@
 //
 
 #include "RimoClient.hpp"
-#include "logger.hpp"
 
 #include <print>
+
+#include "logger.hpp"
 
 using namespace std::chrono_literals;
 
@@ -30,13 +31,12 @@ void RimoClient::subscriberThread() {
   subscriber.set(zmq::sockopt::subscribe, "");
   while (m_running) {
     zmq::message_t message;
-    auto result = subscriber.recv(message);
-    if (!result) continue;
+    if (!subscriber.recv(message)) continue;
     auto msg_str = message.to_string();
-    //std::print("received:\n\t result: {} \n\tmessage {}\n", *result, msg_str);
+    SPDLOG_DEBUG("Received message from publisher!");
+    SPDLOG_TRACE("message:\n{}", msg_str);
     auto [motors] = YAML::Load(msg_str).as<RobotStatus>();
-    if (!_motorStats)
-      continue;
+    if (!_motorStats) continue;
     for (const auto& [m, s] : motors) {
       if (_motorStats->contains(m)) {
         _motorStats->at(m)->configure(s);

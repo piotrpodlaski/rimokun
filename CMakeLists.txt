@@ -27,11 +27,8 @@ FetchContent_Declare(
         GIT_REPOSITORY https://github.com/gabime/spdlog.git
         GIT_TAG v1.15.3
 )
-
-FetchContent_MakeAvailable(yaml-cpp)
-FetchContent_MakeAvailable(magic_enum)
-FetchContent_MakeAvailable(cppzmq)
-FetchContent_MakeAvailable(spdlog)
+option(CPPZMQ_BUILD_TESTS OFF)
+FetchContent_MakeAvailable(yaml-cpp magic_enum cppzmq spdlog)
 
 add_compile_definitions(SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_DEBUG)
 add_compile_definitions(SPDLOG_COMPILED_LIB)

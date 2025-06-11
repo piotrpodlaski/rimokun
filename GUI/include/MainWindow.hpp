@@ -24,9 +24,6 @@ class MainWindow : public QMainWindow {
   explicit MainWindow(QWidget *parent = nullptr);
   ~MainWindow() override;
 
- private slots:
-  static void on_pushButton_clicked();
-
  private:
   utl::RimoClient client;
   Ui::MainWindow *ui;

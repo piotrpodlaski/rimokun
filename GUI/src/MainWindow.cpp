@@ -6,6 +6,7 @@
 // "ui_MainWindow.h" resolved
 
 #include "MainWindow.hpp"
+#include <QTimer>
 
 #include <print>
 
@@ -14,12 +15,10 @@
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent), ui(new Ui::MainWindow) {
   ui->setupUi(this);
-  connect(ui->pushButton_2, &QPushButton::released, this,
-          &MainWindow::on_pushButton_clicked);
 
   motorStats[utl::EMotor::XLeft] = ui->mot1;
-  motorStats[utl::EMotor::XRight] = ui->mot2;
-  motorStats[utl::EMotor::YLeft] = ui->mot3;
+  motorStats[utl::EMotor::XRight] = ui->mot3;
+  motorStats[utl::EMotor::YLeft] = ui->mot2;
   motorStats[utl::EMotor::YRight] = ui->mot4;
   motorStats[utl::EMotor::ZLeft] = ui->mot5;
   motorStats[utl::EMotor::ZRight] = ui->mot6;
@@ -35,8 +34,9 @@ MainWindow::MainWindow(QWidget* parent)
   }
   client.setMotorStatsPtr(&motorStats);
   client.spawn();
+  QTimer::singleShot(1000, [&]() { ui->widget->moveRedTo({100, 200}); });
+  QTimer::singleShot(2000, [&]() { ui->widget->moveGreenTo({200, 200}); });
+  QTimer::singleShot(3000, [&]() { ui->widget->moveBlueTo({300, 200}); });
 }
 
 MainWindow::~MainWindow() { delete ui; }
-
-void MainWindow::on_pushButton_clicked() { std::print("dupa\n"); }

@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <iostream>
+#include <numbers>
 
 #include "logger.hpp"
 
@@ -28,9 +29,23 @@ RobotStatus prepareFakeStatus() {
       {EMotor::YRight, 1}, {EMotor::ZLeft, 1}, {EMotor::ZRight, 1}};
 
   const std::map<EMotor, double> phases = {
-      {EMotor::XLeft, 0},  {EMotor::YLeft, 0}, {EMotor::XRight, 0},
+      {EMotor::XLeft, 0},  {EMotor::YLeft, std::numbers::pi/2}, {EMotor::XRight, 0},
       {EMotor::YRight, 0}, {EMotor::ZLeft, 0}, {EMotor::ZRight, 0}};
+  const std::vector<std::pair<EMotor, EMotorStatusFlags>> vFlags = {
+      {EMotor::XLeft, EMotorStatusFlags::BrakeApplied},
+      {EMotor::XLeft, EMotorStatusFlags::Enabled},
+      {EMotor::YLeft, EMotorStatusFlags::BrakeApplied},
+      {EMotor::YLeft, EMotorStatusFlags::Enabled},
+      {EMotor::XRight, EMotorStatusFlags::BrakeApplied},
+      {EMotor::XRight, EMotorStatusFlags::Enabled},
+      {EMotor::YRight, EMotorStatusFlags::BrakeApplied},
+      {EMotor::YRight, EMotorStatusFlags::Enabled},
+      {EMotor::ZLeft, EMotorStatusFlags::BrakeApplied},
+      {EMotor::ZLeft, EMotorStatusFlags::Enabled},
+      {EMotor::ZRight, EMotorStatusFlags::BrakeApplied},
+      {EMotor::ZRight, EMotorStatusFlags::Enabled}};
 
+  auto flagForNow = vFlags.at(static_cast<int>(3 * t) % vFlags.size());
   for (const auto& motor : motors) {
     const auto A = amplitudes.at(motor);
     const auto omega = omegas.at(motor);
@@ -42,6 +57,8 @@ RobotStatus prepareFakeStatus() {
         .speed = A * omega * std::cos(omega * t + phase),
         .torque = static_cast<int>(
             10 * std::fabs(omega * omega * std::sin(omega * t + phase)))};
+    if (motor == flagForNow.first)
+      status.motors[motor].flags[flagForNow.second] = ELEDState::On;
   }
   t += dt;
   return status;

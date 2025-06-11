@@ -1,0 +1,27 @@
+#pragma once
+
+#include <QGraphicsRectItem>
+#include <QGraphicsObject>
+#include <QColor>
+#include <QPropertyAnimation>
+
+class RobotAluBeam : public QObject, public QGraphicsRectItem {
+  Q_OBJECT
+  Q_PROPERTY(QPointF pos READ pos WRITE setPos)
+
+public:
+  RobotAluBeam(const QRectF& rect, const QColor& color, QGraphicsItem* parent = nullptr)
+      : QGraphicsRectItem(rect, parent) {
+    setBrush(color);
+    setFlag(QGraphicsItem::ItemIsMovable); // optional manual dragging
+  }
+
+public slots:
+    void moveTo(const QPointF& target) {
+    auto* anim = new QPropertyAnimation(this, "pos");
+    anim->setDuration(500);
+    anim->setEndValue(target);
+    anim->setEasingCurve(QEasingCurve::InOutQuad);
+    anim->start(QAbstractAnimation::DeleteWhenStopped);
+  }
+};

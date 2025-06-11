@@ -1,6 +1,6 @@
 #include "VMotorStats.hpp"
 
-void VMotorStats::configure_backend(const utl::SingleMotorStatus& s) const {
+void VMotorStats::configure(const utl::SingleMotorStatus& s) const {
   setCurrentPosition(s.currentPosition);
   setTargetPosition(s.targetPosition);
   setTorque(s.torque);

@@ -1,9 +1,10 @@
 #include "MotorStats.hpp"
+
+#include <QMetaObject>
 #include <format>
 #include <print>
 
-#include <QMetaObject>
-
+#include "spdlog/spdlog.h"
 #include "ui_motorstats.h"
 
 MotorStats::MotorStats(QWidget* parent)
@@ -36,11 +37,23 @@ void MotorStats::setBrake(const utl::ELEDState value) const {
 void MotorStats::setEnabled(const utl::ELEDState value) const {
   ui->enaLED->setState(value);
 }
-void MotorStats::setMotorName(const std::string& name) const {
-  ui->groupBox->setTitle(name.c_str());
+// void MotorStats::setMotorName(const std::string& name) const {
+//   ui->groupBox->setTitle(name.c_str());
+// }
+
+void MotorStats::setMotorId(utl::EMotor mot) {
+  motorId = mot;
+  motorName=magic_enum::enum_name(mot);
+  ui->groupBox->setTitle(motorName.c_str());
 }
 
-void MotorStats::configure(const utl::SingleMotorStatus& s) {
-  QMetaObject::invokeMethod(
-      this, [&]() { configure_backend(s); }, Qt::QueuedConnection);
+void MotorStats::handleUpdate(const utl::RobotStatus& rs) {
+  if (!rs.motors.contains(motorId)) {
+    SPDLOG_WARN("Update came without data for {} motor! Doing nothing.",
+                motorName);
+    return;
+  }
+  const auto motData = rs.motors.at(motorId);
+  configure(motData);
 }
+

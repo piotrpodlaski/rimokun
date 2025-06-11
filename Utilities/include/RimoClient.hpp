@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include <thread>
+#include <optional>
 
 #include "zmq.hpp"
 #include "VMotorStats.hpp"
@@ -14,18 +14,14 @@ namespace utl {
 class RimoClient {
  public:
   RimoClient() = default;
-  ~RimoClient();
-  void spawn();
-  void stop();
-  bool isRunning() const;
-  void setMotorStatsPtr(MotorStatsMap_t* stat);
+  ~RimoClient() = default;
+  void init();
+  std::optional<RobotStatus> receiveRobotStatus();
 
  private:
   bool m_running = false;
-  void subscriberThread();
   zmq::context_t _context;
-  std::thread _subscriberThread;
-  MotorStatsMap_t* _motorStats{nullptr};
+  zmq::socket_t _socket;
 };
 
 }  // namespace utl

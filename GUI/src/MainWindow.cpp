@@ -6,8 +6,8 @@
 // "ui_MainWindow.h" resolved
 
 #include "MainWindow.hpp"
-#include <QTimer>
 
+#include <QTimer>
 #include <print>
 
 #include "ui_MainWindow.h"
@@ -24,16 +24,18 @@ MainWindow::MainWindow(QWidget* parent)
   motorStats[utl::EMotor::ZRight] = ui->mot6;
 
   for (auto& [eMot, motStat] : motorStats) {
-    motStat->setMotorName(magic_enum::enum_name(eMot).data());
+    motStat->setMotorId(eMot);
     motStat->setCurrentPosition(4010.2);
     motStat->setSpeed(2137);
     motStat->setTargetPosition(420);
     motStat->setTorque(69);
     motStat->setBrake(utl::ELEDState::Off);
     motStat->setEnabled(utl::ELEDState::Error);
+    connect(&updater, &Updater::newDataArrived,
+            dynamic_cast<MotorStats*>(motStat), &MotorStats::handleUpdate);
   }
-  client.setMotorStatsPtr(&motorStats);
-  client.spawn();
+  updater.startUpdaterThread();
+
   QTimer::singleShot(1000, [&]() { ui->widget->moveRedTo({100, 200}); });
   QTimer::singleShot(2000, [&]() { ui->widget->moveGreenTo({200, 200}); });
   QTimer::singleShot(3000, [&]() { ui->widget->moveBlueTo({300, 200}); });

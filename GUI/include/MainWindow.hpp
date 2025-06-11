@@ -9,7 +9,7 @@
 
 #include "CommonDefinitions.hpp"
 #include "MotorStats.hpp"
-#include "RimoClient.hpp"
+#include "Updater.hpp"
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -25,7 +25,7 @@ class MainWindow : public QMainWindow {
   ~MainWindow() override;
 
  private:
-  utl::RimoClient client;
+  Updater updater;
   Ui::MainWindow *ui;
   utl::MotorStatsMap_t motorStats;
 };

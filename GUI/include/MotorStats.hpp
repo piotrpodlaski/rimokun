@@ -22,10 +22,14 @@ class MotorStats : public QWidget, public VMotorStats {
   void setTargetPosition(double value) const override;
   void setBrake(utl::ELEDState value) const override;
   void setEnabled(utl::ELEDState value) const override;
-  void setMotorName(const std::string& name) const override;
-  void configure(const utl::SingleMotorStatus& s) override;
+  void setMotorId(utl::EMotor id) override;
+
+  public slots:
+  void handleUpdate(const utl::RobotStatus&);
 
 
  private:
+  std::string motorName;
   Ui::MotorStats* ui;
+  utl::EMotor motorId;
 };

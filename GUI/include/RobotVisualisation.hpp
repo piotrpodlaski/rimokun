@@ -9,15 +9,15 @@
 class RobotVisualisation : public QWidget {
   Q_OBJECT
 
-public:
+ public:
   explicit RobotVisualisation(QWidget* parent = nullptr);
 
-public slots:
+ public slots:
   void moveRedTo(const QPointF& pos) const;
   void moveGreenTo(const QPointF& pos) const;
   void moveBlueTo(const QPointF& pos) const;
 
-private:
+ private:
   QGraphicsScene* scene_;
   RobotAluBeam* red_;
   RobotAluBeam* green_;

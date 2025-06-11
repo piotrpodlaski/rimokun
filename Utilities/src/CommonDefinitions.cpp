@@ -4,7 +4,4 @@
 
 #include "CommonDefinitions.hpp"
 
-namespace utl {
-
-
-}
+namespace utl {}

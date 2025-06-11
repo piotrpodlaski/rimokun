@@ -2,6 +2,7 @@
 
 #include <QColor>
 #include <QWidget>
+
 #include "CommonDefinitions.hpp"
 
 class LedIndicator final : public QWidget {
@@ -11,7 +12,6 @@ class LedIndicator final : public QWidget {
   explicit LedIndicator(QWidget* parent = nullptr);
 
   ~LedIndicator() override = default;
-
 
   void setState(utl::ELEDState state);
   [[nodiscard]] utl::ELEDState state() const;

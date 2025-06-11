@@ -1,23 +1,24 @@
 #pragma once
 
-#include <QGraphicsRectItem>
-#include <QGraphicsObject>
 #include <QColor>
+#include <QGraphicsObject>
+#include <QGraphicsRectItem>
 #include <QPropertyAnimation>
 
 class RobotAluBeam : public QObject, public QGraphicsRectItem {
   Q_OBJECT
   Q_PROPERTY(QPointF pos READ pos WRITE setPos)
 
-public:
-  RobotAluBeam(const QRectF& rect, const QColor& color, QGraphicsItem* parent = nullptr)
+ public:
+  RobotAluBeam(const QRectF& rect, const QColor& color,
+               QGraphicsItem* parent = nullptr)
       : QGraphicsRectItem(rect, parent) {
     setBrush(color);
-    setFlag(QGraphicsItem::ItemIsMovable); // optional manual dragging
+    setFlag(QGraphicsItem::ItemIsMovable);  // optional manual dragging
   }
 
-public slots:
-    void moveTo(const QPointF& target) {
+ public slots:
+  void moveTo(const QPointF& target) {
     auto* anim = new QPropertyAnimation(this, "pos");
     anim->setDuration(500);
     anim->setEndValue(target);

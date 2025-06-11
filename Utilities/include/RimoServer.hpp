@@ -18,7 +18,6 @@ class RimoServer {
   void publish(const RobotStatus &robot);
 
  private:
-
   zmq::context_t _context;
   zmq::socket_t _socket;
 };

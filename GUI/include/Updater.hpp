@@ -14,10 +14,10 @@ class Updater final : public QObject {
   void startUpdaterThread();
   void stopUpdaterThread();
 
-  signals:
+ signals:
   void newDataArrived(const utl::RobotStatus& staus);
 
-  private:
+ private:
   void runner();
   bool running{false};
 

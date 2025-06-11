@@ -2,9 +2,7 @@
 
 #include "logger.hpp"
 
-Updater::Updater(QObject* parent) : QObject(parent) {
-  client.init();
-}
+Updater::Updater(QObject* parent) : QObject(parent) { client.init(); }
 
 Updater::~Updater() { stopUpdaterThread(); }
 

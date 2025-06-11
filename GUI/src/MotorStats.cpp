@@ -14,9 +14,9 @@ MotorStats::MotorStats(QWidget* parent)
 
 namespace {
 QString formatNumber(const double value) {
-    return QString::number(value,'f',1);
-  }
+  return QString::number(value, 'f', 1);
 }
+}  // namespace
 
 MotorStats::~MotorStats() { delete ui; }
 void MotorStats::setTorque(const int value) const {
@@ -43,7 +43,7 @@ void MotorStats::setEnabled(const utl::ELEDState value) const {
 
 void MotorStats::setMotorId(utl::EMotor mot) {
   motorId = mot;
-  motorName=magic_enum::enum_name(mot);
+  motorName = magic_enum::enum_name(mot);
   ui->groupBox->setTitle(motorName.c_str());
 }
 
@@ -56,4 +56,3 @@ void MotorStats::handleUpdate(const utl::RobotStatus& rs) {
   const auto motData = rs.motors.at(motorId);
   configure(motData);
 }
-

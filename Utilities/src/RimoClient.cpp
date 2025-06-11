@@ -12,7 +12,6 @@ using namespace std::chrono_literals;
 
 namespace utl {
 
-
 void RimoClient::init() {
   SPDLOG_INFO("Initializing RimoClient");
   _socket = zmq::socket_t(_context, zmq::socket_type::sub);

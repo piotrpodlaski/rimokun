@@ -29,8 +29,9 @@ RobotStatus prepareFakeStatus() {
       {EMotor::YRight, 1}, {EMotor::ZLeft, 1}, {EMotor::ZRight, 1}};
 
   const std::map<EMotor, double> phases = {
-      {EMotor::XLeft, 0},  {EMotor::YLeft, std::numbers::pi/2}, {EMotor::XRight, 0},
-      {EMotor::YRight, 0}, {EMotor::ZLeft, 0}, {EMotor::ZRight, 0}};
+      {EMotor::XLeft, 0},  {EMotor::YLeft, std::numbers::pi / 2},
+      {EMotor::XRight, 0}, {EMotor::YRight, 0},
+      {EMotor::ZLeft, 0},  {EMotor::ZRight, 0}};
   const std::vector<std::pair<EMotor, EMotorStatusFlags>> vFlags = {
       {EMotor::XLeft, EMotorStatusFlags::BrakeApplied},
       {EMotor::XLeft, EMotorStatusFlags::Enabled},

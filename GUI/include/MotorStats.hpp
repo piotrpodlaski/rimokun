@@ -24,9 +24,8 @@ class MotorStats : public QWidget, public VMotorStats {
   void setEnabled(utl::ELEDState value) const override;
   void setMotorId(utl::EMotor id) override;
 
-  public slots:
+ public slots:
   void handleUpdate(const utl::RobotStatus&);
-
 
  private:
   std::string motorName;

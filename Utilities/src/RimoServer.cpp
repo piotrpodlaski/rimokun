@@ -16,21 +16,19 @@ using namespace std::chrono_literals;
 
 namespace utl {
 
- RimoServer::RimoServer() {
-   _socket = zmq::socket_t(_context, zmq::socket_type::pub);
-   _socket.bind("ipc:///tmp/rimo_server");
- }
+RimoServer::RimoServer() {
+  _socket = zmq::socket_t(_context, zmq::socket_type::pub);
+  _socket.bind("ipc:///tmp/rimo_server");
+}
 
 void RimoServer::publish(const RobotStatus& robot) {
-   auto node = YAML::convert<RobotStatus>::encode(robot);
-   auto yaml_str = YAML::Dump(node);
-   zmq::message_t msg(yaml_str);
-   _socket.send(msg, zmq::send_flags::none);
-   SPDLOG_DEBUG("Published new RobotStatus");
-   SPDLOG_TRACE("RobotStatus: \n {}", yaml_str);
- }
-
-
+  const auto node = YAML::convert<RobotStatus>::encode(robot);
+  const auto yaml_str = YAML::Dump(node);
+  zmq::message_t msg(yaml_str);
+  _socket.send(msg, zmq::send_flags::none);
+  SPDLOG_DEBUG("Published new RobotStatus");
+  SPDLOG_TRACE("RobotStatus: \n {}", yaml_str);
+}
 
 // void RimoServer::publisherThread() {
 //   double t=0;
@@ -64,6 +62,5 @@ void RimoServer::publish(const RobotStatus& robot) {
 //     std::this_thread::sleep_for(50ms  );
 //   }
 // }
-
 
 }  // namespace utl

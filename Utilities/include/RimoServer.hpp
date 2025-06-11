@@ -7,18 +7,20 @@
 #include <thread>
 #include <zmq.hpp>
 
+#include "CommonDefinitions.hpp"
+
 namespace utl {
 
 class RimoServer {
  public:
-  RimoServer()=default;
-  ~RimoServer()=default;
-  void spawn();
+  RimoServer();
+  ~RimoServer() = default;
+  void publish(const RobotStatus &robot);
 
  private:
-  void publisherThread();
+
   zmq::context_t _context;
-  std::thread _publisherThread;
+  zmq::socket_t _socket;
 };
 
 }  // namespace utl

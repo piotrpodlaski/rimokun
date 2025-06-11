@@ -3,6 +3,7 @@ project(rimokun)
 
 set(CMAKE_CXX_STANDARD 23)
 
+
 include(FetchContent)
 FetchContent_Declare(
         yaml-cpp
@@ -21,9 +22,19 @@ FetchContent_Declare(
         GIT_TAG v4.10.0
 )
 
+FetchContent_Declare(
+        spdlog
+        GIT_REPOSITORY https://github.com/gabime/spdlog.git
+        GIT_TAG v1.15.3
+)
+
 FetchContent_MakeAvailable(yaml-cpp)
 FetchContent_MakeAvailable(magic_enum)
 FetchContent_MakeAvailable(cppzmq)
+FetchContent_MakeAvailable(spdlog)
+
+add_compile_definitions(SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_DEBUG)
+add_compile_definitions(SPDLOG_COMPILED_LIB)
 
 
 add_subdirectory(Utilities)

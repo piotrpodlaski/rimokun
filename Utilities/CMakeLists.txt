@@ -10,4 +10,4 @@ target_include_directories(utilities
         ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-target_link_libraries(utilities PRIVATE magic_enum cppzmq)
+target_link_libraries(utilities PRIVATE magic_enum cppzmq spdlog)

@@ -23,7 +23,7 @@ class MotorStats : public QWidget, public VMotorStats {
   void setBrake(utl::ELEDState value) const override;
   void setEnabled(utl::ELEDState value) const override;
   void setMotorName(const std::string& name) const override;
-  void configure(const utl::SingleMotorStatus& s);
+  void configure(const utl::SingleMotorStatus& s) override;
 
 
  private:

@@ -3,6 +3,7 @@
 //
 
 #include "RimoClient.hpp"
+#include "logger.hpp"
 
 #include <print>
 
@@ -11,10 +12,10 @@ using namespace std::chrono_literals;
 namespace utl {
 void RimoClient::spawn() {
   if (m_running) {
-    std::print("Thread already running!\n");
+    SPDLOG_WARN("Thread is already running!");
     return;
   }
-  std::print("spawning thread!!\n");
+  SPDLOG_INFO("Spawning subscriber thread");
   if (_subscriberThread.joinable()) {
     _subscriberThread.join();
   }

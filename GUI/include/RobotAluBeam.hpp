@@ -14,13 +14,12 @@ class RobotAluBeam : public QObject, public QGraphicsRectItem {
                QGraphicsItem* parent = nullptr)
       : QGraphicsRectItem(rect, parent) {
     setBrush(color);
-    setFlag(QGraphicsItem::ItemIsMovable);  // optional manual dragging
   }
 
  public slots:
   void moveTo(const QPointF& target) {
     auto* anim = new QPropertyAnimation(this, "pos");
-    anim->setDuration(500);
+    anim->setDuration(50);
     anim->setEndValue(target);
     anim->setEasingCurve(QEasingCurve::InOutQuad);
     anim->start(QAbstractAnimation::DeleteWhenStopped);

@@ -5,25 +5,28 @@
 
 RobotVisualisation::RobotVisualisation(QWidget* parent) : QWidget(parent) {
   auto layout = new QVBoxLayout;
-  auto view = new QGraphicsView;
-  layout->addWidget(view);
+  view_ = new QGraphicsView;
+  layout->addWidget(view_);
   setLayout(layout);
 
   scene_ = new QGraphicsScene(this);
-  scene_->setSceneRect(0, 0, 400, 300);
-  view->setScene(scene_);
+  scene_->setSceneRect(0, 0, 700 , 300);
+  view_->setRenderHint(QPainter::Antialiasing);
+  view_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+  view_->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+  view_->setScene(scene_);
 
-  red_ = new RobotAluBeam(QRectF(0, 0, 50, 50), Qt::red);
-  green_ = new RobotAluBeam(QRectF(0, 0, 50, 50), Qt::green);
-  blue_ = new RobotAluBeam(QRectF(0, 0, 50, 50), Qt::blue);
+  blue_ = new RobotAluBeam(QRectF(0, 0, 700, 20), Qt::blue);
+  red_ = new RobotAluBeam(QRectF(0, 0, 15, 200), Qt::red);
+  green_ = new RobotAluBeam(QRectF(0, 0, 15, 200), Qt::green);
 
+  blue_->setPos(0, 50);
   red_->setPos(50, 50);
   green_->setPos(150, 50);
-  blue_->setPos(250, 50);
 
+  scene_->addItem(blue_);
   scene_->addItem(red_);
   scene_->addItem(green_);
-  scene_->addItem(blue_);
 }
 
 void RobotVisualisation::moveRedTo(const QPointF& pos) const {
@@ -37,3 +40,20 @@ void RobotVisualisation::moveGreenTo(const QPointF& pos) const {
 void RobotVisualisation::moveBlueTo(const QPointF& pos) const {
   blue_->moveTo(pos);
 }
+
+void RobotVisualisation::resizeEvent(QResizeEvent* event) {
+  QWidget::resizeEvent(event);
+  //scene_->setSceneRect(0, 0, view_->viewport()->width(), view_->viewport()->height());
+  view_->fitInView(scene_->sceneRect(), Qt::KeepAspectRatio);
+}
+
+void RobotVisualisation::updateRobotPosition(const utl::RobotStatus& rs) const {
+  auto xL = rs.motors.at(utl::EMotor::XLeft).currentPosition;
+  auto yL = rs.motors.at(utl::EMotor::YLeft).currentPosition;
+  moveGreenTo({xL, yL});
+
+  auto xR = rs.motors.at(utl::EMotor::XRight).currentPosition;
+  auto yR = rs.motors.at(utl::EMotor::YRight).currentPosition;
+  moveRedTo({xR, yR});
+}
+

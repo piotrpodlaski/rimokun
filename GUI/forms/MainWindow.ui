@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>854</width>
-    <height>740</height>
+    <width>881</width>
+    <height>693</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -229,7 +229,20 @@
     <item>
      <layout class="QHBoxLayout" name="horizontalLayout_5">
       <item>
-       <widget class="RobotVisualisation" name="widget" native="true"/>
+       <widget class="RobotVisualisation" name="widget" native="true">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="minimumSize">
+         <size>
+          <width>700</width>
+          <height>300</height>
+         </size>
+        </property>
+       </widget>
       </item>
       <item>
        <spacer name="horizontalSpacer">
@@ -266,7 +279,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>854</width>
+     <width>881</width>
      <height>23</height>
     </rect>
    </property>

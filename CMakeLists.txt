@@ -27,8 +27,14 @@ FetchContent_Declare(
         GIT_REPOSITORY https://github.com/gabime/spdlog.git
         GIT_TAG v1.15.3
 )
+
+FetchContent_Declare(
+        argparse
+        GIT_REPOSITORY https://github.com/p-ranav/argparse.git
+        GIT_TAG v3.2
+)
 option(CPPZMQ_BUILD_TESTS OFF)
-FetchContent_MakeAvailable(yaml-cpp magic_enum cppzmq spdlog)
+FetchContent_MakeAvailable(yaml-cpp magic_enum cppzmq spdlog argparse)
 
 add_compile_definitions(SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_DEBUG)
 add_compile_definitions(SPDLOG_COMPILED_LIB)

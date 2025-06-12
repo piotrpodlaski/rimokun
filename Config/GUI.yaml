@@ -1,0 +1,18 @@
+classes:
+  RobotVisualisation:
+    scene:
+      width: 4000
+      height: 1500
+    beams:
+      top:
+        width: 4000
+        height: 160
+        color: "#555555"
+      left:
+        width: 40
+        height: 1500
+        color: green
+      right:
+        width: 40
+        height: 1500
+        color: red

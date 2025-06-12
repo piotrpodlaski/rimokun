@@ -3,6 +3,7 @@
 
 #include "MainWindow.hpp"
 #include "argparse/argparse.hpp"
+#include "Config.hpp"
 
 #include <filesystem>
 namespace fs = std::filesystem;
@@ -33,6 +34,8 @@ int main(int argc, char* argv[]) {
     SPDLOG_CRITICAL("Config file '{}' not found! Exiting.", configPath);
     std::exit(1);
   }
+
+  utl::Config::instance().setConfigPath(configPath);
 
   QApplication a(argc, argv);
   QApplication::setStyle("Fusion");

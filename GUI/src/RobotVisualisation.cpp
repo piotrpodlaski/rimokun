@@ -4,21 +4,20 @@
 #include <QVBoxLayout>
 
 RobotVisualisation::RobotVisualisation(QWidget* parent) : QWidget(parent) {
-  auto layout = new QVBoxLayout;
+  auto layout = new QVBoxLayout(this);
   view_ = new QGraphicsView;
   layout->addWidget(view_);
-  setLayout(layout);
 
   scene_ = new QGraphicsScene(this);
-  scene_->setSceneRect(0, 0, 700 , 300);
+  scene_->setSceneRect(0, 0, 4000 , 1500);
   view_->setRenderHint(QPainter::Antialiasing);
   view_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
   view_->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
   view_->setScene(scene_);
 
-  blue_ = new RobotAluBeam(QRectF(0, 0, 700, 20), Qt::blue);
-  red_ = new RobotAluBeam(QRectF(0, 0, 15, 200), Qt::red);
-  green_ = new RobotAluBeam(QRectF(0, 0, 15, 200), Qt::green);
+  blue_ = new RobotAluBeam(QRectF(0, 0, 4000, 160), Qt::blue);
+  red_ = new RobotAluBeam(QRectF(0, 0, 40, 1500), Qt::red);
+  green_ = new RobotAluBeam(QRectF(0, 0, 40, 1500), Qt::green);
 
   blue_->setPos(0, 50);
   red_->setPos(50, 50);
@@ -27,6 +26,8 @@ RobotVisualisation::RobotVisualisation(QWidget* parent) : QWidget(parent) {
   scene_->addItem(blue_);
   scene_->addItem(red_);
   scene_->addItem(green_);
+  scene_->addRect(scene_->sceneRect(), QPen(Qt::black), Qt::NoBrush);
+  view_->fitInView(scene_->sceneRect(), Qt::KeepAspectRatio);
 }
 
 void RobotVisualisation::moveRedTo(const QPointF& pos) const {

@@ -26,7 +26,6 @@ void Updater::runner() {
   while (running) {
     auto status = client.receiveRobotStatus();
     if (!status) {
-      SPDLOG_WARN("Errors during communication with publisher!");
       continue;
     }
     emit newDataArrived(*status);

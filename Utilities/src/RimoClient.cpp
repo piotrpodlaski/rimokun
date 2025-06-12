@@ -17,11 +17,15 @@ void RimoClient::init() {
   _socket = zmq::socket_t(_context, zmq::socket_type::sub);
   _socket.connect("ipc:///tmp/rimo_server");
   _socket.set(zmq::sockopt::subscribe, "");
+  _socket.set(zmq::sockopt::rcvtimeo, 1000);
 }
 
 std::optional<RobotStatus> RimoClient::receiveRobotStatus() {
   zmq::message_t message;
-  if (!_socket.recv(message)) return std::nullopt;
+  if (const auto status = _socket.recv(message); !status) {
+    SPDLOG_WARN("RimoClient message receive timeout. Make sure rimoServer is running!");
+    return std::nullopt;
+  }
   const auto msg_str = message.to_string();
   SPDLOG_DEBUG("Received message from publisher!");
   SPDLOG_TRACE("message:\n{}", msg_str);

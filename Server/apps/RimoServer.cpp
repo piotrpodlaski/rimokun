@@ -17,11 +17,11 @@ RobotStatus prepareFakeStatus() {
   const std::vector motors = {EMotor::XLeft,  EMotor::XRight, EMotor::YLeft,
                               EMotor::YRight, EMotor::ZLeft,  EMotor::ZRight};
   const std::map<EMotor, double> amplitudes = {
-      {EMotor::XLeft, 100},  {EMotor::YLeft, 30}, {EMotor::XRight, 100},
+      {EMotor::XLeft, 100}, {EMotor::YLeft, 30},  {EMotor::XRight, 100},
       {EMotor::YRight, 30}, {EMotor::ZLeft, 100}, {EMotor::ZRight, 100}};
 
   const std::map<EMotor, double> offsets = {
-      {EMotor::XLeft, 150},  {EMotor::YLeft, 20}, {EMotor::XRight, 500},
+      {EMotor::XLeft, 150}, {EMotor::YLeft, 20},  {EMotor::XRight, 500},
       {EMotor::YRight, 20}, {EMotor::ZLeft, 100}, {EMotor::ZRight, 100}};
 
   const std::map<EMotor, double> omegas = {
@@ -46,7 +46,7 @@ RobotStatus prepareFakeStatus() {
       {EMotor::ZRight, EMotorStatusFlags::BrakeApplied},
       {EMotor::ZRight, EMotorStatusFlags::Enabled}};
 
-  auto flagForNow = vFlags.at(static_cast<int>(3 * t) % vFlags.size());
+  auto [fst, snd] = vFlags.at(static_cast<int>(3 * t) % vFlags.size());
   for (const auto& motor : motors) {
     const auto A = amplitudes.at(motor);
     const auto omega = omegas.at(motor);
@@ -58,8 +58,7 @@ RobotStatus prepareFakeStatus() {
         .speed = A * omega * std::cos(omega * t + phase),
         .torque = static_cast<int>(
             10 * std::fabs(omega * omega * std::sin(omega * t + phase)))};
-    if (motor == flagForNow.first)
-      status.motors[motor].flags[flagForNow.second] = ELEDState::On;
+    if (motor == fst) status.motors[motor].flags[snd] = ELEDState::On;
   }
   t += dt;
   return status;

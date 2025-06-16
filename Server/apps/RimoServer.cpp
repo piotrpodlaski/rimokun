@@ -17,12 +17,12 @@ RobotStatus prepareFakeStatus() {
   const std::vector motors = {EMotor::XLeft,  EMotor::XRight, EMotor::YLeft,
                               EMotor::YRight, EMotor::ZLeft,  EMotor::ZRight};
   const std::map<EMotor, double> amplitudes = {
-      {EMotor::XLeft, 100}, {EMotor::YLeft, 30},  {EMotor::XRight, 100},
-      {EMotor::YRight, 30}, {EMotor::ZLeft, 100}, {EMotor::ZRight, 100}};
+      {EMotor::XLeft, 500}, {EMotor::YLeft, 300},  {EMotor::XRight, 500},
+      {EMotor::YRight, 300}, {EMotor::ZLeft, 100}, {EMotor::ZRight, 100}};
 
   const std::map<EMotor, double> offsets = {
-      {EMotor::XLeft, 150}, {EMotor::YLeft, 20},  {EMotor::XRight, 500},
-      {EMotor::YRight, 20}, {EMotor::ZLeft, 100}, {EMotor::ZRight, 100}};
+      {EMotor::XLeft, 1500}, {EMotor::YLeft, -500},  {EMotor::XRight, 3000},
+      {EMotor::YRight, -500}, {EMotor::ZLeft, 100}, {EMotor::ZRight, 100}};
 
   const std::map<EMotor, double> omegas = {
       {EMotor::XLeft, 2},  {EMotor::YLeft, 2}, {EMotor::XRight, 1},

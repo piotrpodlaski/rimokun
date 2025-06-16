@@ -37,10 +37,6 @@ MainWindow::MainWindow(QWidget* parent)
   updater.startUpdaterThread();
 
   connect(&updater, &Updater::newDataArrived, ui->widget, &RobotVisualisation::updateRobotPosition);
-
-  QTimer::singleShot(1000, [&]() { ui->widget->moveRedTo({0, 0}); });
-  //QTimer::singleShot(2000, [&]() { ui->widget->moveGreenTo({200, 200}); });
-  //QTimer::singleShot(3000, [&]() { ui->widget->moveBlueTo({300, 200}); });
 }
 
 MainWindow::~MainWindow() { delete ui; }

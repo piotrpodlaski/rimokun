@@ -9,10 +9,10 @@ classes:
         height: 160
         color: "#555555"
       left:
-        width: 40
-        height: 1500
+        width: &arm_width 40
+        height: &arm_height 1500
         color: green
       right:
-        width: 40
-        height: 1500
+        width: *arm_width
+        height: *arm_height
         color: red

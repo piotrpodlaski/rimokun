@@ -21,6 +21,6 @@ class Updater final : public QObject {
   void runner();
   bool running{false};
 
-  utl::RimoClient client;
+  utl::RimoClient<utl::RobotStatus> client;
   std::thread updaterThread;
 };

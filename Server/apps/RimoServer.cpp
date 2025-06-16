@@ -67,7 +67,7 @@ RobotStatus prepareFakeStatus() {
 [[noreturn]] int main(int argc, char** argv) {
   configure_logger();
   std::cout << "Hello World!\n";
-  auto srv = RimoServer();
+  auto srv = RimoServer<RobotStatus>();
 
   while (true) {
     srv.publish(prepareFakeStatus());

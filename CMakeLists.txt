@@ -38,6 +38,7 @@ FetchContent_MakeAvailable(yaml-cpp magic_enum cppzmq spdlog argparse)
 
 add_compile_definitions(SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_DEBUG)
 #add_compile_definitions(SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE)
+#add_compile_definitions(SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_INFO)
 add_compile_definitions(SPDLOG_COMPILED_LIB)
 
 

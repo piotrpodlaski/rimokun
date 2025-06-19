@@ -15,13 +15,13 @@ using namespace std::chrono_literals;
 
 std::atomic tclOpen{ELEDState::Off};
 std::atomic tclClosed{ELEDState::Off};
-std::atomic tclProx{ELEDState::Off};
+std::atomic tclProx{ELEDState::Error};
 std::atomic tclValveOpen{ELEDState::Off};
 std::atomic tclValveClosed{ELEDState::Off};
 
 std::atomic tcrOpen{ELEDState::Off};
 std::atomic tcrClosed{ELEDState::Off};
-std::atomic tcrProx{ELEDState::Off};
+std::atomic tcrProx{ELEDState::Error};
 std::atomic tcrValveOpen{ELEDState::Off};
 std::atomic tcrValveClosed{ELEDState::Off};
 
@@ -96,41 +96,45 @@ void handleCommands(RimoServer<RobotStatus>& srv) {
   while (true) {
     if (auto command = srv.receiveCommand()) {
       SPDLOG_INFO("Received command:\n{}\n", YAML::Dump(*command));
+      YAML::Node node;
+      node["status"]="OK";
+      srv.sendResponse(node);
       if ((*command)["type"].as<std::string>()=="toolChanger") {
         auto position = (*command)["position"].as<EArm>();
         auto action = (*command)["action"].as<std::string>();
         if (position == EArm::Left) {
           if (action == "close") {
-            tclClosed=ELEDState::On;
-            tclOpen=ELEDState::Off;
             tclValveOpen=ELEDState::Off;
             tclValveClosed=ELEDState::On;
+            std::this_thread::sleep_for(0.5s);
+            tclClosed=ELEDState::On;
+            tclOpen=ELEDState::Off;
           }
           else if (action == "open") {
-            tclClosed=ELEDState::Off;
-            tclOpen=ELEDState::On;
             tclValveOpen=ELEDState::On;
             tclValveClosed=ELEDState::Off;
+            std::this_thread::sleep_for(0.5s);
+            tclClosed=ELEDState::Off;
+            tclOpen=ELEDState::On;
           }
         }
         else if (position == EArm::Right) {
           if (action == "close") {
-            tcrClosed=ELEDState::On;
-            tcrOpen=ELEDState::Off;
             tcrValveOpen=ELEDState::Off;
             tcrValveClosed=ELEDState::On;
+            std::this_thread::sleep_for(0.5s);
+            tcrClosed=ELEDState::On;
+            tcrOpen=ELEDState::Off;
           }
           else if (action == "open") {
-            tcrClosed=ELEDState::Off;
-            tcrOpen=ELEDState::On;
             tcrValveOpen=ELEDState::On;
             tcrValveClosed=ELEDState::Off;
+            std::this_thread::sleep_for(0.5s);
+            tcrClosed=ELEDState::Off;
+            tcrOpen=ELEDState::On;
           }
         }
       }
-      YAML::Node node;
-      node["status"]="OK";
-      srv.sendResponse(node);
     }
   }
 }

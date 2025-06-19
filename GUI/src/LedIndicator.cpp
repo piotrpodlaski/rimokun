@@ -6,6 +6,9 @@ LedIndicator::LedIndicator(QWidget* parent)
     : QWidget(parent), m_state(utl::ELEDState::Off) {
   setMinimumSize(16, 16);
 }
+LedIndicator::operator bool() const {
+  return m_state == utl::ELEDState::On;
+}
 
 void LedIndicator::setState(const utl::ELEDState state) {
   if (m_state != state) {

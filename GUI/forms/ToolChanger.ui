@@ -390,6 +390,12 @@
          <height>60</height>
         </size>
        </property>
+       <property name="font">
+        <font>
+         <pointsize>16</pointsize>
+         <bold>true</bold>
+        </font>
+       </property>
        <property name="text">
         <string>OPEN</string>
        </property>
@@ -408,6 +414,13 @@
          <width>0</width>
          <height>60</height>
         </size>
+       </property>
+       <property name="font">
+        <font>
+         <pointsize>16</pointsize>
+         <bold>true</bold>
+         <kerning>true</kerning>
+        </font>
        </property>
        <property name="text">
         <string>CLOSE</string>

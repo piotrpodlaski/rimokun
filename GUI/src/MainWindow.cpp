@@ -40,6 +40,10 @@ MainWindow::MainWindow(QWidget* parent)
   connect(&updater, &Updater::newDataArrived, robotVis, &RobotVisualisation::updateRobotStatus);
   connect(&updater, &Updater::newDataArrived, leftChanger, &ToolChanger::updateRobotStatus);
   connect(&updater, &Updater::newDataArrived, rightChanger, &ToolChanger::updateRobotStatus);
+
+  connect(leftChanger, &ToolChanger::buttonPressed, &updater, &Updater::sendCommand);
+  connect(rightChanger, &ToolChanger::buttonPressed, &updater, &Updater::sendCommand);
+
 }
 
 MainWindow::~MainWindow() { delete ui; }

@@ -22,6 +22,11 @@ void Updater::startUpdaterThread() {
   updaterThread = std::thread(&Updater::runner, this);
 }
 
+void Updater::sendCommand(const YAML::Node& command) {
+  client.sendCommand(command);
+}
+
+
 void Updater::runner() {
   while (running) {
     auto status = client.receiveRobotStatus();

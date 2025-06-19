@@ -10,6 +10,7 @@ class LedIndicator final : public QWidget {
 
  public:
   explicit LedIndicator(QWidget* parent = nullptr);
+  explicit operator bool() const;
 
   ~LedIndicator() override = default;
 

@@ -1,14 +1,29 @@
 #include "RimoServer.hpp"
 
+#include <atomic>
 #include <chrono>
 #include <iostream>
 #include <numbers>
+#include <thread>
+#include <print>
 
 #include "logger.hpp"
 
 using namespace utl;
 
 using namespace std::chrono_literals;
+
+std::atomic tclOpen{ELEDState::Off};
+std::atomic tclClosed{ELEDState::Off};
+std::atomic tclProx{ELEDState::Off};
+std::atomic tclValveOpen{ELEDState::Off};
+std::atomic tclValveClosed{ELEDState::Off};
+
+std::atomic tcrOpen{ELEDState::Off};
+std::atomic tcrClosed{ELEDState::Off};
+std::atomic tcrProx{ELEDState::Off};
+std::atomic tcrValveOpen{ELEDState::Off};
+std::atomic tcrValveClosed{ELEDState::Off};
 
 RobotStatus prepareFakeStatus() {
   static double t = 0;
@@ -61,22 +76,74 @@ RobotStatus prepareFakeStatus() {
     if (motor == fst) status.motors[motor].flags[snd] = ELEDState::On;
   }
   t += dt;
+
   status.toolChangers[EArm::Left] = {
-      .flags = {{EToolChangerStatusFlags::ClosedSen, ELEDState::On},
-                {EToolChangerStatusFlags::ClosedValve, ELEDState::On}}};
+      .flags = {{EToolChangerStatusFlags::ProxSen, tclProx},
+                {EToolChangerStatusFlags::ClosedSen, tclClosed},
+                {EToolChangerStatusFlags::OpenSen, tclOpen},
+                {EToolChangerStatusFlags::OpenValve, tclValveOpen},
+                {EToolChangerStatusFlags::ClosedValve, tclValveClosed}}};
   status.toolChangers[EArm::Right] = {
-      .flags = {{EToolChangerStatusFlags::ClosedSen, ELEDState::On},
-                {EToolChangerStatusFlags::ClosedValve, ELEDState::On}}};
+      .flags = {{EToolChangerStatusFlags::ProxSen, tcrProx},
+                {EToolChangerStatusFlags::ClosedSen, tcrClosed},
+                {EToolChangerStatusFlags::OpenSen, tcrOpen},
+                {EToolChangerStatusFlags::OpenValve, tcrValveOpen},
+                {EToolChangerStatusFlags::ClosedValve, tcrValveClosed}}};
   return status;
+}
+
+void handleCommands(RimoServer<RobotStatus>& srv) {
+  while (true) {
+    if (auto command = srv.receiveCommand()) {
+      SPDLOG_INFO("Received command:\n{}\n", YAML::Dump(*command));
+      if ((*command)["type"].as<std::string>()=="toolChanger") {
+        auto position = (*command)["position"].as<EArm>();
+        auto action = (*command)["action"].as<std::string>();
+        if (position == EArm::Left) {
+          if (action == "close") {
+            tclClosed=ELEDState::On;
+            tclOpen=ELEDState::Off;
+            tclValveOpen=ELEDState::Off;
+            tclValveClosed=ELEDState::On;
+          }
+          else if (action == "open") {
+            tclClosed=ELEDState::Off;
+            tclOpen=ELEDState::On;
+            tclValveOpen=ELEDState::On;
+            tclValveClosed=ELEDState::Off;
+          }
+        }
+        else if (position == EArm::Right) {
+          if (action == "close") {
+            tcrClosed=ELEDState::On;
+            tcrOpen=ELEDState::Off;
+            tcrValveOpen=ELEDState::Off;
+            tcrValveClosed=ELEDState::On;
+          }
+          else if (action == "open") {
+            tcrClosed=ELEDState::Off;
+            tcrOpen=ELEDState::On;
+            tcrValveOpen=ELEDState::On;
+            tcrValveClosed=ELEDState::Off;
+          }
+        }
+      }
+      YAML::Node node;
+      node["status"]="OK";
+      srv.sendResponse(node);
+    }
+  }
 }
 
 [[noreturn]] int main(int argc, char** argv) {
   configure_logger();
   std::cout << "Hello World!\n";
   auto srv = RimoServer<RobotStatus>();
+  std::thread commandThread{&handleCommands, std::ref(srv)};
 
   while (true) {
     srv.publish(prepareFakeStatus());
     std::this_thread::sleep_for(100ms);
   }
+  commandThread.join();
 }

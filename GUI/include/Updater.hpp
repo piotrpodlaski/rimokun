@@ -17,6 +17,9 @@ class Updater final : public QObject {
  signals:
   void newDataArrived(const utl::RobotStatus& staus);
 
+ public slots:
+  void sendCommand(const YAML::Node& command);
+
  private:
   void runner();
   bool running{false};

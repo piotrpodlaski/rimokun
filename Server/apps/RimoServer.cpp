@@ -17,12 +17,12 @@ RobotStatus prepareFakeStatus() {
   const std::vector motors = {EMotor::XLeft,  EMotor::XRight, EMotor::YLeft,
                               EMotor::YRight, EMotor::ZLeft,  EMotor::ZRight};
   const std::map<EMotor, double> amplitudes = {
-      {EMotor::XLeft, 500}, {EMotor::YLeft, 300},  {EMotor::XRight, 500},
+      {EMotor::XLeft, 500},  {EMotor::YLeft, 300}, {EMotor::XRight, 500},
       {EMotor::YRight, 300}, {EMotor::ZLeft, 100}, {EMotor::ZRight, 100}};
 
   const std::map<EMotor, double> offsets = {
-      {EMotor::XLeft, 1500}, {EMotor::YLeft, -500},  {EMotor::XRight, 3000},
-      {EMotor::YRight, -500}, {EMotor::ZLeft, 100}, {EMotor::ZRight, 100}};
+      {EMotor::XLeft, 1500},  {EMotor::YLeft, -500}, {EMotor::XRight, 3000},
+      {EMotor::YRight, -500}, {EMotor::ZLeft, 100},  {EMotor::ZRight, 100}};
 
   const std::map<EMotor, double> omegas = {
       {EMotor::XLeft, 2},  {EMotor::YLeft, 2}, {EMotor::XRight, 1},
@@ -61,6 +61,12 @@ RobotStatus prepareFakeStatus() {
     if (motor == fst) status.motors[motor].flags[snd] = ELEDState::On;
   }
   t += dt;
+  status.toolChangers[EArm::Left] = {
+      .flags = {{EToolChangerStatusFlags::ClosedSen, ELEDState::On},
+                {EToolChangerStatusFlags::ClosedValve, ELEDState::On}}};
+  status.toolChangers[EArm::Right] = {
+      .flags = {{EToolChangerStatusFlags::ClosedSen, ELEDState::On},
+                {EToolChangerStatusFlags::ClosedValve, ELEDState::On}}};
   return status;
 }
 

@@ -74,7 +74,7 @@ void RobotVisualisation::resizeEvent(QResizeEvent* event) {
   view_->fitInView(scene_->sceneRect(), Qt::KeepAspectRatio);
 }
 
-void RobotVisualisation::updateRobotPosition(const utl::RobotStatus& rs) const {
+void RobotVisualisation::updateRobotStatus(const utl::RobotStatus& rs) const {
   auto xL = rs.motors.at(utl::EMotor::XLeft).currentPosition;
   auto yL = rs.motors.at(utl::EMotor::YLeft).currentPosition;
   moveGreenTo({xL, yL});

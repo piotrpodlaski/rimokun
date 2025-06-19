@@ -6,10 +6,6 @@
 // "ui_MainWindow.h" resolved
 
 #include "MainWindow.hpp"
-
-#include <QTimer>
-#include <print>
-
 #include "ui_MainWindow.h"
 
 MainWindow::MainWindow(QWidget* parent)
@@ -34,9 +30,16 @@ MainWindow::MainWindow(QWidget* parent)
     connect(&updater, &Updater::newDataArrived,
             dynamic_cast<MotorStats*>(motStat), &MotorStats::handleUpdate);
   }
+  const auto leftChanger = ui->leftChanger;
+  const auto rightChanger = ui->rightChanger;
+  leftChanger->setArm(utl::EArm::Left);
+  rightChanger->setArm(utl::EArm::Right);
+  const auto robotVis = ui->widget;
   updater.startUpdaterThread();
 
-  connect(&updater, &Updater::newDataArrived, ui->widget, &RobotVisualisation::updateRobotPosition);
+  connect(&updater, &Updater::newDataArrived, robotVis, &RobotVisualisation::updateRobotStatus);
+  connect(&updater, &Updater::newDataArrived, leftChanger, &ToolChanger::updateRobotStatus);
+  connect(&updater, &Updater::newDataArrived, rightChanger, &ToolChanger::updateRobotStatus);
 }
 
 MainWindow::~MainWindow() { delete ui; }

@@ -19,7 +19,7 @@ class RobotVisualisation final : public QWidget {
   void moveRedTo(const QPointF& pos) const;
   void moveGreenTo(const QPointF& pos) const;
   void moveBlueTo(const QPointF& pos) const;
-  void updateRobotPosition(const utl::RobotStatus& rs) const;
+  void updateRobotStatus(const utl::RobotStatus& rs) const;
 
 
  private:

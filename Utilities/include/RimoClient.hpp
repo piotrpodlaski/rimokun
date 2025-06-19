@@ -7,11 +7,11 @@
 #include <optional>
 #include <logger.hpp>
 #include "zmq.hpp"
-#include "yaml-cpp/yaml.h"
+#include "YamlExtensions.hpp"
 
 namespace utl {
 
-template<typename T>
+template<YAML::YamlConvertible T>
 class RimoClient {
  public:
   RimoClient() = default;

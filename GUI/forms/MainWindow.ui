@@ -245,17 +245,43 @@
        </widget>
       </item>
       <item>
-       <spacer name="horizontalSpacer">
-        <property name="orientation">
-         <enum>Qt::Horizontal</enum>
+       <widget class="QGroupBox" name="groupBox_4">
+        <property name="title">
+         <string>Tool changers</string>
         </property>
-        <property name="sizeHint" stdset="0">
-         <size>
-          <width>40</width>
-          <height>20</height>
-         </size>
-        </property>
-       </spacer>
+        <layout class="QHBoxLayout" name="horizontalLayout_7">
+         <item>
+          <widget class="QGroupBox" name="groupBox_5">
+           <property name="title">
+            <string>Left</string>
+           </property>
+           <property name="alignment">
+            <set>Qt::AlignCenter</set>
+           </property>
+           <layout class="QHBoxLayout" name="horizontalLayout_8">
+            <item>
+             <widget class="ToolChanger" name="leftChanger" native="true"/>
+            </item>
+           </layout>
+          </widget>
+         </item>
+         <item>
+          <widget class="QGroupBox" name="groupBox_6">
+           <property name="title">
+            <string>Right</string>
+           </property>
+           <property name="alignment">
+            <set>Qt::AlignCenter</set>
+           </property>
+           <layout class="QHBoxLayout" name="horizontalLayout_9">
+            <item>
+             <widget class="ToolChanger" name="rightChanger" native="true"/>
+            </item>
+           </layout>
+          </widget>
+         </item>
+        </layout>
+       </widget>
       </item>
      </layout>
     </item>
@@ -297,6 +323,12 @@
    <class>RobotVisualisation</class>
    <extends>QWidget</extends>
    <header location="global">RobotVisualisation.hpp</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>ToolChanger</class>
+   <extends>QWidget</extends>
+   <header location="global">ToolChanger.hpp</header>
    <container>1</container>
   </customwidget>
  </customwidgets>

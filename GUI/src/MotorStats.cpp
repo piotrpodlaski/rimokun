@@ -1,6 +1,6 @@
 #include "MotorStats.hpp"
+#include "magic_enum/magic_enum.hpp"
 
-#include <QMetaObject>
 #include <format>
 #include <print>
 

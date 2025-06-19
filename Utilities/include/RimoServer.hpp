@@ -7,12 +7,11 @@
 #include <thread>
 #include <zmq.hpp>
 #include "logger.hpp"
-
-#include "CommonDefinitions.hpp"
+#include "YamlExtensions.hpp"
 
 namespace utl {
 
-template<typename T>
+template<YAML::YamlConvertible T>
 class RimoServer {
  public:
   RimoServer(){

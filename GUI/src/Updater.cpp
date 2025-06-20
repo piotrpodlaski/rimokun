@@ -29,6 +29,7 @@ void Updater::sendCommand(const YAML::Node& command) {
   auto result = client.sendCommand(command);
   if (!result) {
     SPDLOG_ERROR("Failed to send command and/or get the response!");
+    return;
   }
   if ((*result)["status"].as<std::string>() != "OK") {
     auto msgNode = (*result)["message"];

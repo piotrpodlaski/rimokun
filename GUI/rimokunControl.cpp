@@ -10,6 +10,7 @@ namespace fs = std::filesystem;
 
 
 int main(int argc, char* argv[]) {
+
   utl::configure_logger();
   argparse::ArgumentParser program("rimokunControl");
   program.add_argument("-c", "--config")

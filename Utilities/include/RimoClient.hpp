@@ -25,10 +25,6 @@ class RimoClient {
 
     _commandSocket = zmq::socket_t(_context, zmq::socket_type::req);
     _commandSocket.connect("ipc:///tmp/rimoCommand");
-
-    YAML::Node n;
-    n["type"] = "robot";
-    sendCommand(n);
   }
   std::optional<T> receiveRobotStatus() {
     zmq::message_t message;

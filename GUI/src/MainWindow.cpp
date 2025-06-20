@@ -7,9 +7,11 @@
 
 #include "MainWindow.hpp"
 #include "ui_MainWindow.h"
+#include "QtLogSink.hpp"
 
 MainWindow::MainWindow(QWidget* parent)
-    : QMainWindow(parent), ui(new Ui::MainWindow) {
+    : QMainWindow(parent), ui(new Ui::MainWindow)
+{
   ui->setupUi(this);
 
   motorStats[utl::EMotor::XLeft] = ui->mot1;
@@ -43,6 +45,16 @@ MainWindow::MainWindow(QWidget* parent)
 
   connect(leftChanger, &ToolChanger::buttonPressed, &updater, &Updater::sendCommand);
   connect(rightChanger, &ToolChanger::buttonPressed, &updater, &Updater::sendCommand);
+
+  consoleSink= std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+  qtSink = std::make_shared<QtLogSink>(ui->logOutput);
+  logger= std::make_shared<spdlog::logger>("gui",  spdlog::sinks_init_list{consoleSink, qtSink});
+  spdlog::register_logger(logger);
+  spdlog::set_default_logger(logger);  // optional
+  utl::configure_logger();
+
+
+
 
 }
 

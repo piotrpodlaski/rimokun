@@ -6,8 +6,10 @@
 // "ui_MainWindow.h" resolved
 
 #include "MainWindow.hpp"
-#include "ui_MainWindow.h"
+
+#include "LedIndicator.hpp"
 #include "QtLogSink.hpp"
+#include "ui_MainWindow.h"
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent), ui(new Ui::MainWindow)
@@ -53,9 +55,7 @@ MainWindow::MainWindow(QWidget* parent)
   spdlog::set_default_logger(logger);  // optional
   utl::configure_logger();
 
-
-
-
+  LedIndicator::initBlinkTimer();
 }
 
 MainWindow::~MainWindow() { delete ui; }

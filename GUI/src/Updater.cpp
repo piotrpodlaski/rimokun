@@ -1,6 +1,9 @@
 #include "Updater.hpp"
 
+#include "QMessageBox"
 #include "logger.hpp"
+
+using namespace std::string_literals;
 
 Updater::Updater(QObject* parent) : QObject(parent) { client.init(); }
 
@@ -23,9 +26,21 @@ void Updater::startUpdaterThread() {
 }
 
 void Updater::sendCommand(const YAML::Node& command) {
-  client.sendCommand(command);
+  auto result = client.sendCommand(command);
+  if (!result) {
+    SPDLOG_ERROR("Failed to send command and/or get the response!");
+  }
+  if ((*result)["status"].as<std::string>() != "OK") {
+    auto msgNode = (*result)["message"];
+    auto message = "Server did not provide any messages..."s;
+    if (msgNode) {
+      message = msgNode.as<std::string>();
+    }
+    SPDLOG_ERROR("Server returned error status with message: '{}'", message);
+    QMessageBox::critical(dynamic_cast<QWidget*>(this), "Error",
+                          QString::fromStdString(message));
+  }
 }
-
 
 void Updater::runner() {
   while (running) {

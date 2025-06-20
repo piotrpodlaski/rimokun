@@ -42,7 +42,6 @@ if (${CMAKE_BUILD_TYPE} STREQUAL "Debug")
 else()
     add_compile_definitions(SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_INFO)
 endif()
-
 add_compile_definitions(SPDLOG_COMPILED_LIB)
 
 

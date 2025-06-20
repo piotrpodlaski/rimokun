@@ -1,5 +1,6 @@
 #include "ToolChanger.hpp"
 
+#include "QMessageBox"
 #include "magic_enum/magic_enum.hpp"
 #include "spdlog/spdlog.h"
 #include "ui_ToolChanger.h"
@@ -11,8 +12,10 @@ ToolChanger::ToolChanger(QWidget* parent)
     : QWidget(parent), ui(new Ui::ToolChanger) {
   ui->setupUi(this);
 
-  connect(ui->closeButton, &QPushButton::clicked, this, &ToolChanger::handleButtons);
-  connect(ui->openButon, &QPushButton::clicked, this, &ToolChanger::handleButtons);
+  connect(ui->closeButton, &QPushButton::clicked, this,
+          &ToolChanger::handleButtons);
+  connect(ui->openButon, &QPushButton::clicked, this,
+          &ToolChanger::handleButtons);
 }
 void ToolChanger::setArm(EArm arm) { this->arm = arm; }
 void ToolChanger::updateRobotStatus(const RobotStatus& robotStatus) const {
@@ -47,15 +50,34 @@ void ToolChanger::updateRobotStatus(const RobotStatus& robotStatus) const {
   else
     ui->openButon->setEnabled(true);
 }
-void ToolChanger::handleButtons() const {
+void ToolChanger::handleButtons() {
   SPDLOG_INFO("Button pressed!");
   auto sender = QObject::sender();
   YAML::Node command;
   command["type"] = "toolChanger";
   command["position"] = magic_enum::enum_name(arm);
-  if (sender == ui->closeButton)
+  auto reply = QMessageBox::No;
+  if (sender == ui->closeButton) {
     command["action"] = "close";
-  else if (sender == ui->openButon)
+    auto msg =
+        std::format("Are you sure you want to close the {} tool changer?",
+                    magic_enum::enum_name(arm));
+    if (*(ui->proxLamp))
+      reply = QMessageBox::question(this, "Confirmation", QString(msg.c_str()),
+                                    QMessageBox::Yes | QMessageBox::No);
+    else {
+      msg +=
+          " Proximity sensor did not detect the clamp-side tool changer. Is it "
+          "intentional?";
+      reply = QMessageBox::warning(this, "Warning", QString(msg.c_str()),
+                                   QMessageBox::Yes | QMessageBox::No);
+    }
+  } else if (sender == ui->openButon) {
     command["action"] = "open";
-  emit buttonPressed(command);
+    auto msg = std::format("Are you sure you want to open the {} tool changer?",
+                           magic_enum::enum_name(arm));
+    reply = QMessageBox::question(this, "Confirmation", QString(msg.c_str()),
+                                  QMessageBox::Yes | QMessageBox::No);
+  }
+  if (reply == QMessageBox::Yes) emit buttonPressed(command);
 }

@@ -20,7 +20,7 @@ class ToolChanger final : public QWidget {
   void updateRobotStatus(const utl::RobotStatus& robotStatus) const;
 
   private slots:
-  void handleButtons() const;
+  void handleButtons();
 
  signals:
   void buttonPressed(YAML::Node& button) const;

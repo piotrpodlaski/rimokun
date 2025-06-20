@@ -6,7 +6,7 @@
 class VMotorStats;
 namespace utl {
 enum class EMotor { XLeft, XRight, YLeft, YRight, ZLeft, ZRight };
-enum class ELEDState { On, Off, Error };
+enum class ELEDState { On, Off, Error, ErrorBlinking };
 enum class EMotorStatusFlags { BrakeApplied, Enabled, Error };
 enum class EArm { Left, Right };
 enum class EToolChangerStatusFlags {

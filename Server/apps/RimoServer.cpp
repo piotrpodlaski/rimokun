@@ -15,13 +15,13 @@ using namespace std::chrono_literals;
 
 std::atomic tclOpen{ELEDState::Off};
 std::atomic tclClosed{ELEDState::Off};
-std::atomic tclProx{ELEDState::Error};
+std::atomic tclProx{ELEDState::ErrorBlinking};
 std::atomic tclValveOpen{ELEDState::Off};
 std::atomic tclValveClosed{ELEDState::Off};
 
 std::atomic tcrOpen{ELEDState::Off};
 std::atomic tcrClosed{ELEDState::Off};
-std::atomic tcrProx{ELEDState::Error};
+std::atomic tcrProx{ELEDState::ErrorBlinking};
 std::atomic tcrValveOpen{ELEDState::Off};
 std::atomic tcrValveClosed{ELEDState::Off};
 
@@ -92,12 +92,13 @@ RobotStatus prepareFakeStatus() {
   return status;
 }
 
-void handleCommands(RimoServer<RobotStatus>& srv) {
+[[noreturn]] void handleCommands(RimoServer<RobotStatus>& srv) {
   while (true) {
     if (auto command = srv.receiveCommand()) {
       SPDLOG_INFO("Received command:\n{}\n", YAML::Dump(*command));
       YAML::Node node;
       node["status"]="OK";
+      node["message"]="";
       srv.sendResponse(node);
       if ((*command)["type"].as<std::string>()=="toolChanger") {
         auto position = (*command)["position"].as<EArm>();

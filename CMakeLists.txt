@@ -33,8 +33,14 @@ FetchContent_Declare(
         GIT_REPOSITORY https://github.com/p-ranav/argparse.git
         GIT_TAG v3.2
 )
+
+FetchContent_Declare(
+        googletest
+        GIT_REPOSITORY https://github.com/google/googletest.git
+        GIT_TAG v1.17.0
+)
 option(CPPZMQ_BUILD_TESTS OFF)
-FetchContent_MakeAvailable(yaml-cpp magic_enum cppzmq spdlog argparse)
+FetchContent_MakeAvailable(yaml-cpp magic_enum cppzmq spdlog argparse googletest)
 
 #Handle spdlog debug level:
 if (${CMAKE_BUILD_TYPE} STREQUAL "Debug")
@@ -44,6 +50,7 @@ else()
 endif()
 add_compile_definitions(SPDLOG_COMPILED_LIB)
 
+enable_testing()
 
 add_subdirectory(Utilities)
 add_subdirectory(GUI)

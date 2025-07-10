@@ -4,7 +4,6 @@
 #include <QVBoxLayout>
 #include <iostream>
 
-#include "ClassName.hpp"
 #include "Config.hpp"
 #include "spdlog/spdlog.h"
 
@@ -13,7 +12,8 @@ RobotVisualisation::RobotVisualisation(QWidget* parent) : QWidget(parent) {
   _view = std::make_unique<QGraphicsView>();
   layout->addWidget(_view.get());
 
-  const auto configNode = utl::Config::instance().getConfig(this);
+  const auto configNode =
+      utl::Config::instance().getClassConfig("RobotVisualisation");
 
   std::cout << configNode << std::endl;
 
@@ -44,12 +44,12 @@ RobotVisualisation::RobotVisualisation(QWidget* parent) : QWidget(parent) {
       QRectF(0, 0, rightNode["width"].as<int>(), rightNode["height"].as<int>()),
       rightColor);
 
-  _rightBeam->setPos(0, 50);
   _topBeam->setPos(50, 50);
+  _rightBeam->setPos(0, 50);
   _leftBeam->setPos(150, 50);
 
-  _scene->addItem(_rightBeam.get());
   _scene->addItem(_topBeam.get());
+  _scene->addItem(_rightBeam.get());
   _scene->addItem(_leftBeam.get());
   _scene->addRect(_scene->sceneRect(), QPen(Qt::black), Qt::NoBrush);
   _view->fitInView(_scene->sceneRect(), Qt::KeepAspectRatio);

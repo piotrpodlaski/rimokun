@@ -13,4 +13,7 @@ void Config::setConfigPath(const std::string& configPath) {
   this->_configPath = configPath;
   _topNode = YAML::LoadFile(configPath);
 }
+YAML::Node Config::getClassConfig(const std::string& className) {
+  return _topNode["classes"][className];
+}
 }  // namespace utl

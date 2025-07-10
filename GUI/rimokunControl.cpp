@@ -13,7 +13,7 @@ int main(int argc, char* argv[]) {
   utl::configureLogger();
   argparse::ArgumentParser program("rimokunControl");
   program.add_argument("-c", "--config")
-      .help("PAth to the config file")
+      .help("Path to the config file")
       .default_value("/etc/rimokunControl.yaml");
 
   try {

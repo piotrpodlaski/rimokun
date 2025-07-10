@@ -8,10 +8,12 @@
 #include <thread>
 
 #include "Logger.hpp"
+#include "Config.hpp"
+#include "argparse/argparse.hpp"
 
 using namespace utl;
-
 using namespace std::chrono_literals;
+namespace fs = std::filesystem;
 
 std::atomic tclOpen{ELEDState::Off};
 std::atomic tclClosed{ELEDState::Off};
@@ -142,7 +144,33 @@ RobotStatus prepareFakeStatus() {
 
 [[noreturn]] int main(int argc, char** argv) {
   configureLogger();
-  std::cout << "Hello World!\n";
+
+  argparse::ArgumentParser program("rimokunControl");
+  program.add_argument("-c", "--config")
+      .help("Path to the config file")
+      .default_value("/etc/rimokunControl.yaml");
+
+  try {
+    program.parse_args(argc, argv);
+  }
+  catch (const std::exception& err) {
+    SPDLOG_CRITICAL("{}", err.what());
+    std::exit(1);
+  }
+
+  const auto configPath = program.get<std::string>("-c");
+
+  if (!program.is_used("-c")) {
+    SPDLOG_WARN("Config path not provided, using default: {}", configPath);
+  }
+
+  if (!fs::exists(configPath)) {
+    SPDLOG_CRITICAL("Config file '{}' not found! Exiting.", configPath);
+    std::exit(1);
+  }
+
+  Config::instance().setConfigPath(configPath);
+
   auto srv = RimoServer<RobotStatus>();
   std::thread commandThread{&handleCommands, std::ref(srv)};
 

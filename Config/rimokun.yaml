@@ -16,3 +16,9 @@ classes:
         width: *arm_width
         height: *arm_height
         color: red
+  RimoServer:
+    statusAddress: &statusAddr "ipc:///tmp/rimoStatusDupa"
+    commandAddress: &commandAddr "ipc:///tmp/rimoCommand"
+  RimoClient:
+    statusAddress: *statusAddr
+    commandAddress: *commandAddr

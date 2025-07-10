@@ -51,8 +51,7 @@ void ToolChanger::updateRobotStatus(const RobotStatus& robotStatus) const {
     _ui->openButon->setEnabled(true);
 }
 void ToolChanger::handleButtons() {
-  SPDLOG_INFO("Button pressed!");
-  auto sender = QObject::sender();
+  const auto sender = QObject::sender();
   YAML::Node command;
   command["type"] = "toolChanger";
   command["position"] = magic_enum::enum_name(_arm);
@@ -74,8 +73,9 @@ void ToolChanger::handleButtons() {
     }
   } else if (sender == _ui->openButon) {
     command["action"] = "open";
-    auto msg = std::format("Are you sure you want to open the {} tool changer?",
-                           magic_enum::enum_name(_arm));
+    const auto msg =
+        std::format("Are you sure you want to open the {} tool changer?",
+                    magic_enum::enum_name(_arm));
     reply = QMessageBox::question(this, "Confirmation", QString(msg.c_str()),
                                   QMessageBox::Yes | QMessageBox::No);
   }

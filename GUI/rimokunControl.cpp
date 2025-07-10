@@ -1,5 +1,6 @@
 #include <Logger.hpp>
 #include <QApplication>
+#include <QDirIterator>
 #include <filesystem>
 
 #include "Config.hpp"
@@ -33,6 +34,13 @@ int main(int argc, char* argv[]) {
   if (!fs::exists(configPath)) {
     SPDLOG_CRITICAL("Config file '{}' not found! Exiting.", configPath);
     std::exit(1);
+  }
+
+  QDirIterator it(":", QDirIterator::Subdirectories);
+
+  qDebug() << "Listing Qt Resources:";
+  while (it.hasNext()) {
+    qDebug() << it.next();
   }
 
   utl::Config::instance().setConfigPath(configPath);

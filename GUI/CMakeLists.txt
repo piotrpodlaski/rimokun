@@ -23,9 +23,22 @@ qt_add_executable(rimokunControl
 
 )
 
+qt_add_resources(rimokunControl "images"
+        PREFIX "/"
+        FILES resources/rimoKunLogo.png
+)
+
 target_include_directories(rimokunControl
         PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-target_link_libraries(rimokunControl PRIVATE Qt6::Widgets magic_enum utilities cppzmq yaml-cpp::yaml-cpp spdlog argparse)
+target_link_libraries(rimokunControl PRIVATE
+        Qt6::Widgets
+        magic_enum
+        utilities
+        cppzmq
+        yaml-cpp::yaml-cpp
+        spdlog
+        argparse
+)

@@ -17,7 +17,7 @@ classes:
         height: *arm_height
         color: red
   RimoServer:
-    statusAddress: &statusAddr "ipc:///tmp/rimoStatusDupa"
+    statusAddress: &statusAddr "ipc:///tmp/rimoStatus"
     commandAddress: &commandAddr "ipc:///tmp/rimoCommand"
   RimoClient:
     statusAddress: *statusAddr

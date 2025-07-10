@@ -32,10 +32,10 @@ void Updater::sendCommand(const YAML::Node& command) {
     return;
   }
   if ((*result)["status"].as<std::string>() != "OK") {
-    auto msgNode = (*result)["message"];
-    auto message = "Server did not provide any messages..."s;
-    if (msgNode) {
-      message = msgNode.as<std::string>();
+    const auto msgNode = (*result)["message"];
+    auto message = msgNode.as<std::string>();
+    if (message.empty()) {
+      message ="Server did not provide any messages..."s;
     }
     SPDLOG_ERROR("Server returned error status with message: '{}'", message);
     QMessageBox::critical(dynamic_cast<QWidget*>(this), "Error",

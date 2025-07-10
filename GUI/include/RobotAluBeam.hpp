@@ -5,7 +5,7 @@
 #include <QGraphicsRectItem>
 #include <QPropertyAnimation>
 
-class RobotAluBeam : public QObject, public QGraphicsRectItem {
+class RobotAluBeam final : public QObject, public QGraphicsRectItem {
   Q_OBJECT
   Q_PROPERTY(QPointF pos READ pos WRITE setPos)
 

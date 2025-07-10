@@ -4,10 +4,10 @@
 #include <chrono>
 #include <iostream>
 #include <numbers>
-#include <thread>
 #include <print>
+#include <thread>
 
-#include "logger.hpp"
+#include "Logger.hpp"
 
 using namespace utl;
 
@@ -95,7 +95,7 @@ RobotStatus prepareFakeStatus() {
 [[noreturn]] void handleCommands(RimoServer<RobotStatus>& srv) {
   while (true) {
     if (auto command = srv.receiveCommand()) {
-      SPDLOG_INFO("Received command:\n{}\n", YAML::Dump(*command));
+      SPDLOG_INFO("Received command:\n{}", YAML::Dump(*command));
       YAML::Node node;
       node["status"]="OK";
       node["message"]="";
@@ -141,7 +141,7 @@ RobotStatus prepareFakeStatus() {
 }
 
 [[noreturn]] int main(int argc, char** argv) {
-  configure_logger();
+  configureLogger();
   std::cout << "Hello World!\n";
   auto srv = RimoServer<RobotStatus>();
   std::thread commandThread{&handleCommands, std::ref(srv)};

@@ -1,17 +1,16 @@
+#include <Logger.hpp>
 #include <QApplication>
-#include <logger.hpp>
+#include <filesystem>
 
+#include "Config.hpp"
 #include "MainWindow.hpp"
 #include "argparse/argparse.hpp"
-#include "Config.hpp"
-
-#include <filesystem>
 namespace fs = std::filesystem;
 
 
 int main(int argc, char* argv[]) {
 
-  utl::configure_logger();
+  utl::configureLogger();
   argparse::ArgumentParser program("rimokunControl");
   program.add_argument("-c", "--config")
       .help("PAth to the config file")

@@ -26,6 +26,6 @@ class ToolChanger final : public QWidget {
   void buttonPressed(YAML::Node& button) const;
 
  private:
-  Ui::ToolChanger* ui;
-  utl::EArm arm;
+  Ui::ToolChanger* _ui;
+  utl::EArm _arm;
 };

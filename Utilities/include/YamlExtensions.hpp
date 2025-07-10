@@ -1,11 +1,8 @@
 #pragma once
 
 #include <yaml-cpp/yaml.h>
-
-#include <filesystem>
 #include <magic_enum/magic_enum.hpp>
 #include <type_traits>
-
 #include "CommonDefinitions.hpp"
 
 namespace YAML {

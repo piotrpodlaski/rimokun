@@ -16,3 +16,5 @@ class VMotorStats {
  protected:
   void configure(const utl::SingleMotorStatus& s) const;
 };
+
+typedef std::map<utl::EMotor, VMotorStats*> MotorStatsMap_t;

@@ -28,7 +28,7 @@ class MotorStats : public QWidget, public VMotorStats {
   void handleUpdate(const utl::RobotStatus&);
 
  private:
-  std::string motorName;
-  Ui::MotorStats* ui;
-  utl::EMotor motorId;
+  std::string _motorName;
+  Ui::MotorStats* _ui;
+  utl::EMotor _motorId;
 };

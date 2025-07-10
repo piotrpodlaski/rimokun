@@ -16,16 +16,16 @@ class RobotVisualisation final : public QWidget {
   void resizeEvent(QResizeEvent* event) override;
 
  public slots:
-  void moveRedTo(const QPointF& pos) const;
-  void moveGreenTo(const QPointF& pos) const;
-  void moveBlueTo(const QPointF& pos) const;
+  void moveTop(const QPointF& pos) const;
+  void moveLeft(const QPointF& pos) const;
+  void moveRight(const QPointF& pos) const;
   void updateRobotStatus(const utl::RobotStatus& rs) const;
 
 
  private:
-  QGraphicsScene* scene_;
-  RobotAluBeam* red_;
-  RobotAluBeam* green_;
-  RobotAluBeam* blue_;
-  QGraphicsView* view_;
+  QGraphicsScene* _scene;
+  std::unique_ptr<RobotAluBeam> _topBeam;
+  std::unique_ptr<RobotAluBeam> _leftBeam;
+  std::unique_ptr<RobotAluBeam> _rightBeam;
+  std::unique_ptr<QGraphicsView> _view;
 };

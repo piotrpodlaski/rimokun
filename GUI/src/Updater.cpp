@@ -1,32 +1,32 @@
 #include "Updater.hpp"
 
+#include "Logger.hpp"
 #include "QMessageBox"
-#include "logger.hpp"
 
 using namespace std::string_literals;
 
-Updater::Updater(QObject* parent) : QObject(parent) { client.init(); }
+Updater::Updater(QObject* parent) : QObject(parent) { _client.init(); }
 
 Updater::~Updater() { stopUpdaterThread(); }
 
 void Updater::startUpdaterThread() {
-  if (running) {
+  if (_running) {
     SPDLOG_WARN("Updater thread is already running! Doing nothing.");
     return;
   }
   SPDLOG_INFO("Spawning updater thread.");
 
   // cleanup, just in case
-  if (updaterThread.joinable()) {
-    updaterThread.join();
+  if (_updaterThread.joinable()) {
+    _updaterThread.join();
   }
 
-  running = true;
-  updaterThread = std::thread(&Updater::runner, this);
+  _running = true;
+  _updaterThread = std::thread(&Updater::runner, this);
 }
 
 void Updater::sendCommand(const YAML::Node& command) {
-  auto result = client.sendCommand(command);
+  auto result = _client.sendCommand(command);
   if (!result) {
     SPDLOG_ERROR("Failed to send command and/or get the response!");
     return;
@@ -44,8 +44,8 @@ void Updater::sendCommand(const YAML::Node& command) {
 }
 
 void Updater::runner() {
-  while (running) {
-    auto status = client.receiveRobotStatus();
+  while (_running) {
+    auto status = _client.receiveRobotStatus();
     if (!status) {
       continue;
     }
@@ -55,8 +55,8 @@ void Updater::runner() {
 
 void Updater::stopUpdaterThread() {
   SPDLOG_INFO("Stopping updater thread");
-  running = false;
-  if (updaterThread.joinable()) {
-    updaterThread.join();
+  _running = false;
+  if (_updaterThread.joinable()) {
+    _updaterThread.join();
   }
 }

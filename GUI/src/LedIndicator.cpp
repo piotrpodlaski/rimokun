@@ -4,42 +4,42 @@
 #include <QTimer>
 
 LedIndicator::LedIndicator(QWidget* parent)
-    : QWidget(parent), m_state(utl::ELEDState::Off) {
+    : QWidget(parent), _ledState(utl::ELEDState::Off) {
   setMinimumSize(16, 16);
-  s_blinkingLeds.append(this);
+  _blinkingLeds.append(this);
 }
-LedIndicator::operator bool() const { return m_state == utl::ELEDState::On; }
+LedIndicator::operator bool() const { return _ledState == utl::ELEDState::On; }
 LedIndicator::~LedIndicator() {
-  s_blinkingLeds.removeAll(this);
+  _blinkingLeds.removeAll(this);
 }
 void LedIndicator::initBlinkTimer() {
-  s_blinkTimer=std::make_unique<QTimer>();
-  s_blinkTimer->setInterval(500);
-  connect(s_blinkTimer.get(), &QTimer::timeout, toggleBlinkVisibility);
-  s_blinkTimer->start();
+  _blinkTimer=std::make_unique<QTimer>();
+  _blinkTimer->setInterval(500);
+  connect(_blinkTimer.get(), &QTimer::timeout, toggleBlinkVisibility);
+  _blinkTimer->start();
 }
 void LedIndicator::toggleBlinkVisibility() {
-  s_globalBlinkState = !s_globalBlinkState;
-  for (LedIndicator* led : s_blinkingLeds) {
-    if (led->m_state == utl::ELEDState::ErrorBlinking) {
-      led->m_blinkVisible = s_globalBlinkState;
+  _globalBlinkState = !_globalBlinkState;
+  for (LedIndicator* led : _blinkingLeds) {
+    if (led->_ledState == utl::ELEDState::ErrorBlinking) {
+      led->_blinkVisible = _globalBlinkState;
       led->update();
     }
   }
 }
 
 void LedIndicator::setState(const utl::ELEDState state) {
-  if (m_state != state) {
-    m_state = state;
+  if (_ledState != state) {
+    _ledState = state;
     update();  // trigger repaint
   }
 }
 
 
-utl::ELEDState LedIndicator::state() const { return m_state; }
+utl::ELEDState LedIndicator::state() const { return _ledState; }
 
 QColor LedIndicator::currentColor() const {
-  switch (m_state) {
+  switch (_ledState) {
     case utl::ELEDState::On:
       return Qt::green;
     case utl::ELEDState::Error:
@@ -47,7 +47,7 @@ QColor LedIndicator::currentColor() const {
     case utl::ELEDState::Off:
       return Qt::transparent;
     case utl::ELEDState::ErrorBlinking:
-      return  m_blinkVisible ? Qt::red : Qt::transparent;
+      return  _blinkVisible ? Qt::red : Qt::transparent;
     default:
       return Qt::transparent;
   }
@@ -65,4 +65,4 @@ void LedIndicator::paintEvent(QPaintEvent*) {
   painter.drawEllipse((width() - size) / 2, (height() - size) / 2, size, size);
 }
 
-QSize LedIndicator::sizeHint() const { return QSize(24, 24); }
+QSize LedIndicator::sizeHint() const { return {24, 24}; }

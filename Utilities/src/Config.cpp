@@ -10,7 +10,7 @@ using namespace std::string_literals;
 namespace utl {
 
 void Config::setConfigPath(const std::string& configPath) {
-  this->configPath = configPath;
-  topNode = YAML::LoadFile(configPath);
+  this->_configPath = configPath;
+  _topNode = YAML::LoadFile(configPath);
 }
 }  // namespace utl

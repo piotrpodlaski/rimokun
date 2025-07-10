@@ -8,8 +8,8 @@
 #include "ui_motorstats.h"
 
 MotorStats::MotorStats(QWidget* parent)
-    : QWidget(parent), ui(new Ui::MotorStats) {
-  ui->setupUi(this);
+    : QWidget(parent), _ui(new Ui::MotorStats) {
+  _ui->setupUi(this);
 }
 
 namespace {
@@ -18,41 +18,41 @@ QString formatNumber(const double value) {
 }
 }  // namespace
 
-MotorStats::~MotorStats() { delete ui; }
+MotorStats::~MotorStats() { delete _ui; }
 void MotorStats::setTorque(const int value) const {
-  ui->torquePercent->setValue(value);
+  _ui->torquePercent->setValue(value);
 }
 void MotorStats::setSpeed(const double value) const {
-  ui->speedCms->display(formatNumber(value));
+  _ui->speedCms->display(formatNumber(value));
 }
 void MotorStats::setCurrentPosition(const double value) const {
-  ui->curentPosition->display(formatNumber(value));
+  _ui->curentPosition->display(formatNumber(value));
 }
 void MotorStats::setTargetPosition(const double value) const {
-  ui->targetPosition->display(formatNumber(value));
+  _ui->targetPosition->display(formatNumber(value));
 }
 void MotorStats::setBrake(const utl::ELEDState value) const {
-  ui->brakeLED->setState(value);
+  _ui->brakeLED->setState(value);
 }
 void MotorStats::setEnabled(const utl::ELEDState value) const {
-  ui->enaLED->setState(value);
+  _ui->enaLED->setState(value);
 }
 // void MotorStats::setMotorName(const std::string& name) const {
 //   ui->groupBox->setTitle(name.c_str());
 // }
 
 void MotorStats::setMotorId(utl::EMotor mot) {
-  motorId = mot;
-  motorName = magic_enum::enum_name(mot);
-  ui->groupBox->setTitle(motorName.c_str());
+  _motorId = mot;
+  _motorName = magic_enum::enum_name(mot);
+  _ui->groupBox->setTitle(_motorName.c_str());
 }
 
 void MotorStats::handleUpdate(const utl::RobotStatus& rs) {
-  if (!rs.motors.contains(motorId)) {
+  if (!rs.motors.contains(_motorId)) {
     SPDLOG_WARN("Update came without data for {} motor! Doing nothing.",
-                motorName);
+                _motorName);
     return;
   }
-  const auto motData = rs.motors.at(motorId);
+  const auto motData = rs.motors.at(_motorId);
   configure(motData);
 }

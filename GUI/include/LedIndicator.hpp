@@ -24,11 +24,11 @@ class LedIndicator final : public QWidget {
 
  private:
   static void toggleBlinkVisibility();
-  bool m_blinkVisible = false;
-  utl::ELEDState m_state;
+  bool _blinkVisible = false;
+  utl::ELEDState _ledState;
   [[nodiscard]] QColor currentColor() const;
 
-  static inline bool s_globalBlinkState = false;
-  static inline std::unique_ptr<QTimer> s_blinkTimer;
-  static inline QList<LedIndicator*> s_blinkingLeds;
+  static inline bool _globalBlinkState = false;
+  static inline std::unique_ptr<QTimer> _blinkTimer;
+  static inline QList<LedIndicator*> _blinkingLeds;
 };

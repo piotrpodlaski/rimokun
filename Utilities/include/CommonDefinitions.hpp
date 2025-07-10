@@ -3,7 +3,6 @@
 #include <map>
 #include <string>
 
-class VMotorStats;
 namespace utl {
 enum class EMotor { XLeft, XRight, YLeft, YRight, ZLeft, ZRight };
 enum class ELEDState { On, Off, Error, ErrorBlinking };
@@ -36,7 +35,5 @@ struct RobotStatus {
   std::map<EMotor, SingleMotorStatus> motors;
   std::map<EArm, ToolChangerStatus> toolChangers;
 };
-
-typedef std::map<EMotor, VMotorStats*> MotorStatsMap_t;
 
 }  // namespace utl

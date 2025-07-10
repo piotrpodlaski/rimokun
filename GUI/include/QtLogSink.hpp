@@ -6,7 +6,7 @@
 
 class QtLogSink final : public spdlog::sinks::base_sink<std::mutex> {
 public:
-  explicit QtLogSink(QTextEdit* widget) : logWidget_(widget) {}
+  explicit QtLogSink(QTextEdit* widget) : _logWidget(widget) {}
 
 protected:
   void sink_it_(const spdlog::details::log_msg& msg) override {
@@ -17,7 +17,7 @@ protected:
     QString html = formatToHtml(msg.level, raw);
 
     QMetaObject::invokeMethod(
-        logWidget_, [logWidget = logWidget_, html]() {
+        _logWidget, [logWidget = _logWidget, html]() {
             logWidget->append(html);
         }, Qt::QueuedConnection);
   }
@@ -25,7 +25,7 @@ protected:
   void flush_() override {}
 
 private:
-  QTextEdit* logWidget_;
+  QTextEdit* _logWidget;
 
  static QString formatToHtml(const spdlog::level::level_enum level, const std::string& text) {
     QString safeText = QString::fromStdString(text).toHtmlEscaped();

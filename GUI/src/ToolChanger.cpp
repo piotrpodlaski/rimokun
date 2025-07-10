@@ -9,30 +9,30 @@
 using namespace utl;
 
 ToolChanger::ToolChanger(QWidget* parent)
-    : QWidget(parent), ui(new Ui::ToolChanger) {
-  ui->setupUi(this);
+    : QWidget(parent), _ui(new Ui::ToolChanger) {
+  _ui->setupUi(this);
 
-  connect(ui->closeButton, &QPushButton::clicked, this,
+  connect(_ui->closeButton, &QPushButton::clicked, this,
           &ToolChanger::handleButtons);
-  connect(ui->openButon, &QPushButton::clicked, this,
+  connect(_ui->openButon, &QPushButton::clicked, this,
           &ToolChanger::handleButtons);
 }
-void ToolChanger::setArm(EArm arm) { this->arm = arm; }
+void ToolChanger::setArm(EArm arm) { this->_arm = arm; }
 void ToolChanger::updateRobotStatus(const RobotStatus& robotStatus) const {
-  if (!robotStatus.toolChangers.contains(arm)) {
+  if (!robotStatus.toolChangers.contains(_arm)) {
     SPDLOG_WARN(
         "Status of ToolChanger {} not provided in the update message from "
         "server!",
-        magic_enum::enum_name(arm));
+        magic_enum::enum_name(_arm));
     return;
   }
-  auto tcStatus = robotStatus.toolChangers.at(arm);
+  auto tcStatus = robotStatus.toolChangers.at(_arm);
   const std::map<EToolChangerStatusFlags, LedIndicator*>& ledIndicators = {
-      {EToolChangerStatusFlags::ProxSen, ui->proxLamp},
-      {EToolChangerStatusFlags::OpenSen, ui->openLamp},
-      {EToolChangerStatusFlags::ClosedSen, ui->closedLamp},
-      {EToolChangerStatusFlags::OpenValve, ui->valveOpenLamp},
-      {EToolChangerStatusFlags::ClosedValve, ui->valveClosedLamp},
+      {EToolChangerStatusFlags::ProxSen, _ui->proxLamp},
+      {EToolChangerStatusFlags::OpenSen, _ui->openLamp},
+      {EToolChangerStatusFlags::ClosedSen, _ui->closedLamp},
+      {EToolChangerStatusFlags::OpenValve, _ui->valveOpenLamp},
+      {EToolChangerStatusFlags::ClosedValve, _ui->valveClosedLamp},
   };
   for (const auto& [flag, led] : ledIndicators) {
     if (tcStatus.flags.contains(flag))
@@ -41,28 +41,28 @@ void ToolChanger::updateRobotStatus(const RobotStatus& robotStatus) const {
       led->setState(ELEDState::Off);
   }
   if (*ledIndicators.at(EToolChangerStatusFlags::ClosedValve))
-    ui->closeButton->setEnabled(false);
+    _ui->closeButton->setEnabled(false);
   else
-    ui->closeButton->setEnabled(true);
+    _ui->closeButton->setEnabled(true);
 
   if (*ledIndicators.at(EToolChangerStatusFlags::OpenValve))
-    ui->openButon->setEnabled(false);
+    _ui->openButon->setEnabled(false);
   else
-    ui->openButon->setEnabled(true);
+    _ui->openButon->setEnabled(true);
 }
 void ToolChanger::handleButtons() {
   SPDLOG_INFO("Button pressed!");
   auto sender = QObject::sender();
   YAML::Node command;
   command["type"] = "toolChanger";
-  command["position"] = magic_enum::enum_name(arm);
+  command["position"] = magic_enum::enum_name(_arm);
   auto reply = QMessageBox::No;
-  if (sender == ui->closeButton) {
+  if (sender == _ui->closeButton) {
     command["action"] = "close";
     auto msg =
         std::format("Are you sure you want to close the {} tool changer?",
-                    magic_enum::enum_name(arm));
-    if (*(ui->proxLamp))
+                    magic_enum::enum_name(_arm));
+    if (*(_ui->proxLamp))
       reply = QMessageBox::question(this, "Confirmation", QString(msg.c_str()),
                                     QMessageBox::Yes | QMessageBox::No);
     else {
@@ -72,10 +72,10 @@ void ToolChanger::handleButtons() {
       reply = QMessageBox::warning(this, "Warning", QString(msg.c_str()),
                                    QMessageBox::Yes | QMessageBox::No);
     }
-  } else if (sender == ui->openButon) {
+  } else if (sender == _ui->openButon) {
     command["action"] = "open";
     auto msg = std::format("Are you sure you want to open the {} tool changer?",
-                           magic_enum::enum_name(arm));
+                           magic_enum::enum_name(_arm));
     reply = QMessageBox::question(this, "Confirmation", QString(msg.c_str()),
                                   QMessageBox::Yes | QMessageBox::No);
   }

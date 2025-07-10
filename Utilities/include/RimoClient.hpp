@@ -1,13 +1,10 @@
-//
-// Created by piotrek on 6/10/25.
-//
-
 #pragma once
 
+#include <Logger.hpp>
 #include <optional>
-#include <logger.hpp>
-#include "zmq.hpp"
+
 #include "YamlExtensions.hpp"
+#include "zmq.hpp"
 
 namespace utl {
 
@@ -19,7 +16,7 @@ class RimoClient {
   void init(){
     SPDLOG_INFO("Initializing RimoClient");
     _statusSocket = zmq::socket_t(_context, zmq::socket_type::sub);
-    _statusSocket.connect(statusAddress);
+    _statusSocket.connect(_statusAddress);
     _statusSocket.set(zmq::sockopt::subscribe, "");
     _statusSocket.set(zmq::sockopt::rcvtimeo, 1000);
 
@@ -27,7 +24,7 @@ class RimoClient {
     _commandSocket.set(zmq::sockopt::sndtimeo, 1000);
     _commandSocket.set(zmq::sockopt::rcvtimeo, 1000);
     _commandSocket.set(zmq::sockopt::linger, 0);
-    _commandSocket.connect(commandAddress);
+    _commandSocket.connect(_commandAddress);
   }
   std::optional<T> receiveRobotStatus() {
     zmq::message_t message;
@@ -57,7 +54,7 @@ class RimoClient {
       _commandSocket.set(zmq::sockopt::rcvtimeo, 1000);
       _commandSocket.set(zmq::sockopt::sndtimeo, 1000);
       _commandSocket.set(zmq::sockopt::linger, 0);
-      _commandSocket.connect(commandAddress);
+      _commandSocket.connect(_commandAddress);
       return std::nullopt;
     }
     SPDLOG_INFO("Got response:\n{}", response.to_string());
@@ -69,8 +66,8 @@ class RimoClient {
   zmq::context_t _context;
   zmq::socket_t _statusSocket;
   zmq::socket_t _commandSocket;
-  const std::string statusAddress = "ipc:///tmp/rimoStatus";
-  const std::string commandAddress = "ipc:///tmp/rimoCommand";
+  const std::string _statusAddress = "ipc:///tmp/rimoStatus";
+  const std::string _commandAddress = "ipc:///tmp/rimoCommand";
 };
 
 }  // namespace utl

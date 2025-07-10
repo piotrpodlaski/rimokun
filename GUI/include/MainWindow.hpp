@@ -1,9 +1,4 @@
-//
-// Created by piotrek on 6/6/25.
-//
-
-#ifndef MAINWINDOW_H
-#define MAINWINDOW_H
+#pragma once
 
 #include <QMainWindow>
 
@@ -27,13 +22,11 @@ class MainWindow : public QMainWindow {
   ~MainWindow() override;
 
  private:
-  Updater updater;
-  Ui::MainWindow *ui;
-  utl::MotorStatsMap_t motorStats;
-  std::shared_ptr<spdlog::logger> logger;
-  std::shared_ptr<spdlog::sinks::stdout_color_sink_mt> consoleSink;
-  std::shared_ptr<QtLogSink> qtSink;
+  Updater _updater;
+  Ui::MainWindow *_ui;
+  MotorStatsMap_t _motorStats;
+  std::shared_ptr<spdlog::logger> _logger;
+  std::shared_ptr<spdlog::sinks::stdout_color_sink_mt> _consoleSink;
+  std::shared_ptr<QtLogSink> _qtSink;
 
 };
-
-#endif  // MAINWINDOW_H

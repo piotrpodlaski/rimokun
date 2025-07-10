@@ -1,10 +1,3 @@
-//
-// Created by piotrek on 6/6/25.
-//
-
-// You may need to build the project (run Qt uic code generator) to get
-// "ui_MainWindow.h" resolved
-
 #include "MainWindow.hpp"
 
 #include "LedIndicator.hpp"
@@ -12,18 +5,18 @@
 #include "ui_MainWindow.h"
 
 MainWindow::MainWindow(QWidget* parent)
-    : QMainWindow(parent), ui(new Ui::MainWindow)
+    : QMainWindow(parent), _ui(new Ui::MainWindow)
 {
-  ui->setupUi(this);
+  _ui->setupUi(this);
 
-  motorStats[utl::EMotor::XLeft] = ui->mot1;
-  motorStats[utl::EMotor::XRight] = ui->mot3;
-  motorStats[utl::EMotor::YLeft] = ui->mot2;
-  motorStats[utl::EMotor::YRight] = ui->mot4;
-  motorStats[utl::EMotor::ZLeft] = ui->mot5;
-  motorStats[utl::EMotor::ZRight] = ui->mot6;
+  _motorStats[utl::EMotor::XLeft] = _ui->mot1;
+  _motorStats[utl::EMotor::XRight] = _ui->mot3;
+  _motorStats[utl::EMotor::YLeft] = _ui->mot2;
+  _motorStats[utl::EMotor::YRight] = _ui->mot4;
+  _motorStats[utl::EMotor::ZLeft] = _ui->mot5;
+  _motorStats[utl::EMotor::ZRight] = _ui->mot6;
 
-  for (auto& [eMot, motStat] : motorStats) {
+  for (auto& [eMot, motStat] : _motorStats) {
     motStat->setMotorId(eMot);
     motStat->setCurrentPosition(4010.2);
     motStat->setSpeed(2137);
@@ -31,31 +24,31 @@ MainWindow::MainWindow(QWidget* parent)
     motStat->setTorque(69);
     motStat->setBrake(utl::ELEDState::Off);
     motStat->setEnabled(utl::ELEDState::Error);
-    connect(&updater, &Updater::newDataArrived,
+    connect(&_updater, &Updater::newDataArrived,
             dynamic_cast<MotorStats*>(motStat), &MotorStats::handleUpdate);
   }
-  const auto leftChanger = ui->leftChanger;
-  const auto rightChanger = ui->rightChanger;
+  const auto leftChanger = _ui->leftChanger;
+  const auto rightChanger = _ui->rightChanger;
   leftChanger->setArm(utl::EArm::Left);
   rightChanger->setArm(utl::EArm::Right);
-  const auto robotVis = ui->widget;
-  updater.startUpdaterThread();
+  const auto robotVis = _ui->widget;
+  _updater.startUpdaterThread();
 
-  connect(&updater, &Updater::newDataArrived, robotVis, &RobotVisualisation::updateRobotStatus);
-  connect(&updater, &Updater::newDataArrived, leftChanger, &ToolChanger::updateRobotStatus);
-  connect(&updater, &Updater::newDataArrived, rightChanger, &ToolChanger::updateRobotStatus);
+  connect(&_updater, &Updater::newDataArrived, robotVis, &RobotVisualisation::updateRobotStatus);
+  connect(&_updater, &Updater::newDataArrived, leftChanger, &ToolChanger::updateRobotStatus);
+  connect(&_updater, &Updater::newDataArrived, rightChanger, &ToolChanger::updateRobotStatus);
 
-  connect(leftChanger, &ToolChanger::buttonPressed, &updater, &Updater::sendCommand);
-  connect(rightChanger, &ToolChanger::buttonPressed, &updater, &Updater::sendCommand);
+  connect(leftChanger, &ToolChanger::buttonPressed, &_updater, &Updater::sendCommand);
+  connect(rightChanger, &ToolChanger::buttonPressed, &_updater, &Updater::sendCommand);
 
-  consoleSink= std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
-  qtSink = std::make_shared<QtLogSink>(ui->logOutput);
-  logger= std::make_shared<spdlog::logger>("gui",  spdlog::sinks_init_list{consoleSink, qtSink});
-  spdlog::register_logger(logger);
-  spdlog::set_default_logger(logger);  // optional
-  utl::configure_logger();
+  _consoleSink= std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+  _qtSink = std::make_shared<QtLogSink>(_ui->logOutput);
+  _logger= std::make_shared<spdlog::logger>("gui",  spdlog::sinks_init_list{_consoleSink, _qtSink});
+  spdlog::register_logger(_logger);
+  spdlog::set_default_logger(_logger);  // optional
+  utl::configureLogger();
 
   LedIndicator::initBlinkTimer();
 }
 
-MainWindow::~MainWindow() { delete ui; }
+MainWindow::~MainWindow() { delete _ui; }

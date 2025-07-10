@@ -1,12 +1,9 @@
-//
-// Created by piotrek on 6/10/25.
-//
-
 #pragma once
 
 #include <thread>
 #include <zmq.hpp>
-#include "logger.hpp"
+
+#include "Logger.hpp"
 #include "YamlExtensions.hpp"
 
 namespace utl {
@@ -16,10 +13,10 @@ class RimoServer {
  public:
   RimoServer(){
     _statusSocket = zmq::socket_t(_context, zmq::socket_type::pub);
-    _statusSocket.bind("ipc:///tmp/rimoStatus");
+    _statusSocket.bind(_statusAddress);
 
     _commandSocket = zmq::socket_t(_context, zmq::socket_type::rep);
-    _commandSocket.bind("ipc:///tmp/rimoCommand");
+    _commandSocket.bind(_commandAddress);
     _commandSocket.set(zmq::sockopt::rcvtimeo, 1000);
   }
   ~RimoServer() = default;
@@ -49,6 +46,8 @@ class RimoServer {
   zmq::context_t _context;
   zmq::socket_t _statusSocket;
   zmq::socket_t _commandSocket;
+  const std::string _statusAddress = "ipc:///tmp/rimoStatus";
+  const std::string _commandAddress = "ipc:///tmp/rimoCommand";
 };
 
 }  // namespace utl

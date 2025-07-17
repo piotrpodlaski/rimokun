@@ -36,13 +36,6 @@ int main(int argc, char* argv[]) {
     std::exit(1);
   }
 
-  QDirIterator it(":", QDirIterator::Subdirectories);
-
-  qDebug() << "Listing Qt Resources:";
-  while (it.hasNext()) {
-    qDebug() << it.next();
-  }
-
   utl::Config::instance().setConfigPath(configPath);
 
   QApplication a(argc, argv);

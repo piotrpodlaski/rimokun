@@ -17,7 +17,7 @@ MainWindow::MainWindow(QWidget* parent)
   _motorStats[utl::EMotor::ZRight] = _ui->mot6;
 
   setWindowTitle("Rimo-kun Control");
-  //setWindowIcon(QIcon(":/resources/rimoKunLogo.png"));
+  // setWindowIcon(QIcon(":/resources/rimoKunLogo.png"));
 
   for (auto& [eMot, motStat] : _motorStats) {
     motStat->setMotorId(eMot);
@@ -34,7 +34,7 @@ MainWindow::MainWindow(QWidget* parent)
   const auto rightChanger = _ui->rightChanger;
   leftChanger->setArm(utl::EArm::Left);
   rightChanger->setArm(utl::EArm::Right);
-  const auto robotVis = _ui->widget;
+  const auto robotVis = _ui->robotVis;
   _updater.startUpdaterThread();
 
   connect(&_updater, &Updater::newDataArrived, robotVis,
@@ -47,6 +47,9 @@ MainWindow::MainWindow(QWidget* parent)
   connect(leftChanger, &ToolChanger::buttonPressed, &_updater,
           &Updater::sendCommand);
   connect(rightChanger, &ToolChanger::buttonPressed, &_updater,
+          &Updater::sendCommand);
+
+  connect(_ui->auxControls, &AuxControls::buttonPressed, &_updater,
           &Updater::sendCommand);
 
   _consoleSink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
@@ -63,7 +66,6 @@ MainWindow::MainWindow(QWidget* parent)
   titleBar->setLeftLogo(QPixmap(":/resources/rimoKunLogo.png"));
   titleBar->setRightLogo(QPixmap(":/resources/KEKLogo.png"));
   titleBar->setTitleText("Remote Clamp Controller");
-
 }
 
 MainWindow::~MainWindow() { delete _ui; }

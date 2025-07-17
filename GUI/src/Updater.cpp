@@ -2,6 +2,7 @@
 
 #include "Logger.hpp"
 #include "QMessageBox"
+#include "ResponseConsumer.hpp"
 
 using namespace std::string_literals;
 
@@ -35,11 +36,30 @@ void Updater::sendCommand(const YAML::Node& command) {
     const auto msgNode = (*result)["message"];
     auto message = msgNode.as<std::string>();
     if (message.empty()) {
-      message ="Server did not provide any messages..."s;
+      message = "Server did not provide any messages..."s;
     }
     SPDLOG_ERROR("Server returned error status with message: '{}'", message);
     QMessageBox::critical(dynamic_cast<QWidget*>(this), "Error",
                           QString::fromStdString(message));
+  }
+  const auto sender = dynamic_cast<ResponseConsumer*>(QObject::sender());
+  const bool expectsResponse = (sender != nullptr);
+  const auto response = (*result)["response"];
+  if (expectsResponse) {
+    if (!response) {
+      SPDLOG_CRITICAL(
+          "Class {} was expecting a response, but server did not provide! This "
+          "should never happen! Note, that sender will be waiting for the "
+          "response and it may freeze the GUI!",
+          QObject::sender()->metaObject()->className());
+      return;
+    }
+    sender->processResponse(response);
+  } else if (response) {
+    SPDLOG_CRITICAL(
+        "Class {} was NOT expecting a response, but server send none! This "
+        "should never happen! Ignoring it and continuing execution",
+        QObject::sender()->metaObject()->className());
   }
 }
 

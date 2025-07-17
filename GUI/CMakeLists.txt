@@ -26,6 +26,7 @@ qt_add_executable(rimokunControl
 qt_add_resources(rimokunControl "images"
         PREFIX "/"
         FILES resources/rimoKunLogo.png
+        resources/KEKLogo.png
 )
 
 target_include_directories(rimokunControl

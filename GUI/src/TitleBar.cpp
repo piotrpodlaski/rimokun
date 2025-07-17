@@ -16,7 +16,7 @@ TitleBar::TitleBar(QWidget *parent)
 
     titleLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
     titleLabel->setAlignment(Qt::AlignCenter);
-    titleLabel->setStyleSheet("font-size: 20px; font-weight: bold;");
+    titleLabel->setStyleSheet("font-size: 40px; font-weight: bold;");
 
     // Wrap logos in containers
     leftBox = new QWidget;

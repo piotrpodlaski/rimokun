@@ -62,7 +62,7 @@ MainWindow::MainWindow(QWidget* parent)
 
   titleBar->setLeftLogo(QPixmap(":/resources/rimoKunLogo.png"));
   titleBar->setRightLogo(QPixmap(":/resources/KEKLogo.png"));
-  titleBar->setTitleText("My App Title");
+  titleBar->setTitleText("Remote Clamp Controller");
 
 }
 

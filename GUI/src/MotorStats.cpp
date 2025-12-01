@@ -1,4 +1,4 @@
-#include "MotorStats.hpp"
+﻿#include "MotorStats.hpp"
 #include "magic_enum/magic_enum.hpp"
 
 #include <format>

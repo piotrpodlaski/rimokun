@@ -18,7 +18,7 @@ class AuxControls final : public QWidget, public ResponseConsumer {
   void handleButtons();
 
  signals:
-  void buttonPressed(YAML::Node& button) const;
+  void buttonPressed(YAML::Node button) const;
 
  private:
   Ui::AuxControls* _ui;

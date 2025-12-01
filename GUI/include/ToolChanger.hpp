@@ -23,7 +23,7 @@ class ToolChanger final : public QWidget {
   void handleButtons();
 
  signals:
-  void buttonPressed(YAML::Node& button) const;
+  void buttonPressed(YAML::Node button) const;
 
  private:
   Ui::ToolChanger* _ui;

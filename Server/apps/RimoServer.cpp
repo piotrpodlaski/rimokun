@@ -5,6 +5,9 @@
 #include <iostream>
 #include <numbers>
 #include <print>
+#include <stdexcept>
+#include <string>
+#include <string_view>
 #include <thread>
 
 #include "Logger.hpp"
@@ -94,50 +97,88 @@ RobotStatus prepareFakeStatus() {
   return status;
 }
 
+namespace {
+void applyToolChangerAction(EArm position, std::string_view action) {
+  auto perform = [](auto& valveOpen, auto& valveClosed, auto& closedState,
+                    auto& openState, bool shouldClose) {
+    if (shouldClose) {
+      valveOpen = ELEDState::Off;
+      valveClosed = ELEDState::On;
+      std::this_thread::sleep_for(0.5s);
+      closedState = ELEDState::On;
+      openState = ELEDState::Off;
+    } else {
+      valveOpen = ELEDState::On;
+      valveClosed = ELEDState::Off;
+      std::this_thread::sleep_for(0.5s);
+      closedState = ELEDState::Off;
+      openState = ELEDState::On;
+    }
+  };
+
+  const bool shouldClose = (action == "close");
+  if (position == EArm::Left) {
+    perform(tclValveOpen, tclValveClosed, tclClosed, tclOpen, shouldClose);
+  } else {
+    perform(tcrValveOpen, tcrValveClosed, tcrClosed, tcrOpen, shouldClose);
+  }
+}
+
+std::string validateAction(const YAML::Node& command) {
+  const auto actionNode = command["action"];
+  if (!actionNode || !actionNode.IsScalar()) {
+    throw std::runtime_error("Missing or invalid 'action' entry");
+  }
+  const auto action = actionNode.as<std::string>();
+  if (action != "open" && action != "close") {
+    throw std::runtime_error("Unsupported tool changer action: " + action);
+  }
+  return action;
+}
+
+EArm validatePosition(const YAML::Node& command) {
+  const auto positionNode = command["position"];
+  if (!positionNode || !positionNode.IsScalar()) {
+    throw std::runtime_error("Missing or invalid 'position' entry");
+  }
+  try {
+    return positionNode.as<EArm>();
+  } catch (const YAML::Exception& ex) {
+    throw std::runtime_error(
+        std::string("Failed to parse 'position' entry: ") + ex.what());
+  }
+}
+}  // namespace
+
 [[noreturn]] void handleCommands(RimoServer<RobotStatus>& srv) {
   while (true) {
     if (auto command = srv.receiveCommand()) {
       SPDLOG_INFO("Received command:\n{}", YAML::Dump(*command));
-      YAML::Node node;
-      node["status"]="OK";
-      node["message"]="";
-      srv.sendResponse(node);
-      if ((*command)["type"].as<std::string>()=="toolChanger") {
-        auto position = (*command)["position"].as<EArm>();
-        auto action = (*command)["action"].as<std::string>();
-        if (position == EArm::Left) {
-          if (action == "close") {
-            tclValveOpen=ELEDState::Off;
-            tclValveClosed=ELEDState::On;
-            std::this_thread::sleep_for(0.5s);
-            tclClosed=ELEDState::On;
-            tclOpen=ELEDState::Off;
-          }
-          else if (action == "open") {
-            tclValveOpen=ELEDState::On;
-            tclValveClosed=ELEDState::Off;
-            std::this_thread::sleep_for(0.5s);
-            tclClosed=ELEDState::Off;
-            tclOpen=ELEDState::On;
-          }
+      YAML::Node response;
+      response["status"] = "OK";
+      response["message"] = "";
+      try {
+        if (!command->IsMap()) {
+          throw std::runtime_error("Command must be a map");
         }
-        else if (position == EArm::Right) {
-          if (action == "close") {
-            tcrValveOpen=ELEDState::Off;
-            tcrValveClosed=ELEDState::On;
-            std::this_thread::sleep_for(0.5s);
-            tcrClosed=ELEDState::On;
-            tcrOpen=ELEDState::Off;
-          }
-          else if (action == "open") {
-            tcrValveOpen=ELEDState::On;
-            tcrValveClosed=ELEDState::Off;
-            std::this_thread::sleep_for(0.5s);
-            tcrClosed=ELEDState::Off;
-            tcrOpen=ELEDState::On;
-          }
+        const auto typeNode = (*command)["type"];
+        if (!typeNode || !typeNode.IsScalar()) {
+          throw std::runtime_error("Command lacks a valid 'type' entry");
         }
+        const auto type = typeNode.as<std::string>();
+        if (type == "toolChanger") {
+          const auto position = validatePosition(*command);
+          const auto action = validateAction(*command);
+          applyToolChangerAction(position, action);
+        } else {
+          throw std::runtime_error("Unsupported command type: " + type);
+        }
+      } catch (const std::exception& ex) {
+        response["status"] = "ERROR";
+        response["message"] = ex.what();
+        SPDLOG_WARN("Failed to process command: {}", ex.what());
       }
+      srv.sendResponse(response);
     }
   }
 }

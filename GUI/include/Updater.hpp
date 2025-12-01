@@ -1,10 +1,13 @@
 #pragma once
+#include <QMetaType>
 #include <qobject.h>
 
 #include <thread>
 
 #include "CommonDefinitions.hpp"
 #include "RimoClient.hpp"
+
+Q_DECLARE_METATYPE(utl::RobotStatus);
 
 class Updater final : public QObject {
   Q_OBJECT

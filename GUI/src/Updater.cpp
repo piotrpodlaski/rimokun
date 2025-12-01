@@ -6,7 +6,18 @@
 
 using namespace std::string_literals;
 
-Updater::Updater(QObject* parent) : QObject(parent) { _client.init(); }
+namespace {
+void ensureMetaTypesRegistered() {
+  static const int robotStatusMetaType =
+      qRegisterMetaType<utl::RobotStatus>("utl::RobotStatus");
+  (void)robotStatusMetaType;
+}
+}  // namespace
+
+Updater::Updater(QObject* parent) : QObject(parent) {
+  ensureMetaTypesRegistered();
+  _client.init();
+}
 
 Updater::~Updater() { stopUpdaterThread(); }
 

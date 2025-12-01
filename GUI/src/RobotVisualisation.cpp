@@ -2,9 +2,10 @@
 
 #include <QGraphicsView>
 #include <QVBoxLayout>
-#include <iostream>
+#include <optional>
 
 #include "Config.hpp"
+#include "magic_enum/magic_enum.hpp"
 #include "spdlog/spdlog.h"
 
 RobotVisualisation::RobotVisualisation(QWidget* parent) : QWidget(parent) {
@@ -14,8 +15,6 @@ RobotVisualisation::RobotVisualisation(QWidget* parent) : QWidget(parent) {
 
   const auto configNode =
       utl::Config::instance().getClassConfig("RobotVisualisation");
-
-  std::cout << configNode << std::endl;
 
   _scene = new QGraphicsScene(this);
   _scene->setSceneRect(0, 0, configNode["scene"]["width"].as<int>(),
@@ -73,11 +72,27 @@ void RobotVisualisation::resizeEvent(QResizeEvent* event) {
 }
 
 void RobotVisualisation::updateRobotStatus(const utl::RobotStatus& rs) const {
-  auto xL = rs.motors.at(utl::EMotor::XLeft).currentPosition;
-  auto yL = rs.motors.at(utl::EMotor::YLeft).currentPosition;
-  moveLeft({xL, yL});
+  const auto updateArm = [&rs](utl::EMotor xMotor, utl::EMotor yMotor)
+      -> std::optional<QPointF> {
+    const auto xIt = rs.motors.find(xMotor);
+    const auto yIt = rs.motors.find(yMotor);
+    if (xIt == rs.motors.end() || yIt == rs.motors.end()) {
+      SPDLOG_WARN("Robot status lacks data for {} or {}. Skipping update.",
+                  magic_enum::enum_name(xMotor),
+                  magic_enum::enum_name(yMotor));
+      return std::nullopt;
+    }
+    return QPointF{xIt->second.currentPosition,
+                   yIt->second.currentPosition};
+  };
 
-  auto xR = rs.motors.at(utl::EMotor::XRight).currentPosition;
-  auto yR = rs.motors.at(utl::EMotor::YRight).currentPosition;
-  moveRight({xR, yR});
+  if (const auto leftPos =
+          updateArm(utl::EMotor::XLeft, utl::EMotor::YLeft)) {
+    moveLeft(*leftPos);
+  }
+
+  if (const auto rightPos =
+          updateArm(utl::EMotor::XRight, utl::EMotor::YRight)) {
+    moveRight(*rightPos);
+  }
 }

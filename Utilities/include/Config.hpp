@@ -10,26 +10,54 @@
 
 namespace utl {
 class Config : public Singleton<Config> {
- public:
+public:
   void setConfigPath(const std::string& configPath);
-  // template <typename T>
-  // YAML::Node getClassConfig(T obj) {
-  //   if (obj == nullptr) return {};
-  //   if (_configPath.empty()) {
-  //     constexpr auto msg =
-  //         "Config path is empty! Initialize the path first before calling "
-  //         "::setConfigPath method!";
-  //     SPDLOG_ERROR((msg));
-  //     throw std::runtime_error(msg);
-  //   }
-  //   auto className = getClassName(obj);
-  //   std::cout<<className<<std::endl;
-  //   return _topNode["classes"][className];
-  // }
 
-  YAML::Node getClassConfig(const std::string& className);
 
- private:
+  YAML::Node getClassConfig(std::string_view className) const;
+
+  template <typename T>
+  T getRequired(std::string_view className,
+                        std::string_view key) const {
+    YAML::Node classNode = getClassConfig(className);
+
+    YAML::Node valueNode = classNode[std::string(key)];
+    if (!valueNode || !valueNode.IsDefined()) {
+      throw std::runtime_error(std::format(
+          "Missing required key '{}.{}' in config file '{}'",
+          className, key, _configPath));
+    }
+
+    try {
+      return valueNode.as<T>();
+    } catch (const YAML::Exception& e) {
+      throw std::runtime_error(std::format(
+          "Invalid type for '{}.{}' in config file '{}': {}",
+          className, key, _configPath, e.what()));
+    }
+  }
+
+  template <typename T>
+  T getOptional(std::string_view className,
+                        std::string_view key,
+                        T defaultValue) const {
+    YAML::Node classNode = getClassConfig(className);
+
+    YAML::Node valueNode = classNode[std::string(key)];
+    if (!valueNode || !valueNode.IsDefined()) {
+      return defaultValue;
+    }
+
+    try {
+      return valueNode.as<T>();
+    } catch (const YAML::Exception& e) {
+      throw std::runtime_error(std::format(
+          "Invalid type for optional '{}.{}' in '{}': {}",
+          className, key, _configPath, e.what()));
+    }
+  }
+
+private:
   Config() = default;
   ~Config() = default;
 

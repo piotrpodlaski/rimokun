@@ -22,3 +22,10 @@ classes:
   RimoClient:
     statusAddress: *statusAddr
     commandAddress: *commandAddr
+  Contec:
+    ipAddress: "10.1.1.101"
+    port : 502
+    slaveId: 0
+    nDI : 16
+    nDO : 8
+    nAI : 0 #so far not used

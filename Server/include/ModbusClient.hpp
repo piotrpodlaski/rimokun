@@ -97,11 +97,10 @@ class ModbusClient {
     const auto sec = static_cast<uint32_t>(timeout.count() / 1000);
     const auto usec = static_cast<uint32_t>((timeout.count() % 1000) * 1000);
 
-
     if (modbus_set_response_timeout(ctx_, sec, usec) == -1) {
       return std::unexpected(last_error());
     }
-    return{};
+    return {};
   }
 
   // ---- Register operations ------------------------------------------------
@@ -145,6 +144,63 @@ class ModbusClient {
     if (rc == -1) {
       return std::unexpected(last_error());
     }
+    return {};
+  }
+
+  ModbusResult<std::vector<uint8_t>> read_bits(int addr, int count) {
+    std::vector<uint8_t> bits(static_cast<std::size_t>(count));
+
+    int rc = modbus_read_bits(ctx_, addr, count, bits.data());
+    if (rc == -1) {
+      return std::unexpected(last_error());
+    }
+
+    bits.resize(static_cast<std::size_t>(rc));
+    return bits;
+  }
+
+  ModbusResult<std::vector<bool>> read_input_bits(int addr, int count) {
+    std::vector<uint8_t> raw(static_cast<std::size_t>(count));
+
+    int rc = modbus_read_input_bits(ctx_, addr, count, raw.data());
+    if (rc == -1) {
+      return std::unexpected(last_error());
+    }
+
+    std::vector<bool> bits;
+    bits.reserve(static_cast<std::size_t>(rc));
+
+    for (int i = 0; i < rc; i++) {
+      bits.push_back(raw[i] != 0);  // take only lowest bit
+    }
+
+    return bits;
+  }
+
+  ModbusResult<void> write_bit(int addr, bool value) {
+    int rc = modbus_write_bit(ctx_, addr, value ? 1 : 0);
+    if (rc == -1) {
+      return std::unexpected(last_error());
+    }
+    return {};
+  }
+
+  ModbusResult<void> write_bits(int addr, const std::vector<bool>& values) {
+    // Copy bools into a buffer of uint8_t (0 or 1)
+    std::vector<uint8_t> raw;
+    raw.reserve(values.size());
+
+    for (bool b : values) {
+      raw.push_back(b ? 1 : 0);
+    }
+
+    int rc =
+        modbus_write_bits(ctx_, addr, static_cast<int>(raw.size()), raw.data());
+
+    if (rc == -1) {
+      return std::unexpected(last_error());
+    }
+
     return {};
   }
 

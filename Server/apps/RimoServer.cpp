@@ -104,13 +104,13 @@ void applyToolChangerAction(EArm position, std::string_view action) {
     if (shouldClose) {
       valveOpen = ELEDState::Off;
       valveClosed = ELEDState::On;
-      std::this_thread::sleep_for(0.5s);
+      std::this_thread::sleep_for(0.1s);
       closedState = ELEDState::On;
       openState = ELEDState::Off;
     } else {
       valveOpen = ELEDState::On;
       valveClosed = ELEDState::Off;
-      std::this_thread::sleep_for(0.5s);
+      std::this_thread::sleep_for(0.1s);
       closedState = ELEDState::Off;
       openState = ELEDState::On;
     }

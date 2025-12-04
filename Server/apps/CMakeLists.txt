@@ -1,4 +1,7 @@
-add_executable(rimoServer RimoServer.cpp)
+add_executable(rimoServerDummy rimoServerDummy.cpp)
+target_link_libraries(rimoServerDummy PRIVATE  rimoSrvlib)
+
+add_executable(rimoServer rimoServer.cpp)
 target_link_libraries(rimoServer PRIVATE  rimoSrvlib)
 
 add_executable(modbusTestRTU modbusTestRTU.cpp)

@@ -29,3 +29,14 @@ classes:
     nDI : 16
     nDO : 8
     nAI : 0 #so far not used
+  Machine:
+    loopSleepTimeMS: 10
+    inputMapping:
+      safetyON : 8
+      button1 : 9
+      button2 : 10
+    outputMapping:
+      toolChangerLeft: 0
+      toolChangerRight: 1
+      light1 : 2
+      light2 : 3

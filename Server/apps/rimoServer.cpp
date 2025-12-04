@@ -1,5 +1,3 @@
-#include "RimoServer.hpp"
-
 #include <atomic>
 #include <chrono>
 #include <iostream>
@@ -10,8 +8,9 @@
 #include <string_view>
 #include <thread>
 
-#include "Logger.hpp"
 #include "Config.hpp"
+#include "Logger.hpp"
+#include "RimoServer.hpp"
 #include "argparse/argparse.hpp"
 
 using namespace utl;

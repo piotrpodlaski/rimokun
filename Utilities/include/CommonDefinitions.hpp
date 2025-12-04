@@ -16,6 +16,8 @@ enum class EToolChangerStatusFlags {
   ClosedValve
 };
 
+enum class EToolChangerAction { Open, Close };
+
 std::string getMotorName(EMotor em);
 EMotor getMotorType(std::string name);
 

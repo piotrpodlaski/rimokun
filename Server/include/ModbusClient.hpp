@@ -147,15 +147,20 @@ class ModbusClient {
     return {};
   }
 
-  ModbusResult<std::vector<uint8_t>> read_bits(int addr, int count) {
-    std::vector<uint8_t> bits(static_cast<std::size_t>(count));
+  ModbusResult<std::vector<bool>> read_bits(int addr, int count) {
+    std::vector<uint8_t> raw(static_cast<std::size_t>(count));
 
-    int rc = modbus_read_bits(ctx_, addr, count, bits.data());
+    int rc = modbus_read_bits(ctx_, addr, count, raw.data());
     if (rc == -1) {
       return std::unexpected(last_error());
     }
 
-    bits.resize(static_cast<std::size_t>(rc));
+    std::vector<bool> bits;
+    bits.reserve(static_cast<std::size_t>(rc));
+
+    for (int i = 0; i < rc; i++) {
+      bits.push_back(raw[i] != 0);  // take only lowest bit
+    }
     return bits;
   }
 

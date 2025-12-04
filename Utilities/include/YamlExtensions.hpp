@@ -49,6 +49,10 @@ struct convert<utl::EMotorStatusFlags> : convert_enum<utl::EMotorStatusFlags> {
 };
 
 template <>
+struct convert<utl::EToolChangerAction> : convert_enum<utl::EToolChangerAction> {
+};
+
+template <>
 struct convert<utl::SingleMotorStatus> {
   static Node encode(const utl::SingleMotorStatus& rhs) {
     Node node;

@@ -101,3 +101,8 @@ void Contec::setOutputs(bitVector outputs) {
     throw std::runtime_error(msg);
   }
 }
+
+void Contec::reset() {
+  _modbus->close();
+  _modbus=std::nullopt;
+}

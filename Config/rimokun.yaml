@@ -35,6 +35,12 @@ classes:
       safetyON : 8
       button1 : 9
       button2 : 10
+      tclProx : 0
+      tclOpen : 2
+      tclClose: 3
+      tcrProx: 4
+      tcrOpen: 5
+      tcrClose: 6
     outputMapping:
       toolChangerLeft: 0
       toolChangerRight: 1

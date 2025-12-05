@@ -50,8 +50,9 @@ void Updater::sendCommand(const YAML::Node& command) {
       message = "Server did not provide any messages..."s;
     }
     SPDLOG_ERROR("Server returned error status with message: '{}'", message);
-    QMessageBox::critical(dynamic_cast<QWidget*>(this), "Error",
-                          QString::fromStdString(message));
+    //QMessageBox::critical(dynamic_cast<QWidget*>(this), "Error",
+      //                    QString::fromStdString(message));
+    spawnCriticalmessage(message);
   }
   const auto sender = dynamic_cast<ResponseConsumer*>(QObject::sender());
   const bool expectsResponse = (sender != nullptr);
@@ -82,6 +83,19 @@ void Updater::runner() {
     }
     emit newDataArrived(*status);
   }
+}
+void Updater::spawnCriticalmessage(std::string msg) {
+  QMessageBox *msgBox = new QMessageBox(); // Allocate on heap to ensure it persists
+  msgBox->setIcon(QMessageBox::Critical); // Set the critical icon
+  msgBox->setWindowTitle("Error");
+  msgBox->setText(QString::fromStdString(msg));
+  //msgBox->setInformativeText("Please check the logs for more details.");
+  msgBox->setStandardButtons(QMessageBox::Ok);
+  msgBox->setDefaultButton(QMessageBox::Ok);
+  msgBox->setAttribute(Qt::WA_DeleteOnClose); // delete pointer after close
+  msgBox->setModal(false);
+  msgBox->show();
+
 }
 
 void Updater::stopUpdaterThread() {

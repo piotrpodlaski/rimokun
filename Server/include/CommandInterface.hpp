@@ -5,7 +5,14 @@
 #include <optional>
 #include <future>
 #include <CommonDefinitions.hpp>
-#include <yaml-cpp/yaml.h>
+
+
+template <class... Ts>
+struct Overloaded : Ts... {
+  using Ts::operator()...;
+};
+template <class... Ts>
+Overloaded(Ts...) -> Overloaded<Ts...>;
 
 namespace cmd {
 
@@ -14,8 +21,17 @@ struct ToolChangerCommand {
   utl::EToolChangerAction action;
 };
 
+struct ReconnectCommand {
+  utl::ERobotComponent robotComponent;
+};
+
+struct AuxCommand {
+  utl::ERobotComponent robotComponent;
+};
+
+
 struct Command {
-  std::variant<ToolChangerCommand> payload;
+  std::variant<ToolChangerCommand, ReconnectCommand> payload;
   std::promise<std::string> reply;
 };
 

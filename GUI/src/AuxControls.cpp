@@ -1,6 +1,7 @@
 #include <AuxControls.hpp>
 #include <iostream>
 
+#include "spdlog/spdlog.h"
 #include "ui_AuxControls.h"
 
 AuxControls::AuxControls(QWidget* parent)
@@ -18,15 +19,15 @@ AuxControls::AuxControls(QWidget* parent)
 }
 
 void AuxControls::processResponse(const YAML::Node response) {
-  std::cout << response << std::endl;
+  SPDLOG_WARN(response.as<std::string>());
 }
 
 void AuxControls::handleButtons() {
   const auto sender = QObject::sender();
   YAML::Node command;
-  command["type"] = "auxControls";
+  command["type"] = "reset";
   if (sender == _ui->enableButton) {
-    command["action"] = "enableMotors";
+    command["system"] = "Contec";
   }
   else if (sender == _ui->disableButton) {
     command["action"] = "disableMotors";

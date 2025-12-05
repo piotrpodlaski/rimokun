@@ -32,6 +32,10 @@ struct convert_enum {
 };
 
 template <>
+struct convert<utl::EToolChangerAction> : convert_enum<utl::EToolChangerAction> {
+};
+
+template <>
 struct convert<utl::EMotor> : convert_enum<utl::EMotor> {};
 
 template <>
@@ -49,7 +53,7 @@ struct convert<utl::EMotorStatusFlags> : convert_enum<utl::EMotorStatusFlags> {
 };
 
 template <>
-struct convert<utl::EToolChangerAction> : convert_enum<utl::EToolChangerAction> {
+struct convert<utl::ERobotComponent> : convert_enum<utl::ERobotComponent> {
 };
 
 template <>
@@ -105,6 +109,9 @@ struct convert<utl::RobotStatus> {
     for (const auto& [arm, tc] : rhs.toolChangers) {
       node["toolChangers"][convert<utl::EArm>::encode(arm)] = tc;
     }
+    for (const auto& [cmp, tc] : rhs.robotComponents) {
+      node["robotComponents"][convert<utl::ERobotComponent>::encode(cmp)] = tc;
+    }
     return node;
   }
 
@@ -120,6 +127,12 @@ struct convert<utl::RobotStatus> {
       utl::EArm arm;
       if (!convert<utl::EArm>::decode(kv.first, arm)) return false;
       rhs.toolChangers[arm] = kv.second.as<utl::ToolChangerStatus>();
+    }
+
+    for (const auto& kv : node["robotComponents"]) {
+      utl::ERobotComponent cmp;
+      if (!convert<utl::ERobotComponent>::decode(kv.first, cmp)) return false;
+      rhs.robotComponents[cmp] = kv.second.as<utl::ELEDState>();
     }
 
     return true;

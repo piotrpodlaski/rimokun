@@ -18,6 +18,8 @@ enum class EToolChangerStatusFlags {
 
 enum class EToolChangerAction { Open, Close };
 
+enum class ERobotComponent {Contec, MotorControl};
+
 std::string getMotorName(EMotor em);
 EMotor getMotorType(std::string name);
 
@@ -36,6 +38,7 @@ struct ToolChangerStatus {
 struct RobotStatus {
   std::map<EMotor, SingleMotorStatus> motors;
   std::map<EArm, ToolChangerStatus> toolChangers;
+  std::map<ERobotComponent, ELEDState> robotComponents;
 };
 
 }  // namespace utl

@@ -9,18 +9,28 @@
 typedef std::map<std::string, bool> signalMap_t;
 
 class Machine {
+  enum class EContecState {
+    Normal,
+    Error
+  };
  public:
   Machine();
   ~Machine() = default;
 
-  signalMap_t getInputSignals();
+  std::optional<signalMap_t> readInputSignals();
   void setOutputs(signalMap_t signals);
-  signalMap_t readInputSignals();
-  void init();
+  std::optional<signalMap_t> readOutputSignals();
+  void initialize();
+  void shutdown();
 
  private:
-  void handleCommandsThread();
+  void commandServerThread();
   void processThread();
+  void controlLoopTasks();
+  void handleToolChangerCommand(const cmd::ToolChangerCommand& c);
+  void handleReconnectCommand(const cmd::ReconnectCommand& c);
+  void makeDummyStatus();
+  void updateStatus();
   Contec _contec;
   std::map<std::string, unsigned int> _inputMapping;
   std::map<std::string, unsigned int> _outputMapping;
@@ -29,4 +39,7 @@ class Machine {
   std::atomic<bool> _isRunning;
   std::chrono::duration<double> _loopSleepTime;
   utl::RimoServer<utl::RobotStatus> _robotServer;
+  std::thread _commandServerThread;
+  std::thread _processThread;
+  EContecState _contecState{EContecState::Normal};
 };

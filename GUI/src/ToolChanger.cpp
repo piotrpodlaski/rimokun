@@ -5,6 +5,7 @@
 #include "spdlog/spdlog.h"
 #include "ui_ToolChanger.h"
 #include "yaml-cpp/yaml.h"
+#include "YamlExtensions.hpp"
 
 using namespace utl;
 
@@ -57,7 +58,7 @@ void ToolChanger::handleButtons() {
   command["position"] = magic_enum::enum_name(_arm);
   auto reply = QMessageBox::No;
   if (sender == _ui->closeButton) {
-    command["action"] = "close";
+    command["action"] = EToolChangerAction::Close;
     auto msg =
         std::format("Are you sure you want to close the {} tool changer?",
                     magic_enum::enum_name(_arm));
@@ -72,7 +73,7 @@ void ToolChanger::handleButtons() {
                                    QMessageBox::Yes | QMessageBox::No);
     }
   } else if (sender == _ui->openButon) {
-    command["action"] = "open";
+    command["action"] = EToolChangerAction::Open;
     const auto msg =
         std::format("Are you sure you want to open the {} tool changer?",
                     magic_enum::enum_name(_arm));

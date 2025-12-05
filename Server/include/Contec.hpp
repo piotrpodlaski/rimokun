@@ -7,6 +7,7 @@ class Contec {
  public:
   Contec();
   ~Contec();
+  void reset();
   bitVector readInputs();
   bitVector readOutputs();
   void setOutputs(bitVector outputs);

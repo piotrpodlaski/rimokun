@@ -49,8 +49,15 @@ MainWindow::MainWindow(QWidget* parent)
   connect(rightChanger, &ToolChanger::buttonPressed, &_updater,
           &Updater::sendCommand);
 
-  connect(_ui->auxControls, &AuxControls::buttonPressed, &_updater,
+  connect(_ui->resetControls, &ResetControls::buttonPressed, &_updater,
           &Updater::sendCommand);
+
+  connect(&_updater, &Updater::newDataArrived, _ui->resetControls,
+          &ResetControls::updateRobotStatus);
+
+  connect(&_updater, &Updater::serverNotConnected, _ui->resetControls,
+          &ResetControls::announceServerError);
+
 
   _consoleSink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
   _qtSink = std::make_shared<QtLogSink>(_ui->logOutput);

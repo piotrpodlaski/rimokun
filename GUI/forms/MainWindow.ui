@@ -287,13 +287,28 @@
        </widget>
       </item>
       <item>
-       <widget class="AuxControls" name="auxControls" native="true">
-        <property name="minimumSize">
-         <size>
-          <width>150</width>
-          <height>0</height>
-         </size>
+       <widget class="QGroupBox" name="groupBox_7">
+        <property name="title">
+         <string>Component status</string>
         </property>
+        <layout class="QHBoxLayout" name="horizontalLayout_6">
+         <item>
+          <widget class="ResetControls" name="resetControls" native="true">
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+             <horstretch>0</horstretch>
+             <verstretch>0</verstretch>
+            </sizepolicy>
+           </property>
+           <property name="minimumSize">
+            <size>
+             <width>250</width>
+             <height>0</height>
+            </size>
+           </property>
+          </widget>
+         </item>
+        </layout>
        </widget>
       </item>
      </layout>
@@ -373,9 +388,9 @@ li.checked::marker { content: &quot;\2612&quot;; }
    <container>1</container>
   </customwidget>
   <customwidget>
-   <class>AuxControls</class>
+   <class>ResetControls</class>
    <extends>QWidget</extends>
-   <header location="global">AuxControls.hpp</header>
+   <header location="global">ResetControls.hpp</header>
    <container>1</container>
   </customwidget>
  </customwidgets>

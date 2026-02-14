@@ -19,6 +19,7 @@ class Updater final : public QObject {
 
  signals:
   void newDataArrived(const utl::RobotStatus& staus);
+  void serverNotConnected();
 
  public slots:
   void sendCommand(const YAML::Node& command);

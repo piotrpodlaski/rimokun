@@ -79,6 +79,7 @@ void Updater::runner() {
   while (_running) {
     auto status = _client.receiveRobotStatus();
     if (!status) {
+      emit serverNotConnected();
       continue;
     }
     emit newDataArrived(*status);

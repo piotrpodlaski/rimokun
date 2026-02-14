@@ -18,7 +18,7 @@ enum class EToolChangerStatusFlags {
 
 enum class EToolChangerAction { Open, Close };
 
-enum class ERobotComponent {Contec, MotorControl};
+enum class ERobotComponent {Contec, MotorControl, ControlPanel};
 
 std::string getMotorName(EMotor em);
 EMotor getMotorType(std::string name);

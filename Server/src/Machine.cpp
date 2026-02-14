@@ -24,7 +24,7 @@ std::optional<signalMap_t> Machine::readInputSignals() {
       inputSignals[signal] = inputs[index];
     }
   } catch (const std::exception& e) {
-    SPDLOG_WARN("Exception caught in 'readInputSignals'! {}", e.what());
+    SPDLOG_ERROR("Exception caught in 'readInputSignals'! {}", e.what());
     _contecState = EContecState::Error;
     return std::nullopt;
   }
@@ -262,7 +262,7 @@ void Machine::updateStatus() {
         utl::ELEDState::On;
   } else {
     _robotStatus.robotComponents[utl::ERobotComponent::Contec] =
-        utl::ELEDState::ErrorBlinking;
+        utl::ELEDState::Error;
   }
   _robotServer.publish(_robotStatus);
   auto inputs = readInputSignals();

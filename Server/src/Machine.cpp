@@ -153,7 +153,7 @@ void Machine::commandServerThread() {
         _commandQueue.push(std::move(c));
         std::string reply = fut.get();
         response["message"] = "";
-        if (reply == "") {  // everything OK
+        if (reply.empty()) {  // everything OK
           response["status"] = "OK";
         } else {  // there was a problem
           response["status"] = "Error";
@@ -169,7 +169,7 @@ void Machine::commandServerThread() {
         _commandQueue.push(std::move(c));
         std::string reply = fut.get();
         response["message"] = "";
-        if (reply == "") {  // everything OK
+        if (reply.empty()) {  // everything OK
           response["status"] = "OK";
         } else {  // there was a problem
           response["status"] = "Error";
@@ -220,6 +220,7 @@ void Machine::handleToolChangerCommand(const cmd::ToolChangerCommand& c) {
 void Machine::handleReconnectCommand(const cmd::ReconnectCommand& c) {
   if (c.robotComponent == utl::ERobotComponent::Contec) {
     // this should be enough to reset...
+    SPDLOG_INFO("Reconnecting to Contec...");
     _contec.reset();
     _contecState = EContecState::Normal;
     makeDummyStatus();

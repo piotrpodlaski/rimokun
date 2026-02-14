@@ -84,7 +84,7 @@ Contec::bitVector Contec::readOutputs() {
   return *regs;
 }
 
-void Contec::setOutputs(bitVector outputs) {
+void Contec::setOutputs(const bitVector& outputs) {
   if (outputs.size() != _nDO) {
     auto msg =
         std::format("Invalid number of outputs provided! {} instead of {}",
@@ -103,6 +103,7 @@ void Contec::setOutputs(bitVector outputs) {
 }
 
 void Contec::reset() {
-  _modbus->close();
+  if (_modbus)
+    _modbus->close();
   _modbus=std::nullopt;
 }

@@ -10,9 +10,9 @@ class Contec {
   void reset();
   bitVector readInputs();
   bitVector readOutputs();
-  void setOutputs(bitVector outputs);
-  unsigned int getNOutputs() {return _nDO;}
-  unsigned int getNInputs() {return _nDI;}
+  void setOutputs(const bitVector& outputs);
+  unsigned int getNOutputs() const {return _nDO;}
+  unsigned int getNInputs() const {return _nDI;}
 
 
 private:

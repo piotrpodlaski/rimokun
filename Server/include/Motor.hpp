@@ -82,6 +82,18 @@ struct MotorDirectIoStatus {
   std::vector<std::string_view> activeFlags;
 };
 
+enum class MotorOperationMode : std::int32_t {
+  Incremental = 0,
+  Absolute = 1,
+};
+
+enum class MotorOperationFunction : std::int32_t {
+  SingleMotion = 0,
+  LinkedMotion = 1,
+  LinkedMotion2 = 2,
+  Push = 3,
+};
+
 class Motor {
  public:
   Motor(utl::EMotor id, int slaveAddress, MotorRegisterMap map);
@@ -123,6 +135,28 @@ class Motor {
   void setReverse(ModbusClient& bus, bool enabled) const;
   void setJogPlus(ModbusClient& bus, bool enabled) const;
   void setJogMinus(ModbusClient& bus, bool enabled) const;
+  [[nodiscard]] static std::uint8_t decodeOperationIdFromInputRaw(
+      std::uint16_t raw);
+  [[nodiscard]] std::uint8_t readSelectedOperationId(ModbusClient& bus) const;
+  void setSelectedOperationId(ModbusClient& bus, std::uint8_t opId) const;
+  void setOperationMode(ModbusClient& bus, std::uint8_t opId,
+                        MotorOperationMode mode) const;
+  void setOperationFunction(ModbusClient& bus, std::uint8_t opId,
+                            MotorOperationFunction function) const;
+  void setOperationPosition(ModbusClient& bus, std::uint8_t opId,
+                            std::int32_t position) const;
+  void setOperationSpeed(ModbusClient& bus, std::uint8_t opId,
+                         std::int32_t speed) const;
+  void setOperationAcceleration(ModbusClient& bus, std::uint8_t opId,
+                                std::int32_t acceleration) const;
+  void setOperationDeceleration(ModbusClient& bus, std::uint8_t opId,
+                                std::int32_t deceleration) const;
+  void configureConstantSpeedPair(ModbusClient& bus, std::int32_t speedOp0,
+                                  std::int32_t speedOp1, std::int32_t acceleration,
+                                  std::int32_t deceleration) const;
+  // Double-buffer update for constant-speed operation (op0/op1 swap).
+  // Writes speed to inactive operation and switches selected opId.
+  void updateConstantSpeedBuffered(ModbusClient& bus, std::int32_t speed) const;
   [[nodiscard]] MotorFlagStatus decodeDriverInputStatus(std::uint16_t raw) const;
   [[nodiscard]] MotorFlagStatus decodeDriverOutputStatus(std::uint16_t raw) const;
   [[nodiscard]] MotorDirectIoStatus decodeDirectIoAndBrakeStatus(

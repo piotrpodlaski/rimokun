@@ -9,3 +9,6 @@ target_link_libraries(modbusTestRTU  PUBLIC  rimoSrvlib)
 
 add_executable(modbusTestTCP modbusTestTCP.cpp)
 target_link_libraries(modbusTestTCP  PRIVATE  rimoSrvlib)
+
+add_executable(motorControlDemo motorControlDemo.cpp)
+target_link_libraries(motorControlDemo PRIVATE rimoSrvlib)

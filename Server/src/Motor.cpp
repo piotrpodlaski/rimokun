@@ -99,6 +99,22 @@ std::string joinFlags(const std::vector<std::string_view>& flags) {
   }
   return out;
 }
+
+constexpr std::uint16_t kOperationIdMask =
+    static_cast<std::uint16_t>(MotorInputFlag::M0) |
+    static_cast<std::uint16_t>(MotorInputFlag::M1) |
+    static_cast<std::uint16_t>(MotorInputFlag::M2) |
+    static_cast<std::uint16_t>(MotorInputFlag::Ms0) |
+    static_cast<std::uint16_t>(MotorInputFlag::Ms1) |
+    static_cast<std::uint16_t>(MotorInputFlag::Ms2);
+
+int operationAddr(const int baseUpperAddr, const std::uint8_t opId) {
+  if (opId > 63) {
+    throw std::runtime_error(std::format("Invalid operation id {} (allowed 0..63)",
+                                         static_cast<int>(opId)));
+  }
+  return baseUpperAddr + static_cast<int>(opId) * 2;
+}
 }  // namespace
 
 Motor::Motor(utl::EMotor id, int slaveAddress, MotorRegisterMap map)
@@ -310,6 +326,98 @@ void Motor::setJogPlus(ModbusClient& bus, const bool enabled) const {
 
 void Motor::setJogMinus(ModbusClient& bus, const bool enabled) const {
   setDriverInputFlag(bus, MotorInputFlag::MinusJog, enabled);
+}
+
+std::uint8_t Motor::decodeOperationIdFromInputRaw(const std::uint16_t raw) {
+  std::uint8_t opId = 0;
+  if ((raw & static_cast<std::uint16_t>(MotorInputFlag::M0)) != 0) opId |= 1u;
+  if ((raw & static_cast<std::uint16_t>(MotorInputFlag::M1)) != 0) opId |= 2u;
+  if ((raw & static_cast<std::uint16_t>(MotorInputFlag::M2)) != 0) opId |= 4u;
+  if ((raw & static_cast<std::uint16_t>(MotorInputFlag::Ms0)) != 0) opId |= 8u;
+  if ((raw & static_cast<std::uint16_t>(MotorInputFlag::Ms1)) != 0)
+    opId |= 16u;
+  if ((raw & static_cast<std::uint16_t>(MotorInputFlag::Ms2)) != 0)
+    opId |= 32u;
+  return opId;
+}
+
+std::uint8_t Motor::readSelectedOperationId(ModbusClient& bus) const {
+  return decodeOperationIdFromInputRaw(readDriverInputCommandRaw(bus));
+}
+
+void Motor::setSelectedOperationId(ModbusClient& bus, const std::uint8_t opId) const {
+  if (opId > 63) {
+    throw std::runtime_error(std::format("Invalid operation id {} (allowed 0..63)",
+                                         static_cast<int>(opId)));
+  }
+  auto raw = readDriverInputCommandRaw(bus);
+  raw = static_cast<std::uint16_t>(raw & ~kOperationIdMask);
+  if ((opId & 1u) != 0) raw |= static_cast<std::uint16_t>(MotorInputFlag::M0);
+  if ((opId & 2u) != 0) raw |= static_cast<std::uint16_t>(MotorInputFlag::M1);
+  if ((opId & 4u) != 0) raw |= static_cast<std::uint16_t>(MotorInputFlag::M2);
+  if ((opId & 8u) != 0) raw |= static_cast<std::uint16_t>(MotorInputFlag::Ms0);
+  if ((opId & 16u) != 0) raw |= static_cast<std::uint16_t>(MotorInputFlag::Ms1);
+  if ((opId & 32u) != 0) raw |= static_cast<std::uint16_t>(MotorInputFlag::Ms2);
+  writeDriverInputCommandRaw(bus, raw);
+}
+
+void Motor::setOperationMode(ModbusClient& bus, const std::uint8_t opId,
+                             const MotorOperationMode mode) const {
+  writeInt32(bus, operationAddr(_map.operationModeNo0, opId),
+             static_cast<std::int32_t>(mode));
+}
+
+void Motor::setOperationFunction(ModbusClient& bus, const std::uint8_t opId,
+                                 const MotorOperationFunction function) const {
+  // Operation function starts at 0x0580 and is contiguous.
+  writeInt32(bus, operationAddr(_map.operationModeNo0 + 0x80, opId),
+             static_cast<std::int32_t>(function));
+}
+
+void Motor::setOperationPosition(ModbusClient& bus, const std::uint8_t opId,
+                                 const std::int32_t position) const {
+  writeInt32(bus, operationAddr(_map.positionNo0, opId), position);
+}
+
+void Motor::setOperationSpeed(ModbusClient& bus, const std::uint8_t opId,
+                              const std::int32_t speed) const {
+  writeInt32(bus, operationAddr(_map.speedNo0, opId), speed);
+}
+
+void Motor::setOperationAcceleration(ModbusClient& bus, const std::uint8_t opId,
+                                     const std::int32_t acceleration) const {
+  writeInt32(bus, operationAddr(_map.accelerationNo0, opId), acceleration);
+}
+
+void Motor::setOperationDeceleration(ModbusClient& bus, const std::uint8_t opId,
+                                     const std::int32_t deceleration) const {
+  writeInt32(bus, operationAddr(_map.decelerationNo0, opId), deceleration);
+}
+
+void Motor::configureConstantSpeedPair(ModbusClient& bus,
+                                       const std::int32_t speedOp0,
+                                       const std::int32_t speedOp1,
+                                       const std::int32_t acceleration,
+                                       const std::int32_t deceleration) const {
+  setOperationMode(bus, 0, MotorOperationMode::Incremental);
+  setOperationMode(bus, 1, MotorOperationMode::Incremental);
+  setOperationFunction(bus, 0, MotorOperationFunction::SingleMotion);
+  setOperationFunction(bus, 1, MotorOperationFunction::SingleMotion);
+  setOperationSpeed(bus, 0, speedOp0);
+  setOperationSpeed(bus, 1, speedOp1);
+  setOperationAcceleration(bus, 0, acceleration);
+  setOperationAcceleration(bus, 1, acceleration);
+  setOperationDeceleration(bus, 0, deceleration);
+  setOperationDeceleration(bus, 1, deceleration);
+  setSelectedOperationId(bus, 0);
+}
+
+void Motor::updateConstantSpeedBuffered(ModbusClient& bus,
+                                        const std::int32_t speed) const {
+  const auto active = readSelectedOperationId(bus);
+  const std::uint8_t next = (active == 0u) ? 1u : 0u;
+  setOperationSpeed(bus, next, speed);
+  setSelectedOperationId(bus, next);
 }
 
 MotorFlagStatus Motor::decodeDriverInputStatus(const std::uint16_t raw) const {

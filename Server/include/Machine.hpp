@@ -1,5 +1,7 @@
 #pragma once
 #include <Contec.hpp>
+#include <ControlPanel.hpp>
+#include <MachineComponent.hpp>
 #include <map>
 #include <atomic>
 #include <CommonDefinitions.hpp>
@@ -9,10 +11,6 @@
 typedef std::map<std::string, bool> signalMap_t;
 
 class Machine {
-  enum class EContecState {
-    Normal,
-    Error
-  };
  public:
   Machine();
   ~Machine() = default;
@@ -29,9 +27,13 @@ class Machine {
   void controlLoopTasks();
   void handleToolChangerCommand(const cmd::ToolChangerCommand& c);
   void handleReconnectCommand(const cmd::ReconnectCommand& c);
+  MachineComponent* getComponent(utl::ERobotComponent component);
+  static utl::ELEDState stateToLed(MachineComponent::State state);
   void makeDummyStatus();
   void updateStatus();
   Contec _contec;
+  ControlPanel _controlPanel;
+  std::map<utl::ERobotComponent, MachineComponent*> _components;
   std::map<std::string, unsigned int> _inputMapping;
   std::map<std::string, unsigned int> _outputMapping;
   utl::RobotStatus _robotStatus;
@@ -41,5 +43,4 @@ class Machine {
   utl::RimoServer<utl::RobotStatus> _robotServer;
   std::thread _commandServerThread;
   std::thread _processThread;
-  EContecState _contecState{EContecState::Normal};
 };

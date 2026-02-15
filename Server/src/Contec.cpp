@@ -15,6 +15,25 @@ Contec::Contec() {
       cfg.getOptional<unsigned>("Contec", "responseTimeoutMS", 1000u);
 }
 
+void Contec::initialize() {
+  try {
+    auto& client = ensureModbusClient();
+    auto outputs = client.read_bits(0, _nDO);
+    if (!outputs) {
+      auto msg = std::format("Contec Modbus test failed on read_bits({}, {}): {}",
+                             0, _nDO, outputs.error().message);
+      SPDLOG_ERROR(msg);
+      setState(State::Error);
+      throw std::runtime_error(msg);
+    }
+    setState(State::Normal);
+  } catch (const std::exception& e) {
+    SPDLOG_ERROR("Failed to initialize Contec: {}", e.what());
+    setState(State::Error);
+    throw;
+  }
+}
+
 ModbusClient& Contec::ensureModbusClient() {
   // Already have a client
   if (_modbus) {
@@ -28,6 +47,7 @@ ModbusClient& Contec::ensureModbusClient() {
     auto msg = std::format("Failed to create Modbus TCP client: {}",
                            cli_res.error().message);
     SPDLOG_CRITICAL(msg);
+    setState(State::Error);
     throw std::runtime_error(msg);
   }
 
@@ -40,6 +60,7 @@ ModbusClient& Contec::ensureModbusClient() {
     auto msg = std::format("Failed to connect to {}:{} (slave {}): {}",
                            _ipAddress, _port, _slaveId, err.message);
     SPDLOG_CRITICAL(msg);
+    setState(State::Error);
     throw std::runtime_error(msg);
   }
 
@@ -52,13 +73,19 @@ ModbusClient& Contec::ensureModbusClient() {
     auto msg =
         std::format("Failed to set response timeout: {}", err.message);
     SPDLOG_CRITICAL(msg);
+    setState(State::Error);
     throw std::runtime_error(msg);
   }
 
+  setState(State::Normal);
   return *_modbus;
 }
 
-Contec::~Contec() { _modbus->close(); }
+Contec::~Contec() {
+  if (_modbus) {
+    _modbus->close();
+  }
+}
 
 Contec::bitVector Contec::readInputs() {
   auto& client = ensureModbusClient();
@@ -67,8 +94,10 @@ Contec::bitVector Contec::readInputs() {
     auto msg = std::format("read_input_bits({}, {}) failed: {}", 0, _nDI,
                            regs.error().message);
     SPDLOG_CRITICAL(msg);
+    setState(State::Error);
     throw std::runtime_error(msg);
   }
+  setState(State::Normal);
   return *regs;
 }
 
@@ -76,11 +105,13 @@ Contec::bitVector Contec::readOutputs() {
   auto& client = ensureModbusClient();
   auto regs = client.read_bits(0, _nDO);
   if (!regs) {
-    auto msg = std::format("read_bits({}, {}) failed: {}", 0, _nDI,
+    auto msg = std::format("read_bits({}, {}) failed: {}", 0, _nDO,
                            regs.error().message);
     SPDLOG_CRITICAL(msg);
+    setState(State::Error);
     throw std::runtime_error(msg);
   }
+  setState(State::Normal);
   return *regs;
 }
 
@@ -95,15 +126,19 @@ void Contec::setOutputs(const bitVector& outputs) {
   auto& client = ensureModbusClient();
   auto ret = client.write_bits(0, outputs);
   if (!ret) {
-    auto msg = std::format("write_bits({}, {}) failed: {}", 0, _nDI,
+    auto msg = std::format("write_bits({}, {}) failed: {}", 0, _nDO,
                            ret.error().message);
     SPDLOG_CRITICAL(msg);
+    setState(State::Error);
     throw std::runtime_error(msg);
   }
+  setState(State::Normal);
 }
 
 void Contec::reset() {
-  if (_modbus)
+  if (_modbus) {
     _modbus->close();
-  _modbus=std::nullopt;
+  }
+  _modbus = std::nullopt;
+  setState(State::Error);
 }

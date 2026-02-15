@@ -1,6 +1,6 @@
 #include "ToolChanger.hpp"
 
-#include "QMessageBox"
+#include "StyledPopup.hpp"
 #include "magic_enum/magic_enum.hpp"
 #include "spdlog/spdlog.h"
 #include "ui_ToolChanger.h"
@@ -63,22 +63,25 @@ void ToolChanger::handleButtons() {
         std::format("Are you sure you want to close the {} tool changer?",
                     magic_enum::enum_name(_arm));
     if (*(_ui->proxLamp))
-      reply = QMessageBox::question(this, "Confirmation", QString(msg.c_str()),
-                                    QMessageBox::Yes | QMessageBox::No);
+      reply = StyledPopup::askQuestion("Confirmation", QString::fromStdString(msg),
+                                       QMessageBox::Yes | QMessageBox::No,
+                                       QMessageBox::No, this);
     else {
       msg +=
           " Proximity sensor did not detect the clamp-side tool changer. Is it "
           "intentional?";
-      reply = QMessageBox::warning(this, "Warning", QString(msg.c_str()),
-                                   QMessageBox::Yes | QMessageBox::No);
+      reply = StyledPopup::askWarning("Warning", QString::fromStdString(msg),
+                                      QMessageBox::Yes | QMessageBox::No,
+                                      QMessageBox::No, this);
     }
   } else if (sender == _ui->openButon) {
     command["action"] = EToolChangerAction::Open;
     const auto msg =
         std::format("Are you sure you want to open the {} tool changer?",
                     magic_enum::enum_name(_arm));
-    reply = QMessageBox::question(this, "Confirmation", QString(msg.c_str()),
-                                  QMessageBox::Yes | QMessageBox::No);
+    reply = StyledPopup::askQuestion("Confirmation", QString::fromStdString(msg),
+                                     QMessageBox::Yes | QMessageBox::No,
+                                     QMessageBox::No, this);
   }
   if (reply == QMessageBox::Yes) emit buttonPressed(command);
 }

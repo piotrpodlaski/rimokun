@@ -11,10 +11,13 @@ Machine::Machine() {
   _outputMapping = cfg.getRequired<std::map<std::string, unsigned int>>(
       "Machine", "outputMapping");
   _loopSleepTime = 1ms * cfg.getRequired<double>("Machine", "loopSleepTimeMS");
+
+  _components.emplace(_contec.componentType(), &_contec);
+  _components.emplace(_controlPanel.componentType(), &_controlPanel);
 }
 
 std::optional<signalMap_t> Machine::readInputSignals() {
-  if (_contecState == EContecState::Error) {
+  if (_contec.state() == MachineComponent::State::Error) {
     return std::nullopt;
   }
   signalMap_t inputSignals;
@@ -25,14 +28,13 @@ std::optional<signalMap_t> Machine::readInputSignals() {
     }
   } catch (const std::exception& e) {
     SPDLOG_ERROR("Exception caught in 'readInputSignals'! {}", e.what());
-    _contecState = EContecState::Error;
     return std::nullopt;
   }
   return inputSignals;
 }
 
 void Machine::setOutputs(signalMap_t signals) {
-  if (_contecState == EContecState::Error) {
+  if (_contec.state() == MachineComponent::State::Error) {
     return;
   }
   try {
@@ -43,12 +45,11 @@ void Machine::setOutputs(signalMap_t signals) {
     _contec.setOutputs(outputs);
   } catch (const std::exception& e) {
     SPDLOG_ERROR("Exception caught in 'setOutputs'! {}", e.what());
-    _contecState = EContecState::Error;
   }
 }
 
 std::optional<signalMap_t> Machine::readOutputSignals() {
-  if (_contecState == EContecState::Error) {
+  if (_contec.state() == MachineComponent::State::Error) {
     return std::nullopt;
   }
   try {
@@ -60,7 +61,6 @@ std::optional<signalMap_t> Machine::readOutputSignals() {
     return outputSignals;
   } catch (const std::exception& e) {
     SPDLOG_WARN("Exception caught in 'readOutputSignals'! {}", e.what());
-    _contecState = EContecState::Error;
     return std::nullopt;
   }
 }
@@ -94,7 +94,7 @@ void Machine::processThread() {
 void Machine::controlLoopTasks() {
   // CONTEC
   auto inputs = readInputSignals();
-  if (!inputs || _contecState == EContecState::Error) {
+  if (!inputs || _contec.state() == MachineComponent::State::Error) {
     // unable to access Contec for whatever reason, producing errors!
     for (auto& [_, tc] : _robotStatus.toolChangers) {
       for (auto& [_, flag] : tc.flags) {
@@ -112,6 +112,14 @@ void Machine::controlLoopTasks() {
 
 void Machine::initialize() {
   makeDummyStatus();
+  for (const auto& [componentType, component] : _components) {
+    try {
+      component->initialize();
+    } catch (const std::exception& e) {
+      SPDLOG_ERROR("{} initialization failed: {}",
+                   magic_enum::enum_name(componentType), e.what());
+    }
+  }
   _isRunning = true;
   _commandServerThread = std::thread(&Machine::commandServerThread, this);
   _processThread = std::thread(&Machine::processThread, this);
@@ -193,7 +201,7 @@ void Machine::commandServerThread() {
 void Machine::handleToolChangerCommand(const cmd::ToolChangerCommand& c) {
   SPDLOG_INFO("Changing status of '{}' tool changer to '{}'",
               magic_enum::enum_name(c.arm), magic_enum::enum_name(c.action));
-  if (_contecState == EContecState::Error) {
+  if (_contec.state() == MachineComponent::State::Error) {
     std::string msg =
         "Contec is in error state. Not possible to alter tool changer state!";
     SPDLOG_ERROR(msg);
@@ -218,13 +226,27 @@ void Machine::handleToolChangerCommand(const cmd::ToolChangerCommand& c) {
   }
 }
 void Machine::handleReconnectCommand(const cmd::ReconnectCommand& c) {
-  if (c.robotComponent == utl::ERobotComponent::Contec) {
-    // this should be enough to reset...
-    SPDLOG_INFO("Reconnecting to Contec...");
-    _contec.reset();
-    _contecState = EContecState::Normal;
-    makeDummyStatus();
+  MachineComponent* component = getComponent(c.robotComponent);
+  if (!component) {
+    auto msg = std::format("Resetting of '{}' is not implemented!",
+                           magic_enum::enum_name(c.robotComponent));
+    throw std::runtime_error(msg);
   }
+  SPDLOG_INFO("Reconnecting {}...", magic_enum::enum_name(c.robotComponent));
+  component->reset();
+  try {
+    component->initialize();
+  } catch (const std::exception& e) {
+    auto msg = std::format("Resetting '{}' failed: {}",
+                           magic_enum::enum_name(c.robotComponent), e.what());
+    throw std::runtime_error(msg);
+  }
+  if (component->state() != MachineComponent::State::Normal) {
+    auto msg = std::format("Resetting '{}' was unsuccessful!",
+                           magic_enum::enum_name(c.robotComponent));
+    throw std::runtime_error(msg);
+  }
+  makeDummyStatus();
 }
 
 void Machine::shutdown() {
@@ -257,14 +279,20 @@ void Machine::makeDummyStatus() {
 }
 
 void Machine::updateStatus() {
-  if (_contecState == EContecState::Normal) {
-    _robotStatus.robotComponents[utl::ERobotComponent::Contec] =
-        utl::ELEDState::On;
-  } else {
-    _robotStatus.robotComponents[utl::ERobotComponent::Contec] =
-        utl::ELEDState::Error;
+  for (const auto& [componentType, component] : _components) {
+    _robotStatus.robotComponents[componentType] = stateToLed(component->state());
   }
-  _robotServer.publish(_robotStatus);
+  _robotStatus.robotComponents[utl::ERobotComponent::MotorControl] =
+      utl::ELEDState::Error;
+
+  const auto joystick = _controlPanel.getSnapshot();
+  _robotStatus.joystics[utl::EArm::Left] = {
+      .x = joystick.x[0], .y = joystick.y[0], .btn = joystick.b[0]};
+  _robotStatus.joystics[utl::EArm::Right] = {
+      .x = joystick.x[1], .y = joystick.y[1], .btn = joystick.b[1]};
+  _robotStatus.joystics[utl::EArm::Gantry] = {
+      .x = joystick.x[2], .y = joystick.y[2], .btn = joystick.b[2]};
+
   auto inputs = readInputSignals();
   auto outputs = readOutputSignals();
   if (inputs) {
@@ -292,4 +320,16 @@ void Machine::updateStatus() {
         .flags[utl::EToolChangerStatusFlags::OpenValve] =
         tcrStatus ? utl::ELEDState::On : utl::ELEDState::Off;
   }
+
+  _robotServer.publish(_robotStatus);
+}
+
+MachineComponent* Machine::getComponent(utl::ERobotComponent component) {
+  auto it = _components.find(component);
+  return it == _components.end() ? nullptr : it->second;
+}
+
+utl::ELEDState Machine::stateToLed(MachineComponent::State state) {
+  return state == MachineComponent::State::Normal ? utl::ELEDState::On
+                                                   : utl::ELEDState::Error;
 }

@@ -54,6 +54,8 @@ MainWindow::MainWindow(QWidget* parent)
 
   connect(&_updater, &Updater::newDataArrived, _ui->resetControls,
           &ResetControls::updateRobotStatus);
+  connect(&_updater, &Updater::newDataArrived, this,
+          &MainWindow::onRobotStatusUpdate);
 
   connect(&_updater, &Updater::serverNotConnected, _ui->resetControls,
           &ResetControls::announceServerError);
@@ -73,6 +75,39 @@ MainWindow::MainWindow(QWidget* parent)
   titleBar->setLeftLogo(QPixmap(":/resources/rimoKunLogo.png"));
   titleBar->setRightLogo(QPixmap(":/resources/KEKLogo.png"));
   titleBar->setTitleText("Remote Clamp Controller");
+
+  connect(_ui->actionControl_panel_monitor, &QAction::triggered, this,
+          &MainWindow::openJoystickPanel);
 }
 
 MainWindow::~MainWindow() { delete _ui; }
+
+void MainWindow::openJoystickPanel() {
+  if (joystickPanel == nullptr) {
+    joystickPanel = new JoystickPanelWindow(this);
+  }
+  joystickPanel->show();
+  joystickPanel->raise();
+  joystickPanel->activateWindow();
+}
+
+void MainWindow::onJoystickUpdate(int id, double x, double y, bool pressed) {
+  if (joystickPanel) {
+    joystickPanel->setState(id, x, y, pressed);
+  }
+}
+
+void MainWindow::onRobotStatusUpdate(const utl::RobotStatus& status) {
+  if (status.joystics.contains(utl::EArm::Left)) {
+    const auto& js = status.joystics.at(utl::EArm::Left);
+    onJoystickUpdate(0, js.x, js.y, js.btn);
+  }
+  if (status.joystics.contains(utl::EArm::Right)) {
+    const auto& js = status.joystics.at(utl::EArm::Right);
+    onJoystickUpdate(1, js.x, js.y, js.btn);
+  }
+  if (status.joystics.contains(utl::EArm::Gantry)) {
+    const auto& js = status.joystics.at(utl::EArm::Gantry);
+    onJoystickUpdate(2, js.x, js.y, js.btn);
+  }
+}

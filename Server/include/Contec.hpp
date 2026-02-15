@@ -1,18 +1,23 @@
 #pragma once
 
+#include <MachineComponent.hpp>
 #include <ModbusClient.hpp>
 
-class Contec {
+class Contec final : public MachineComponent {
   typedef std::vector<bool> bitVector;
  public:
   Contec();
   ~Contec();
-  void reset();
+  void initialize() override;
+  void reset() override;
+  [[nodiscard]] utl::ERobotComponent componentType() const override {
+    return utl::ERobotComponent::Contec;
+  }
   bitVector readInputs();
   bitVector readOutputs();
   void setOutputs(const bitVector& outputs);
-  unsigned int getNOutputs() const {return _nDO;}
-  unsigned int getNInputs() const {return _nDI;}
+  [[nodiscard]] unsigned int getNOutputs() const {return _nDO;}
+  [[nodiscard]] unsigned int getNInputs() const {return _nDI;}
 
 
 private:

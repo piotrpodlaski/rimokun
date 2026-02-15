@@ -18,7 +18,7 @@ ResetControls::ResetControls(QWidget* parent) : QWidget(parent), _ui(new Ui::Res
   _lControlPanelLed = _ui->ledControlPanel;
 
   _lServerLed->setState(ELEDState::Error);
-  _bResetControlPanel->setEnabled(false);
+  _bResetContec->setEnabled(false);
   _bResetMotors->setEnabled(false);
   _bResetControlPanel->setEnabled(false);
 
@@ -67,4 +67,12 @@ void ResetControls::updateRobotStatus(
 }
 void ResetControls::announceServerError() {
   _lServerLed->setState(ELEDState::Error);
+  _lContecLed->setState(ELEDState::Off);
+  _lMotorLed->setState(ELEDState::Off);
+  _lControlPanelLed->setState(ELEDState::Off);
+
+  _bResetContec->setEnabled(false);
+  _bResetMotors->setEnabled(false);
+  _bResetControlPanel->setEnabled(false);
+
 }

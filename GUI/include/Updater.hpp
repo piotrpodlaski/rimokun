@@ -26,7 +26,6 @@ class Updater final : public QObject {
 
  private:
   void runner();
-  void spawnCriticalmessage(std::string msg);
   bool _running{false};
 
   utl::RimoClient<utl::RobotStatus> _client;

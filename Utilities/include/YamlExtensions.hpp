@@ -1,9 +1,18 @@
 #pragma once
 
 #include <yaml-cpp/yaml.h>
+#ifndef MAGIC_ENUM_RANGE_MIN
+#define MAGIC_ENUM_RANGE_MIN -128
+#endif
+#ifndef MAGIC_ENUM_RANGE_MAX
+#define MAGIC_ENUM_RANGE_MAX 5000
+#endif
 #include <magic_enum/magic_enum.hpp>
 #include <type_traits>
 #include "CommonDefinitions.hpp"
+#if __has_include(<libserial/SerialPortConstants.h>)
+#include <libserial/SerialPortConstants.h>
+#endif
 
 namespace YAML {
 
@@ -56,6 +65,25 @@ template <>
 struct convert<utl::ERobotComponent> : convert_enum<utl::ERobotComponent> {
 };
 
+#if __has_include(<libserial/SerialPortConstants.h>)
+template <>
+struct convert<LibSerial::BaudRate> : convert_enum<LibSerial::BaudRate> {};
+
+template <>
+struct convert<LibSerial::CharacterSize>
+    : convert_enum<LibSerial::CharacterSize> {};
+
+template <>
+struct convert<LibSerial::FlowControl>
+    : convert_enum<LibSerial::FlowControl> {};
+
+template <>
+struct convert<LibSerial::Parity> : convert_enum<LibSerial::Parity> {};
+
+template <>
+struct convert<LibSerial::StopBits> : convert_enum<LibSerial::StopBits> {};
+#endif
+
 template <>
 struct convert<utl::SingleMotorStatus> {
   static Node encode(const utl::SingleMotorStatus& rhs) {
@@ -100,6 +128,25 @@ struct convert<utl::ToolChangerStatus> {
 };
 
 template <>
+struct convert<utl::JoystickStatus> {
+  static Node encode(const utl::JoystickStatus& rhs) {
+    Node node;
+    node["x"] = rhs.x;
+    node["y"] = rhs.y;
+    node["btn"] = rhs.btn;
+    return node;
+  }
+
+  static bool decode(const Node& node, utl::JoystickStatus& rhs) {
+    if (!node.IsMap()) return false;
+    rhs.x = node["x"].as<double>();
+    rhs.y = node["y"].as<double>();
+    rhs.btn = node["btn"].as<bool>();
+    return true;
+  }
+};
+
+template <>
 struct convert<utl::RobotStatus> {
   static Node encode(const utl::RobotStatus& rhs) {
     Node node;
@@ -111,6 +158,9 @@ struct convert<utl::RobotStatus> {
     }
     for (const auto& [cmp, tc] : rhs.robotComponents) {
       node["robotComponents"][convert<utl::ERobotComponent>::encode(cmp)] = tc;
+    }
+    for (const auto& [arm, js] : rhs.joystics) {
+      node["joystics"][convert<utl::EArm>::encode(arm)] = js;
     }
     return node;
   }
@@ -133,6 +183,14 @@ struct convert<utl::RobotStatus> {
       utl::ERobotComponent cmp;
       if (!convert<utl::ERobotComponent>::decode(kv.first, cmp)) return false;
       rhs.robotComponents[cmp] = kv.second.as<utl::ELEDState>();
+    }
+    const auto joysticsNode = node["joystics"];
+    if (joysticsNode && joysticsNode.IsMap()) {
+      for (const auto& kv : joysticsNode) {
+        utl::EArm arm;
+        if (!convert<utl::EArm>::decode(kv.first, arm)) return false;
+        rhs.joystics[arm] = kv.second.as<utl::JoystickStatus>();
+      }
     }
 
     return true;

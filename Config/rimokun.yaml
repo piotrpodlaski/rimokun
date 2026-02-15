@@ -29,6 +29,18 @@ classes:
     nDI : 16
     nDO : 8
     nAI : 0 #so far not used
+  ControlPanel:
+    port: "/dev/ttyACM0"
+    baudRate: "BAUD_115200" #libserial naming
+    characterSize: "CHAR_SIZE_8"
+    flowControl: "FLOW_CONTROL_NONE"
+    parity: "PARITY_NONE"
+    stopBits: "STOP_BITS_1"
+    readTimeoutMS: 200
+    movingAverageDepth: 5
+    baselineSamples: 50
+    buttonDebounceSamples: 3
+    lineTerminator: "\\n"
   Machine:
     loopSleepTimeMS: 10
     inputMapping:

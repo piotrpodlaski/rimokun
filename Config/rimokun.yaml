@@ -41,6 +41,21 @@ classes:
     baselineSamples: 50
     buttonDebounceSamples: 3
     lineTerminator: "\\n"
+  MotorControl:
+    model: "AR-KD2"
+    device: "/dev/ttyr03"
+    baud: 115200
+    parity: "E"
+    dataBits: 8
+    stopBits: 1
+    responseTimeoutMS: 1000
+    motorAddresses:
+      XLeft: 1
+      XRight: 2
+      YLeft: 3
+      YRight: 4
+      ZLeft: 5
+      ZRight: 6
   Machine:
     loopSleepTimeMS: 10
     inputMapping:

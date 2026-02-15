@@ -103,6 +103,16 @@ class ModbusClient {
     return {};
   }
 
+  ModbusResult<void> set_slave(int slave_id) {
+    if (!ctx_) {
+      return std::unexpected(ModbusError{0, "Null context"});
+    }
+    if (modbus_set_slave(ctx_, slave_id) == -1) {
+      return std::unexpected(last_error());
+    }
+    return {};
+  }
+
   // ---- Register operations ------------------------------------------------
 
   ModbusResult<std::vector<std::uint16_t>> read_holding_registers(int addr,

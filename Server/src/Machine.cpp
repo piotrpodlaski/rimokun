@@ -14,6 +14,7 @@ Machine::Machine() {
 
   _components.emplace(_contec.componentType(), &_contec);
   _components.emplace(_controlPanel.componentType(), &_controlPanel);
+  _components.emplace(_motorControl.componentType(), &_motorControl);
 }
 
 std::optional<signalMap_t> Machine::readInputSignals() {
@@ -282,8 +283,6 @@ void Machine::updateStatus() {
   for (const auto& [componentType, component] : _components) {
     _robotStatus.robotComponents[componentType] = stateToLed(component->state());
   }
-  _robotStatus.robotComponents[utl::ERobotComponent::MotorControl] =
-      utl::ELEDState::Error;
 
   const auto joystick = _controlPanel.getSnapshot();
   _robotStatus.joystics[utl::EArm::Left] = {

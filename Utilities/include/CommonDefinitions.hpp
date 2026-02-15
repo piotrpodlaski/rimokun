@@ -50,3 +50,5 @@ struct RobotStatus {
 };
 
 }  // namespace utl
+
+#include <YamlExtensions.hpp>

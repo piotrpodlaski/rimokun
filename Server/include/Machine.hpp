@@ -2,6 +2,7 @@
 #include <Contec.hpp>
 #include <ControlPanel.hpp>
 #include <MachineComponent.hpp>
+#include <MotorControl.hpp>
 #include <map>
 #include <atomic>
 #include <CommonDefinitions.hpp>
@@ -33,6 +34,7 @@ class Machine {
   void updateStatus();
   Contec _contec;
   ControlPanel _controlPanel;
+  MotorControl _motorControl;
   std::map<utl::ERobotComponent, MachineComponent*> _components;
   std::map<std::string, unsigned int> _inputMapping;
   std::map<std::string, unsigned int> _outputMapping;

@@ -2,12 +2,14 @@
 
 struct MotorRegisterMap {
   // 16-bit control/status
-  int driverInputCommand{0x007d};
+  int driverInputCommandLower{0x007d};
+  int driverOutputCommandLower{0x007f};
 
   // 32-bit (2x16) registers, upper word first
   int presentAlarm{0x0080};
   int presentWarning{0x0096};
   int communicationErrorCode{0x00AC};
+  int directIoAndBrakeStatus{0x00D4};
 
   // From lab validation script (vendor docs should be preferred for production reset flow).
   int alarmResetCommand{0x0180};

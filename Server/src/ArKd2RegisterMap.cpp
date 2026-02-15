@@ -4,12 +4,14 @@ MotorRegisterMap makeArKd2RegisterMap() {
   MotorRegisterMap map;
 
   // 0x007D: driver input command (16-bit)
-  map.driverInputCommand = 0x007D;
+  map.driverInputCommandLower = 0x007D;
+  map.driverOutputCommandLower = 0x007F;
 
   // 0x0080/0x0081: present alarm (32-bit)
   map.presentAlarm = 0x0080;
   map.presentWarning = 0x0096;
   map.communicationErrorCode = 0x00AC;
+  map.directIoAndBrakeStatus = 0x00D4;
 
   // 0x0180/0x0181: alarm reset command (used by existing lab script)
   map.alarmResetCommand = 0x0180;

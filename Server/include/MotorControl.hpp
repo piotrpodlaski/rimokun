@@ -19,6 +19,17 @@ class MotorControl final : public MachineComponent {
   [[nodiscard]] const std::map<utl::EMotor, Motor>& motors() const {
     return _motors;
   }
+
+  void pulseStart(utl::EMotor motorId);
+  void pulseStop(utl::EMotor motorId);
+  void pulseHome(utl::EMotor motorId);
+  void setForward(utl::EMotor motorId, bool enabled);
+  void setReverse(utl::EMotor motorId, bool enabled);
+  void setJogPlus(utl::EMotor motorId, bool enabled);
+  void setJogMinus(utl::EMotor motorId, bool enabled);
+  [[nodiscard]] MotorFlagStatus readInputStatus(utl::EMotor motorId);
+  [[nodiscard]] MotorFlagStatus readOutputStatus(utl::EMotor motorId);
+  [[nodiscard]] MotorDirectIoStatus readDirectIoStatus(utl::EMotor motorId);
   [[nodiscard]] MotorCodeDiagnostic diagnoseCurrentAlarm(utl::EMotor motorId);
   [[nodiscard]] MotorCodeDiagnostic diagnoseCurrentWarning(utl::EMotor motorId);
   [[nodiscard]] MotorCodeDiagnostic diagnoseCurrentCommunicationError(

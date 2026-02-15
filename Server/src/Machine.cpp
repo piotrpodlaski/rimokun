@@ -1,8 +1,24 @@
 #include <Config.hpp>
 #include <Machine.hpp>
+
+#include <chrono>
 #include <future>
 
 using namespace std::chrono_literals;
+
+namespace {
+unsigned int requireMappingIndex(
+    const std::map<std::string, unsigned int>& mapping,
+    const std::string_view key) {
+  const auto it = mapping.find(std::string(key));
+  if (it == mapping.end()) {
+    throw std::runtime_error(
+        std::format("Missing required signal mapping key '{}'", key));
+  }
+  return it->second;
+}
+
+}  // namespace
 
 Machine::Machine() {
   auto& cfg = utl::Config::instance();
@@ -10,11 +26,27 @@ Machine::Machine() {
       "Machine", "inputMapping");
   _outputMapping = cfg.getRequired<std::map<std::string, unsigned int>>(
       "Machine", "outputMapping");
-  _loopSleepTime = 1ms * cfg.getRequired<double>("Machine", "loopSleepTimeMS");
+  const auto loopIntervalMS = cfg.getOptional<int>(
+      "Machine", "loopIntervalMS",
+      cfg.getOptional<int>("Machine", "loopSleepTimeMS", 10));
+  const auto updateIntervalMS = cfg.getOptional<int>(
+      "Machine", "updateIntervalMS",
+      cfg.getOptional<int>("Machine", "statusPublishPeriodMS", 50));
+
+  _loopInterval = std::chrono::milliseconds{std::max(1, loopIntervalMS)};
+  _updateInterval = std::chrono::milliseconds{std::max(1, updateIntervalMS)};
 
   _components.emplace(_contec.componentType(), &_contec);
   _components.emplace(_controlPanel.componentType(), &_controlPanel);
   _components.emplace(_motorControl.componentType(), &_motorControl);
+
+  // Validate mappings used by the control loop and command handlers at startup.
+  (void)requireMappingIndex(_inputMapping, "button1");
+  (void)requireMappingIndex(_inputMapping, "button2");
+  (void)requireMappingIndex(_outputMapping, "toolChangerLeft");
+  (void)requireMappingIndex(_outputMapping, "toolChangerRight");
+  (void)requireMappingIndex(_outputMapping, "light1");
+  (void)requireMappingIndex(_outputMapping, "light2");
 }
 
 std::optional<signalMap_t> Machine::readInputSignals() {
@@ -25,6 +57,12 @@ std::optional<signalMap_t> Machine::readInputSignals() {
   try {
     auto inputs = _contec.readInputs();
     for (const auto& [signal, index] : _inputMapping) {
+      if (index >= inputs.size()) {
+        throw std::runtime_error(std::format(
+            "Input mapping '{}' points outside Contec input range (index={}, "
+            "size={})",
+            signal, index, inputs.size()));
+      }
       inputSignals[signal] = inputs[index];
     }
   } catch (const std::exception& e) {
@@ -34,14 +72,25 @@ std::optional<signalMap_t> Machine::readInputSignals() {
   return inputSignals;
 }
 
-void Machine::setOutputs(signalMap_t signals) {
+void Machine::setOutputs(const signalMap_t& signals) {
   if (_contec.state() == MachineComponent::State::Error) {
     return;
   }
   try {
     auto outputs = _contec.readOutputs();
     for (const auto& [signal, value] : signals) {
-      outputs[_outputMapping[signal]] = value;
+      const auto it = _outputMapping.find(signal);
+      if (it == _outputMapping.end()) {
+        throw std::runtime_error(
+            std::format("Unknown output signal '{}'", signal));
+      }
+      if (it->second >= outputs.size()) {
+        throw std::runtime_error(std::format(
+            "Output mapping '{}' points outside Contec output range "
+            "(index={}, size={})",
+            signal, it->second, outputs.size()));
+      }
+      outputs[it->second] = value;
     }
     _contec.setOutputs(outputs);
   } catch (const std::exception& e) {
@@ -57,6 +106,12 @@ std::optional<signalMap_t> Machine::readOutputSignals() {
     auto output = _contec.readOutputs();
     signalMap_t outputSignals;
     for (auto& [signal, index] : _outputMapping) {
+      if (index >= output.size()) {
+        throw std::runtime_error(std::format(
+            "Output mapping '{}' points outside Contec output range "
+            "(index={}, size={})",
+            signal, index, output.size()));
+      }
       outputSignals[signal] = output[index];
     }
     return outputSignals;
@@ -67,7 +122,21 @@ std::optional<signalMap_t> Machine::readOutputSignals() {
 }
 void Machine::processThread() {
   SPDLOG_INFO("Processing thread started");
-  while (_isRunning) {
+  const auto loopInterval = _loopInterval;
+  const auto updateInterval = _updateInterval;
+  auto nextLoopAt = std::chrono::steady_clock::now();
+  auto nextPublishAt = nextLoopAt;
+  auto nextDutyLogAt = nextLoopAt + 1s;
+  double dutyCycleSum = 0.0;
+  std::size_t dutyCycleSamples = 0;
+
+  while (_isRunning.load(std::memory_order_acquire)) {
+    const auto nowBefore = std::chrono::steady_clock::now();
+    if (nowBefore < nextLoopAt) {
+      std::this_thread::sleep_until(nextLoopAt);
+    }
+    const auto loopStart = std::chrono::steady_clock::now();
+
     // regular control loop stuff
     controlLoopTasks();
     // next we handle commands
@@ -86,8 +155,40 @@ void Machine::processThread() {
         command->reply.set_value(e.what());
       }
     }
-    updateStatus();
-    std::this_thread::sleep_for(_loopSleepTime);
+    const auto now = std::chrono::steady_clock::now();
+    if (now >= nextPublishAt) {
+      updateStatus();
+      do {
+        nextPublishAt += updateInterval;
+      } while (nextPublishAt <= now);
+    }
+
+    const auto loopWork = now - loopStart;
+    const auto dutyCycle =
+        std::chrono::duration<double>(loopWork).count() /
+        std::chrono::duration<double>(loopInterval).count();
+    dutyCycleSum += dutyCycle;
+    ++dutyCycleSamples;
+    if (now >= nextDutyLogAt && dutyCycleSamples > 0) {
+      const auto avgDutyCycle = dutyCycleSum / static_cast<double>(dutyCycleSamples);
+      SPDLOG_DEBUG("Machine loop duty cycle avg {:.3f}% (last {:.3f}%)",
+                  avgDutyCycle * 100.0, dutyCycle * 100.0);
+      dutyCycleSum = 0.0;
+      dutyCycleSamples = 0;
+      do {
+        nextDutyLogAt += 1s;
+      } while (nextDutyLogAt <= now);
+    }
+
+    nextLoopAt += loopInterval;
+    if (nextLoopAt <= now) {
+      const auto overrun = std::chrono::duration_cast<std::chrono::milliseconds>(
+          now - nextLoopAt + loopInterval);
+      SPDLOG_WARN("Machine loop overrun by {} ms", overrun.count());
+      do {
+        nextLoopAt += loopInterval;
+      } while (nextLoopAt <= now);
+    }
   }
   SPDLOG_INFO("Processing thread finished!");
 }
@@ -127,7 +228,7 @@ void Machine::initialize() {
 }
 void Machine::commandServerThread() {
   SPDLOG_INFO("Command Server Thread Started!");
-  while (_isRunning) {
+  while (_isRunning.load(std::memory_order_acquire)) {
     auto command = _robotServer.receiveCommand();
     if (!command) continue;
     SPDLOG_INFO("Received command:\n{}", YAML::Dump(*command));
@@ -159,7 +260,18 @@ void Machine::commandServerThread() {
         cmd::Command c;
         c.payload = cmd::ToolChangerCommand(position, action);
         auto fut = c.reply.get_future();
-        _commandQueue.push(std::move(c));
+        if (!_commandQueue.push(std::move(c))) {
+          response["status"] = "Error";
+          response["message"] = "Machine is shutting down";
+          _robotServer.sendResponse(response);
+          continue;
+        }
+        if (fut.wait_for(2s) != std::future_status::ready) {
+          response["status"] = "Error";
+          response["message"] = "Command processing timed out";
+          _robotServer.sendResponse(response);
+          continue;
+        }
         std::string reply = fut.get();
         response["message"] = "";
         if (reply.empty()) {  // everything OK
@@ -175,7 +287,18 @@ void Machine::commandServerThread() {
         cmd::Command c;
         c.payload = cmd::ReconnectCommand(robotComponent);
         auto fut = c.reply.get_future();
-        _commandQueue.push(std::move(c));
+        if (!_commandQueue.push(std::move(c))) {
+          response["status"] = "Error";
+          response["message"] = "Machine is shutting down";
+          _robotServer.sendResponse(response);
+          continue;
+        }
+        if (fut.wait_for(2s) != std::future_status::ready) {
+          response["status"] = "Error";
+          response["message"] = "Command processing timed out";
+          _robotServer.sendResponse(response);
+          continue;
+        }
         std::string reply = fut.get();
         response["message"] = "";
         if (reply.empty()) {  // everything OK
@@ -203,9 +326,8 @@ void Machine::handleToolChangerCommand(const cmd::ToolChangerCommand& c) {
   SPDLOG_INFO("Changing status of '{}' tool changer to '{}'",
               magic_enum::enum_name(c.arm), magic_enum::enum_name(c.action));
   if (_contec.state() == MachineComponent::State::Error) {
-    std::string msg =
+    const std::string msg =
         "Contec is in error state. Not possible to alter tool changer state!";
-    SPDLOG_ERROR(msg);
     throw std::runtime_error(msg);
   }
   signalMap_t outputSignals;
@@ -219,10 +341,9 @@ void Machine::handleToolChangerCommand(const cmd::ToolChangerCommand& c) {
   setOutputs(outputSignals);
   auto outputs = readOutputSignals();
   if (!outputs) {
-    std::string msg =
+    const std::string msg =
         "Unable to read status of output signals, tool changer status update "
         "failed!";
-    SPDLOG_ERROR(msg);
     throw std::runtime_error(msg);
   }
 }
@@ -252,9 +373,10 @@ void Machine::handleReconnectCommand(const cmd::ReconnectCommand& c) {
 
 void Machine::shutdown() {
   SPDLOG_INFO("Shutting down. Joining Threads...");
-  _isRunning = false;
-  if (_commandServerThread.joinable()) _commandServerThread.join();
+  _isRunning.store(false, std::memory_order_release);
+  _commandQueue.shutdown();
   if (_processThread.joinable()) _processThread.join();
+  if (_commandServerThread.joinable()) _commandServerThread.join();
 }
 
 void Machine::makeDummyStatus() {

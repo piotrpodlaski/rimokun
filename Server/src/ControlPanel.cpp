@@ -1,38 +1,60 @@
 #include <ControlPanel.hpp>
+#include <ControlPanelCommFactory.hpp>
 #include <Config.hpp>
 #include <Logger.hpp>
-#include <YamlExtensions.hpp>
 
 #include <algorithm>
-#include <cerrno>
-#include <fcntl.h>
 #include <sstream>
-#include <unistd.h>
 #include <utility>
 
 ControlPanel::ControlPanel() {
   auto& cfg = utl::Config::instance();
-  _serial = std::make_unique<LibSerial::SerialPort>();
-  _port = cfg.getRequired<std::string>("ControlPanel", "port");
-  _baudRate = cfg.getRequired<LibSerial::BaudRate>("ControlPanel", "baudRate");
-  _characterSize = cfg.getOptional<LibSerial::CharacterSize>(
-      "ControlPanel", "characterSize", LibSerial::CharacterSize::CHAR_SIZE_8);
-  _flowControl = cfg.getOptional<LibSerial::FlowControl>(
-      "ControlPanel", "flowControl", LibSerial::FlowControl::FLOW_CONTROL_NONE);
-  _parity = cfg.getOptional<LibSerial::Parity>(
-      "ControlPanel", "parity", LibSerial::Parity::PARITY_NONE);
-  _stopBits = cfg.getOptional<LibSerial::StopBits>(
-      "ControlPanel", "stopBits", LibSerial::StopBits::STOP_BITS_1);
-  _readTimeoutMS = std::max<std::size_t>(
-      1u, cfg.getOptional<std::size_t>("ControlPanel", "readTimeoutMS", 200u));
-  _movingAverageDepth = std::max<std::size_t>(
-      1u, cfg.getOptional<std::size_t>("ControlPanel", "movingAverageDepth", 5u));
-  _baselineSamples = std::max<std::size_t>(
-      1u, cfg.getOptional<std::size_t>("ControlPanel", "baselineSamples", 50u));
+  const auto controlPanelCfg = cfg.getClassConfig("ControlPanel");
+
+  auto commCfg = controlPanelCfg["comm"];
+  if (!commCfg || !commCfg.IsMap()) {
+    SPDLOG_WARN(
+        "ControlPanel config does not define 'comm' object. Falling back to "
+        "legacy top-level serial keys.");
+    commCfg = YAML::Node(YAML::NodeType::Map);
+    const auto legacyTransport = controlPanelCfg["transport"];
+    commCfg["type"] =
+        legacyTransport ? legacyTransport.as<std::string>() : "serial";
+    auto serialCfg = YAML::Node(YAML::NodeType::Map);
+    auto copyLegacy = [&](const char* key) {
+      const auto n = controlPanelCfg[key];
+      if (n) serialCfg[key] = n;
+    };
+    copyLegacy("port");
+    copyLegacy("baudRate");
+    copyLegacy("characterSize");
+    copyLegacy("flowControl");
+    copyLegacy("parity");
+    copyLegacy("stopBits");
+    copyLegacy("readTimeoutMS");
+    copyLegacy("lineTerminator");
+    commCfg["serial"] = serialCfg;
+  }
+  _comm = makeControlPanelComm(commCfg);
+
+  const auto processingCfg = controlPanelCfg["processing"];
+  auto getProcessingOrLegacy = [&](const char* key,
+                                   const std::size_t fallback) -> std::size_t {
+    if (processingCfg && processingCfg[key]) {
+      return processingCfg[key].as<std::size_t>();
+    }
+    if (controlPanelCfg[key]) {
+      return controlPanelCfg[key].as<std::size_t>();
+    }
+    return fallback;
+  };
+
+  _movingAverageDepth =
+      std::max<std::size_t>(1u, getProcessingOrLegacy("movingAverageDepth", 5u));
+  _baselineSamples =
+      std::max<std::size_t>(1u, getProcessingOrLegacy("baselineSamples", 50u));
   _buttonDebounceSamples = std::max<std::size_t>(
-      1u, cfg.getOptional<std::size_t>("ControlPanel", "buttonDebounceSamples", 3u));
-  _lineTerminator = parseLineTerminator(
-      cfg.getOptional<std::string>("ControlPanel", "lineTerminator", "\\n"));
+      1u, getProcessingOrLegacy("buttonDebounceSamples", 3u));
   resetSignalProcessingState();
 }
 
@@ -46,23 +68,17 @@ ControlPanel::~ControlPanel() {
 
 void ControlPanel::initialize() {
   reset();
-  SPDLOG_INFO("Initializing ControlPanel serial interface on {}", _port);
+  SPDLOG_INFO("Initializing ControlPanel communication via {}", _comm->describe());
   try {
-    _serial->Open(_port);
-    _serial->SetBaudRate(_baudRate);
-    _serial->SetCharacterSize(_characterSize);
-    _serial->SetFlowControl(_flowControl);
-    _serial->SetParity(_parity);
-    _serial->SetStopBits(_stopBits);
-    _serial->FlushIOBuffers();
+    _comm->open();
     resetSignalProcessingState();
     _readerRunning = true;
     _readerThread = std::thread(&ControlPanel::readerLoop, this);
     setState(State::Normal);
   } catch (const std::exception& e) {
-    SPDLOG_ERROR("Failed to initialize ControlPanel serial interface: {}",
+    SPDLOG_ERROR("Failed to initialize ControlPanel communication: {}",
                  e.what());
-    closeSerialNoThrow();
+    _comm->closeNoThrow();
     setState(State::Error);
     throw;
   }
@@ -75,7 +91,7 @@ void ControlPanel::reset() {
   if (_readerThread.joinable()) {
     _readerThread.join();
   }
-  closeSerialNoThrow();
+  _comm->closeNoThrow();
 }
 
 void ControlPanel::readerLoop() {
@@ -92,8 +108,11 @@ void ControlPanel::readerLoop() {
 
   while (_readerRunning) {
     try {
-      std::string line;
-      _serial->ReadLine(line, _lineTerminator, _readTimeoutMS);
+      auto lineOpt = _comm->readLine();
+      if (!lineOpt) {
+        continue;
+      }
+      auto line = std::move(*lineOpt);
       if (!_readerRunning) {
         break;
       }
@@ -102,28 +121,11 @@ void ControlPanel::readerLoop() {
         continue;
       }
       processLine(line);
-    } catch (const LibSerial::ReadTimeout&) {
-      try {
-        if (!_serial->IsOpen()) {
-          SPDLOG_ERROR("ControlPanel serial port is no longer open.");
-          setState(State::Error);
-          _readerRunning = false;
-          break;
-        }
-        (void)_serial->GetNumberOfBytesAvailable();
-      } catch (const std::exception& e) {
-        SPDLOG_ERROR("ControlPanel serial health check failed: {}", e.what());
-        setState(State::Error);
-        _readerRunning = false;
-        closeSerialNoThrow();
-        break;
-      }
-      continue;
     } catch (const std::exception& e) {
-      SPDLOG_ERROR("ControlPanel serial read failed: {}", e.what());
+      SPDLOG_ERROR("ControlPanel communication read failed: {}", e.what());
       setState(State::Error);
       _readerRunning = false;
-      closeSerialNoThrow();
+      _comm->closeNoThrow();
       break;
     }
   }
@@ -238,60 +240,6 @@ ControlPanel::Snapshot ControlPanel::getSnapshot() const {
     s.b[i] = _b[i].load(std::memory_order_acquire);
   }
   return s;
-}
-
-char ControlPanel::parseLineTerminator(const std::string& token) {
-  if (token == "\\n") {
-    return '\n';
-  }
-  if (token == "\\r") {
-    return '\r';
-  }
-  if (token == "\\0") {
-    return '\0';
-  }
-  if (token.empty()) {
-    return '\n';
-  }
-  return token.front();
-}
-
-void ControlPanel::closeSerialNoThrow() {
-  int fd = -1;
-  bool closeViaLibSerialFailed = false;
-  try {
-    fd = _serial->GetFileDescriptor();
-  } catch (const std::exception&) {
-    fd = -1;
-  }
-
-  try {
-    if (_serial->IsOpen()) {
-      _serial->Close();
-    }
-  } catch (const std::exception& e) {
-    SPDLOG_WARN("ControlPanel serial close via LibSerial failed: {}", e.what());
-    closeViaLibSerialFailed = true;
-  }
-
-  // Fallback: only force-close raw fd if LibSerial close failed and fd is still valid.
-  if (closeViaLibSerialFailed && fd >= 0 && ::fcntl(fd, F_GETFD) != -1) {
-    if (::close(fd) == -1 && errno != EBADF) {
-      SPDLOG_WARN("ControlPanel forced close(fd={}) failed, errno={}", fd, errno);
-    }
-  }
-
-  // Recreate object to clear stale internal state.
-  // If LibSerial close failed, destroying the current object may throw and terminate
-  // the process. In that case we intentionally leak the poisoned instance.
-  if (closeViaLibSerialFailed) {
-    SPDLOG_WARN("ControlPanel keeping poisoned SerialPort instance leaked to avoid "
-                "terminate on destructor after close failure.");
-    (void)_serial.release();
-    _serial = std::make_unique<LibSerial::SerialPort>();
-    return;
-  }
-  _serial = std::make_unique<LibSerial::SerialPort>();
 }
 
 void ControlPanel::resetSignalProcessingState() {

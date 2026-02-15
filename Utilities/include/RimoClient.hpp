@@ -47,7 +47,6 @@ class RimoClient {
       return std::nullopt;
     }
     const auto msg_str = message.to_string();
-    SPDLOG_DEBUG("Received message from publisher!");
     SPDLOG_TRACE("message:\n{}", msg_str);
     return YAML::Load(msg_str).as<T>();
   }

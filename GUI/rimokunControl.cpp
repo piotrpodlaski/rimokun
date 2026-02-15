@@ -1,12 +1,21 @@
 #include <Logger.hpp>
 #include <QApplication>
 #include <QDirIterator>
+#include <QTimer>
+#include <atomic>
+#include <csignal>
 #include <filesystem>
 
 #include "Config.hpp"
 #include "MainWindow.hpp"
 #include "argparse/argparse.hpp"
 namespace fs = std::filesystem;
+
+namespace {
+std::atomic<bool> g_shutdownRequested{false};
+
+void signalHandler(int) { g_shutdownRequested.store(true, std::memory_order_release); }
+}  // namespace
 
 
 int main(int argc, char* argv[]) {
@@ -38,8 +47,20 @@ int main(int argc, char* argv[]) {
 
   utl::Config::instance().setConfigPath(configPath);
 
+  std::signal(SIGINT, signalHandler);
+  std::signal(SIGTERM, signalHandler);
+
   QApplication a(argc, argv);
   QApplication::setStyle("Fusion");
+
+  QTimer shutdownPollTimer;
+  QObject::connect(&shutdownPollTimer, &QTimer::timeout, &a, [&a]() {
+    if (g_shutdownRequested.load(std::memory_order_acquire)) {
+      a.quit();
+    }
+  });
+  shutdownPollTimer.start(50);
+
   MainWindow w;
   w.show();
   const auto retCode = QApplication::exec();

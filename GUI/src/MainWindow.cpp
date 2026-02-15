@@ -66,7 +66,6 @@ MainWindow::MainWindow(QWidget* parent)
   _logger = std::make_shared<spdlog::logger>(
       "gui", spdlog::sinks_init_list{_consoleSink, _qtSink});
   spdlog::register_logger(_logger);
-  spdlog::set_default_logger(_logger);  // optional
   utl::configureLogger();
   LedIndicator::initBlinkTimer();
 
@@ -80,7 +79,14 @@ MainWindow::MainWindow(QWidget* parent)
           &MainWindow::openJoystickPanel);
 }
 
-MainWindow::~MainWindow() { delete _ui; }
+MainWindow::~MainWindow() {
+  _updater.stopUpdaterThread();
+  spdlog::drop("gui");
+  _logger.reset();
+  _qtSink.reset();
+  _consoleSink.reset();
+  delete _ui;
+}
 
 void MainWindow::openJoystickPanel() {
   if (joystickPanel == nullptr) {

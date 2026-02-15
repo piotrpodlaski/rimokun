@@ -1,7 +1,8 @@
 #pragma once
 
 #include <MachineComponent.hpp>
-#include <libserial/SerialPort.h>
+#include <IControlPanelComm.hpp>
+
 #include <array>
 #include <atomic>
 #include <cstdint>
@@ -31,23 +32,13 @@ class ControlPanel final : public MachineComponent {
  private:
   void readerLoop();
   void processLine(const std::string& line);
-  static char parseLineTerminator(const std::string& token);
-  void closeSerialNoThrow();
   void resetSignalProcessingState();
   static double clipToUnitRange(double value);
 
-  std::unique_ptr<LibSerial::SerialPort> _serial;
-  std::string _port;
-  LibSerial::BaudRate _baudRate;
-  LibSerial::CharacterSize _characterSize;
-  LibSerial::FlowControl _flowControl;
-  LibSerial::Parity _parity;
-  LibSerial::StopBits _stopBits;
-  std::size_t _readTimeoutMS;
+  std::unique_ptr<IControlPanelComm> _comm;
   std::size_t _movingAverageDepth;
   std::size_t _baselineSamples;
   std::size_t _buttonDebounceSamples;
-  char _lineTerminator;
   std::atomic<bool> _readerRunning{false};
   std::thread _readerThread;
   std::array<std::atomic<double>, 3> _x{};

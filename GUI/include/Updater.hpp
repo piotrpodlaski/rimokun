@@ -1,7 +1,11 @@
 #pragma once
 #include <QMetaType>
+#include <QPointer>
 #include <qobject.h>
 
+#include <atomic>
+#include <mutex>
+#include <queue>
 #include <thread>
 
 #include "CommonDefinitions.hpp"
@@ -25,8 +29,18 @@ class Updater final : public QObject {
   void sendCommand(const YAML::Node& command);
 
  private:
+  struct PendingCommand {
+    YAML::Node command;
+    QPointer<QObject> sender;
+    bool expectsResponse{false};
+    QString senderClassName;
+  };
+
   void runner();
-  bool _running{false};
+  void processPendingCommands();
+  std::atomic<bool> _running{false};
+  std::mutex _commandMutex;
+  std::queue<PendingCommand> _pendingCommands;
 
   utl::RimoClient<utl::RobotStatus> _client;
   std::thread _updaterThread;

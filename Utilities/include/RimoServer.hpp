@@ -37,14 +37,13 @@ class RimoServer {
     const auto yaml_str = YAML::Dump(node);
     zmq::message_t msg(yaml_str);
     _statusSocket.send(msg, zmq::send_flags::none);
-    SPDLOG_DEBUG("Published new RobotStatus");
     SPDLOG_TRACE("RobotStatus: \n {}", yaml_str);
   }
 
   std::optional<YAML::Node> receiveCommand() {
     zmq::message_t msg;
     if (const auto status = _commandSocket.recv(msg); !status) {
-      SPDLOG_DEBUG("Timeout waiting for message from RimoClient...");
+      SPDLOG_TRACE("Timeout waiting for message from RimoClient...");
       return std::nullopt;
     }
     return YAML::Load(msg.to_string());

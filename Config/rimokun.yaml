@@ -30,17 +30,21 @@ classes:
     nDO : 8
     nAI : 0 #so far not used
   ControlPanel:
-    port: "/dev/ttyACM0"
-    baudRate: "BAUD_115200" #libserial naming
-    characterSize: "CHAR_SIZE_8"
-    flowControl: "FLOW_CONTROL_NONE"
-    parity: "PARITY_NONE"
-    stopBits: "STOP_BITS_1"
-    readTimeoutMS: 200
-    movingAverageDepth: 5
-    baselineSamples: 50
-    buttonDebounceSamples: 3
-    lineTerminator: "\\n"
+    comm:
+      type: "serial"
+      serial:
+        port: "/dev/ttyACM0"
+        baudRate: "BAUD_115200" #libserial naming
+        characterSize: "CHAR_SIZE_8"
+        flowControl: "FLOW_CONTROL_NONE"
+        parity: "PARITY_NONE"
+        stopBits: "STOP_BITS_1"
+        readTimeoutMS: 200
+        lineTerminator: "\\n"
+    processing:
+      movingAverageDepth: 5
+      baselineSamples: 50
+      buttonDebounceSamples: 3
   MotorControl:
     model: "AR-KD2"
     device: "/dev/ttyr03"
@@ -57,7 +61,8 @@ classes:
       ZLeft: 5
       ZRight: 6
   Machine:
-    loopSleepTimeMS: 10
+    loopIntervalMS: 10
+    updateIntervalMS: 50
     inputMapping:
       safetyON : 8
       button1 : 9

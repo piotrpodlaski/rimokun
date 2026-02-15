@@ -3,6 +3,7 @@
 #include <ControlPanel.hpp>
 #include <MachineComponent.hpp>
 #include <MotorControl.hpp>
+#include <chrono>
 #include <map>
 #include <atomic>
 #include <CommonDefinitions.hpp>
@@ -17,7 +18,7 @@ class Machine {
   ~Machine() = default;
 
   std::optional<signalMap_t> readInputSignals();
-  void setOutputs(signalMap_t signals);
+  void setOutputs(const signalMap_t& signals);
   std::optional<signalMap_t> readOutputSignals();
   void initialize();
   void shutdown();
@@ -40,8 +41,9 @@ class Machine {
   std::map<std::string, unsigned int> _outputMapping;
   utl::RobotStatus _robotStatus;
   cmd::CommandQueue _commandQueue;
-  std::atomic<bool> _isRunning;
-  std::chrono::duration<double> _loopSleepTime;
+  std::atomic<bool> _isRunning{false};
+  std::chrono::milliseconds _loopInterval{10};
+  std::chrono::milliseconds _updateInterval{50};
   utl::RimoServer<utl::RobotStatus> _robotServer;
   std::thread _commandServerThread;
   std::thread _processThread;

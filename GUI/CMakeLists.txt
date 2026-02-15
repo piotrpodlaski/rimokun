@@ -6,19 +6,17 @@ find_package(Qt6 COMPONENTS
 
 qt_standard_project_setup()
 
-qt6_wrap_ui(gui_ui ${gui_forms})
-
-set(CMAKE_AUTOUIC_SEARCH_PATHS forms/)
+set(CMAKE_AUTOUIC_SEARCH_PATHS ${CMAKE_CURRENT_SOURCE_DIR}/forms)
 
 file(GLOB_RECURSE gui_sources "src/*.cpp")
 file(GLOB_RECURSE gui_headers "include/*.hpp")
-file(GLOB_RECURSE gui_forms "forms/*.hpp")
+file(GLOB_RECURSE gui_forms "forms/*.ui")
 
 
 qt_add_executable(rimokunControl
         ${gui_sources}
         ${gui_headers}
-        ${gui_ui}
+        ${gui_forms}
         rimokunControl.cpp
 
 )

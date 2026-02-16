@@ -8,6 +8,7 @@
 #include <filesystem>
 #include <fstream>
 #include <memory>
+#include <stdexcept>
 #include <string>
 
 #include "server/fakes/FakeClock.hpp"
@@ -134,6 +135,60 @@ TEST(MachineLoopTests, OverrunResynchronizesToFutureTick) {
 
   machine.runOneCycle(state);
   EXPECT_EQ(state.nextLoopAt, IClock::time_point{std::chrono::milliseconds{60}});
+
+  std::filesystem::remove(configPath);
+}
+
+TEST(MachineLoopTests, MakeInitialStateThrowsWhenMachineIsNotWired) {
+  const auto configPath = writeTempConfig();
+  utl::Config::instance().setConfigPath(configPath.string());
+
+  auto fakeClock = std::make_shared<FakeClock>();
+  TestMachine machine(fakeClock);
+
+  EXPECT_THROW((void)machine.makeInitialLoopState(), std::runtime_error);
+
+  std::filesystem::remove(configPath);
+}
+
+TEST(MachineLoopTests, RunOneCycleThrowsWhenMachineIsNotWired) {
+  const auto configPath = writeTempConfig();
+  utl::Config::instance().setConfigPath(configPath.string());
+
+  auto fakeClock = std::make_shared<FakeClock>();
+  TestMachine machine(fakeClock);
+  Machine::LoopState state{};
+
+  EXPECT_THROW((void)machine.runOneCycle(state), std::runtime_error);
+
+  std::filesystem::remove(configPath);
+}
+
+TEST(MachineLoopTests, InitializeThrowsWhenMachineIsNotWired) {
+  const auto configPath = writeTempConfig();
+  utl::Config::instance().setConfigPath(configPath.string());
+
+  auto fakeClock = std::make_shared<FakeClock>();
+  TestMachine machine(fakeClock);
+
+  EXPECT_THROW((void)machine.initialize(), std::runtime_error);
+
+  std::filesystem::remove(configPath);
+}
+
+TEST(MachineLoopTests, WireMachineIsIdempotentAndAllowsLoopExecution) {
+  const auto configPath = writeTempConfig();
+  utl::Config::instance().setConfigPath(configPath.string());
+
+  auto fakeClock = std::make_shared<FakeClock>();
+  TestMachine machine(fakeClock);
+
+  MachineRuntime::wireMachine(machine);
+  MachineRuntime::wireMachine(machine);
+
+  auto state = machine.makeInitialLoopState();
+  EXPECT_NO_THROW((void)machine.runOneCycle(state));
+  EXPECT_EQ(machine.controlCycles, 1);
 
   std::filesystem::remove(configPath);
 }

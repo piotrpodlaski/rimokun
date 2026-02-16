@@ -51,9 +51,6 @@ TEST(ArKd2RegisterMapTests, LookupReturnsKnownNamesAndUnknownWhenMissing) {
 
 TEST(ArKd2RegisterMapTests, CompactMapAddressesExistInFullRegisterMap) {
   const auto map = makeArKd2RegisterMap();
-  // Full table currently covers operational/diagnostic/manual-mapped registers.
-  // Operation data base ranges (0x0400+) are validated separately by exact value
-  // checks in CoreAddressesMatchExpectedManualValues.
   const std::vector<int> addresses{
       map.driverInputCommandLower,
       map.driverOutputCommandLower,
@@ -66,6 +63,11 @@ TEST(ArKd2RegisterMapTests, CompactMapAddressesExistInFullRegisterMap) {
       map.commandSpeed,
       map.actualPosition,
       map.actualSpeed,
+      map.positionNo0,
+      map.speedNo0,
+      map.operationModeNo0,
+      map.accelerationNo0,
+      map.decelerationNo0,
   };
 
   for (const auto addr : addresses) {

@@ -5,6 +5,8 @@ set(CMAKE_CXX_STANDARD 23)
 
 include(CTest)
 
+option(ENABLE_COVERAGE "Enable code coverage instrumentation" OFF)
+
 include(FetchContent)
 FetchContent_Declare(
         yaml-cpp
@@ -55,6 +57,19 @@ else()
     add_compile_definitions(SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_INFO)
 endif()
 add_compile_definitions(SPDLOG_COMPILED_LIB)
+
+if (ENABLE_COVERAGE)
+    if (NOT BUILD_TESTING)
+        message(FATAL_ERROR "ENABLE_COVERAGE requires BUILD_TESTING=ON.")
+    endif ()
+    if (NOT CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        message(FATAL_ERROR "ENABLE_COVERAGE is supported only with GCC/Clang.")
+    endif ()
+
+    message(STATUS "Code coverage instrumentation enabled")
+    add_compile_options(-O0 -g --coverage)
+    add_link_options(--coverage)
+endif ()
 
 
 add_subdirectory(Utilities)

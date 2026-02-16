@@ -2,21 +2,29 @@
 
 #include <Logger.hpp>
 #include <magic_enum/magic_enum.hpp>
+#include <stdexcept>
 
 MachineController::MachineController(ReadSignalsFn readInputs,
                                      SetOutputsFn setOutputs,
                                      ReadSignalsFn readOutputs,
                                      ComponentStateFn contecState,
-                                     utl::RobotStatus& robotStatus)
+                                     utl::RobotStatus& robotStatus,
+                                     std::unique_ptr<IRobotControlPolicy> controlPolicy)
     : _readInputs(std::move(readInputs)),
       _setOutputs(std::move(setOutputs)),
       _readOutputs(std::move(readOutputs)),
       _contecState(std::move(contecState)),
-      _robotStatus(robotStatus) {}
+      _robotStatus(robotStatus),
+      _controlPolicy(std::move(controlPolicy)) {
+  if (!_controlPolicy) {
+    throw std::runtime_error("MachineController requires a non-null control policy.");
+  }
+}
 
 void MachineController::runControlLoopTasks() const {
-  const auto inputs = _readInputs();
-  if (!inputs || _contecState() == MachineComponent::State::Error) {
+  const auto decision =
+      _controlPolicy->decide(_readInputs(), _contecState(), _robotStatus);
+  if (decision.setToolChangerErrorBlinking) {
     for (auto& [_, tc] : _robotStatus.toolChangers) {
       for (auto& [__, flag] : tc.flags) {
         flag = utl::ELEDState::ErrorBlinking;
@@ -24,10 +32,9 @@ void MachineController::runControlLoopTasks() const {
     }
     return;
   }
-  signal_map_t outputSignals;
-  outputSignals["light1"] = inputs->at("button1");
-  outputSignals["light2"] = inputs->at("button2");
-  _setOutputs(outputSignals);
+  if (decision.outputs) {
+    _setOutputs(*decision.outputs);
+  }
 }
 
 void MachineController::handleToolChangerCommand(

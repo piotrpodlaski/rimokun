@@ -16,6 +16,7 @@ gtest_discover_tests(utilities_unit_tests)
 add_executable(server_unit_tests
         server/ControlLoopRunnerTests.cpp
         server/MachineControllerTests.cpp
+        server/RobotControlPolicyTests.cpp
         server/MachineCommandProcessorTests.cpp
         server/MachineComponentServiceTests.cpp
         server/MachineStatusBuilderTests.cpp

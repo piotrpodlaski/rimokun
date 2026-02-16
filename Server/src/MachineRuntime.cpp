@@ -10,7 +10,8 @@ void MachineRuntime::wireMachine(Machine& machine) {
         [&machine]() { return machine.readInputSignals(); },
         [&machine](const signal_map_t& outputs) { machine.setOutputs(outputs); },
         [&machine]() { return machine.readOutputSignals(); },
-        [&machine]() { return machine._contec.state(); }, machine._robotStatus);
+        [&machine]() { return machine._contec.state(); }, machine._robotStatus,
+        std::make_unique<DefaultRobotControlPolicy>());
   }
   if (!machine._componentService) {
     machine._componentService =

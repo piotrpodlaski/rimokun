@@ -2,14 +2,16 @@
 
 #include <functional>
 #include <map>
+#include <memory>
 #include <optional>
 #include <string>
 
 #include "CommandInterface.hpp"
 #include "CommonDefinitions.hpp"
 #include "MachineComponent.hpp"
+#include "RobotControlPolicy.hpp"
 
-using signal_map_t = std::map<std::string, bool>;
+using signal_map_t = IRobotControlPolicy::SignalMap;
 
 class MachineController {
  public:
@@ -21,7 +23,8 @@ class MachineController {
                     SetOutputsFn setOutputs,
                     ReadSignalsFn readOutputs,
                     ComponentStateFn contecState,
-                    utl::RobotStatus& robotStatus);
+                    utl::RobotStatus& robotStatus,
+                    std::unique_ptr<IRobotControlPolicy> controlPolicy);
 
   void runControlLoopTasks() const;
   void handleToolChangerCommand(const cmd::ToolChangerCommand& command) const;
@@ -32,4 +35,5 @@ class MachineController {
   ReadSignalsFn _readOutputs;
   ComponentStateFn _contecState;
   utl::RobotStatus& _robotStatus;
+  std::unique_ptr<IRobotControlPolicy> _controlPolicy;
 };

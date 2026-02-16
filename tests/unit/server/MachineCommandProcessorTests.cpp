@@ -130,3 +130,22 @@ TEST(MachineCommandProcessorTests, ToolChangerInvalidEnumReturnsError) {
       response["message"].as<std::string>().find("Invalid toolChanger command") !=
       std::string::npos);
 }
+
+TEST(MachineCommandProcessorTests, ResetInvalidEnumReturnsError) {
+  MachineCommandProcessor processor;
+  YAML::Node command;
+  command["type"] = "reset";
+  command["system"] = "not-a-component";
+
+  bool dispatched = false;
+  const auto response = processor.processCommand(
+      command, [&](cmd::Command, std::chrono::milliseconds) {
+        dispatched = true;
+        return std::string{};
+      });
+
+  EXPECT_FALSE(dispatched);
+  EXPECT_EQ(response["status"].as<std::string>(), "Error");
+  EXPECT_TRUE(response["message"].as<std::string>().find("Invalid reset command") !=
+              std::string::npos);
+}

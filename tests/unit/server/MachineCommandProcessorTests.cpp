@@ -71,3 +71,62 @@ TEST(MachineCommandProcessorTests, ResetDispatchErrorPropagates) {
   EXPECT_EQ(response["status"].as<std::string>(), "Error");
   EXPECT_EQ(response["message"].as<std::string>(), "boom");
 }
+
+TEST(MachineCommandProcessorTests, ToolChangerMissingFieldsReturnsErrorWithoutDispatch) {
+  MachineCommandProcessor processor;
+  YAML::Node command;
+  command["type"] = "toolChanger";
+  command["position"] = "Left";
+
+  bool dispatched = false;
+  const auto response = processor.processCommand(
+      command, [&](cmd::Command, std::chrono::milliseconds) {
+        dispatched = true;
+        return std::string{};
+      });
+
+  EXPECT_FALSE(dispatched);
+  EXPECT_EQ(response["status"].as<std::string>(), "Error");
+  EXPECT_TRUE(
+      response["message"].as<std::string>().find("requires both 'position' and 'action'") !=
+      std::string::npos);
+}
+
+TEST(MachineCommandProcessorTests, ResetMissingSystemReturnsErrorWithoutDispatch) {
+  MachineCommandProcessor processor;
+  YAML::Node command;
+  command["type"] = "reset";
+
+  bool dispatched = false;
+  const auto response = processor.processCommand(
+      command, [&](cmd::Command, std::chrono::milliseconds) {
+        dispatched = true;
+        return std::string{};
+      });
+
+  EXPECT_FALSE(dispatched);
+  EXPECT_EQ(response["status"].as<std::string>(), "Error");
+  EXPECT_TRUE(response["message"].as<std::string>().find("requires a 'system' field") !=
+              std::string::npos);
+}
+
+TEST(MachineCommandProcessorTests, ToolChangerInvalidEnumReturnsError) {
+  MachineCommandProcessor processor;
+  YAML::Node command;
+  command["type"] = "toolChanger";
+  command["position"] = "invalid-arm";
+  command["action"] = "Open";
+
+  bool dispatched = false;
+  const auto response = processor.processCommand(
+      command, [&](cmd::Command, std::chrono::milliseconds) {
+        dispatched = true;
+        return std::string{};
+      });
+
+  EXPECT_FALSE(dispatched);
+  EXPECT_EQ(response["status"].as<std::string>(), "Error");
+  EXPECT_TRUE(
+      response["message"].as<std::string>().find("Invalid toolChanger command") !=
+      std::string::npos);
+}

@@ -23,7 +23,13 @@ YAML::Node MachineCommandProcessor::processCommand(const YAML::Node& command,
 
   const auto type = typeNode.as<std::string>();
   if (type == "toolChanger") {
-    if (command["position"] && command["action"]) {
+    if (!command["position"] || !command["action"]) {
+      response["status"] = "Error";
+      response["message"] =
+          "toolChanger command requires both 'position' and 'action'.";
+      return response;
+    }
+    try {
       cmd::Command c;
       c.payload = cmd::ToolChangerCommand(
           command["position"].as<utl::EArm>(),
@@ -33,12 +39,20 @@ YAML::Node MachineCommandProcessor::processCommand(const YAML::Node& command,
         response["status"] = "Error";
         response["message"] = reply;
       }
+    } catch (const std::exception& e) {
+      response["status"] = "Error";
+      response["message"] = std::format("Invalid toolChanger command: {}", e.what());
     }
     return response;
   }
 
   if (type == "reset") {
-    if (command["system"]) {
+    if (!command["system"]) {
+      response["status"] = "Error";
+      response["message"] = "reset command requires a 'system' field.";
+      return response;
+    }
+    try {
       cmd::Command c;
       c.payload = cmd::ReconnectCommand(command["system"].as<utl::ERobotComponent>());
       const auto reply = dispatch(std::move(c), 2s);
@@ -46,6 +60,9 @@ YAML::Node MachineCommandProcessor::processCommand(const YAML::Node& command,
         response["status"] = "Error";
         response["message"] = reply;
       }
+    } catch (const std::exception& e) {
+      response["status"] = "Error";
+      response["message"] = std::format("Invalid reset command: {}", e.what());
     }
     return response;
   }

@@ -2,6 +2,8 @@
 
 #include <MachineController.hpp>
 
+#include <stdexcept>
+
 namespace {
 class FakeControlPolicy final : public IRobotControlPolicy {
  public:
@@ -88,4 +90,40 @@ TEST(MachineControllerTests, PolicyOutputsAreForwardedToOutputsWriter) {
   ASSERT_TRUE(seenOutputs.contains("light2"));
   EXPECT_TRUE(seenOutputs.at("light1"));
   EXPECT_FALSE(seenOutputs.at("light2"));
+}
+
+TEST(MachineControllerTests, ToolChangerCommandThrowsWhenContecIsInErrorState) {
+  utl::RobotStatus status;
+  bool outputsCalled = false;
+  auto policy = std::make_unique<FakeControlPolicy>();
+
+  MachineController controller(
+      []() -> std::optional<signal_map_t> { return signal_map_t{}; },
+      [&](const signal_map_t&) { outputsCalled = true; },
+      []() -> std::optional<signal_map_t> { return signal_map_t{}; },
+      []() { return MachineComponent::State::Error; }, status, std::move(policy));
+
+  EXPECT_THROW((void)controller.handleToolChangerCommand(
+                   cmd::ToolChangerCommand{utl::EArm::Right,
+                                           utl::EToolChangerAction::Open}),
+               std::runtime_error);
+  EXPECT_FALSE(outputsCalled);
+}
+
+TEST(MachineControllerTests, ToolChangerCommandThrowsWhenOutputReadbackFails) {
+  utl::RobotStatus status;
+  bool outputsCalled = false;
+  auto policy = std::make_unique<FakeControlPolicy>();
+
+  MachineController controller(
+      []() -> std::optional<signal_map_t> { return signal_map_t{}; },
+      [&](const signal_map_t&) { outputsCalled = true; },
+      []() -> std::optional<signal_map_t> { return std::nullopt; },
+      []() { return MachineComponent::State::Normal; }, status, std::move(policy));
+
+  EXPECT_THROW((void)controller.handleToolChangerCommand(
+                   cmd::ToolChangerCommand{utl::EArm::Left,
+                                           utl::EToolChangerAction::Close}),
+               std::runtime_error);
+  EXPECT_TRUE(outputsCalled);
 }

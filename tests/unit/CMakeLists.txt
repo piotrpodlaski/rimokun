@@ -29,6 +29,7 @@ add_executable(server_unit_tests
         server/ArKd2DiagnosticsTests.cpp
         server/ArKd2RegisterMapTests.cpp
         server/ControlPanelCommFactoryTests.cpp
+        server/SerialControlPanelCommTests.cpp
 )
 
 target_include_directories(server_unit_tests
@@ -50,6 +51,7 @@ gtest_discover_tests(server_unit_tests)
 add_executable(motor_unit_tests
         server/MotorTests.cpp
         server/MotorControlTests.cpp
+        server/ModbusClientTests.cpp
         server/fakes/FakeModbus.cpp
 )
 

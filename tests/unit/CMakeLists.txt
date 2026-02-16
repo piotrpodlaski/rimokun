@@ -17,6 +17,7 @@ add_executable(server_unit_tests
         server/ControlLoopRunnerTests.cpp
         server/MachineControllerTests.cpp
         server/MachineCommandProcessorTests.cpp
+        server/MachineComponentServiceTests.cpp
         server/MachineStatusBuilderTests.cpp
         server/CommandQueueTests.cpp
         server/MachineLoopTests.cpp

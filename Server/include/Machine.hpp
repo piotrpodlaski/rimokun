@@ -25,6 +25,7 @@
 typedef std::map<std::string, bool> signalMap_t;
 
 class Machine {
+  friend class MachineRuntime;
  public:
   using LoopState = ControlLoopRunner::State;
 

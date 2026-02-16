@@ -2,6 +2,7 @@
 
 #include <Config.hpp>
 #include <Machine.hpp>
+#include <MachineRuntime.hpp>
 
 #include <chrono>
 #include <filesystem>
@@ -104,6 +105,7 @@ TEST(MachineLoopTests, RunOneCycleAtConfiguredCadence) {
 
   auto fakeClock = std::make_shared<FakeClock>();
   TestMachine machine(fakeClock);
+  MachineRuntime::wireMachine(machine);
   auto state = machine.makeInitialLoopState();
 
   for (int i = 0; i < 12; ++i) {
@@ -124,6 +126,7 @@ TEST(MachineLoopTests, OverrunResynchronizesToFutureTick) {
 
   auto fakeClock = std::make_shared<FakeClock>();
   SlowTestMachine machine(fakeClock, std::chrono::milliseconds{25});
+  MachineRuntime::wireMachine(machine);
   auto state = machine.makeInitialLoopState();
 
   machine.runOneCycle(state);

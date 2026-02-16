@@ -2,6 +2,7 @@
 
 #include <Config.hpp>
 #include <Machine.hpp>
+#include <MachineRuntime.hpp>
 
 #include <chrono>
 #include <filesystem>
@@ -96,6 +97,7 @@ TEST(MachineCommandTests, ValidCommandReturnsOkResponse) {
 
   auto fakeClock = std::make_shared<FakeClock>();
   CommandTestMachine machine(fakeClock);
+  MachineRuntime::wireMachine(machine);
   auto state = machine.makeInitialLoopState();
 
   cmd::Command command;

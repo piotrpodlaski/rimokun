@@ -45,19 +45,6 @@ Machine::Machine(std::shared_ptr<IClock> clock) : _clock(std::move(clock)) {
   _components.emplace(_controlPanel.componentType(), &_controlPanel);
   _components.emplace(_motorControl.componentType(), &_motorControl);
 
-  _loopRunner =
-      std::make_unique<ControlLoopRunner>(*_clock, _loopInterval, _updateInterval);
-  _controller = std::make_unique<MachineController>(
-      [this]() { return readInputSignals(); },
-      [this](const signal_map_t& outputs) { setOutputs(outputs); },
-      [this]() { return readOutputSignals(); },
-      [this]() { return _contec.state(); }, _robotStatus);
-  _componentService = std::make_unique<MachineComponentService>(_components);
-  _statusBuilder = std::make_unique<MachineStatusBuilder>();
-  _commandProcessor = std::make_unique<MachineCommandProcessor>();
-  _commandServer =
-      std::make_unique<MachineCommandServer>(*_commandProcessor, _robotServer);
-
   // Validate mappings used by the control loop and command handlers at startup.
   (void)requireMappingIndex(_inputMapping, "button1");
   (void)requireMappingIndex(_inputMapping, "button2");
@@ -144,10 +131,16 @@ void Machine::processThread() {
 }
 
 Machine::LoopState Machine::makeInitialLoopState() const {
+  if (!_loopRunner) {
+    throw std::runtime_error("Machine is not wired. Call MachineRuntime::wireMachine first.");
+  }
   return _loopRunner->makeInitialState();
 }
 
 void Machine::runOneCycle(LoopState& state) {
+  if (!_loopRunner) {
+    throw std::runtime_error("Machine is not wired. Call MachineRuntime::wireMachine first.");
+  }
   _loopRunner->runOneCycle(
       [this]() { controlLoopTasks(); },
       [this]() {
@@ -187,10 +180,19 @@ std::string Machine::dispatchCommandAndWait(cmd::Command command,
 }
 
 void Machine::controlLoopTasks() {
+  if (!_controller) {
+    throw std::runtime_error("Machine controller is not wired.");
+  }
   _controller->runControlLoopTasks();
 }
 
 void Machine::initialize() {
+  if (!_loopRunner || !_controller || !_componentService || !_statusBuilder ||
+      !_commandProcessor || !_commandServer) {
+    throw std::runtime_error(
+        "Machine collaborators are not wired. Use MachineRuntime::wireMachine "
+        "before initialize().");
+  }
   makeDummyStatus();
   _componentService->initializeAll();
   _isRunning = true;

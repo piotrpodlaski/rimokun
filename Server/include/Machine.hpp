@@ -17,6 +17,7 @@
 #include <atomic>
 #include <future>
 #include <memory>
+#include <mutex>
 #include <string_view>
 #include <CommonDefinitions.hpp>
 #include <CommandInterface.hpp>
@@ -74,6 +75,7 @@ class Machine {
   utl::RimoServer<utl::RobotStatus> _robotServer;
   std::thread _commandServerThread;
   std::thread _processThread;
+  std::mutex _lifecycleMutex;
   std::unique_ptr<ControlLoopRunner> _loopRunner;
   std::unique_ptr<MachineController> _controller;
   std::unique_ptr<MachineComponentService> _componentService;

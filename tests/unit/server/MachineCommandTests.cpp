@@ -199,3 +199,38 @@ TEST(MachineCommandTests, DispatchAfterShutdownReturnsMachineShuttingDown) {
 
   std::filesystem::remove(configPath);
 }
+
+TEST(MachineCommandTests, PendingCommandGetsShutdownReplyWhenMachineStops) {
+  const auto configPath = writeTempConfig();
+  utl::Config::instance().setConfigPath(configPath.string());
+
+  auto fakeClock = std::make_shared<FakeClock>();
+  CommandTestMachine machine(fakeClock);
+
+  cmd::Command command;
+  command.payload = cmd::ReconnectCommand{utl::ERobotComponent::ControlPanel};
+  auto future = command.reply.get_future();
+  ASSERT_TRUE(machine.submitCommand(std::move(command)));
+
+  machine.shutdown();
+
+  ASSERT_EQ(future.wait_for(50ms), std::future_status::ready);
+  EXPECT_EQ(future.get(), "Machine is shutting down");
+
+  std::filesystem::remove(configPath);
+}
+
+TEST(MachineCommandTests, SubmitCommandAfterShutdownIsRejected) {
+  const auto configPath = writeTempConfig();
+  utl::Config::instance().setConfigPath(configPath.string());
+
+  auto fakeClock = std::make_shared<FakeClock>();
+  CommandTestMachine machine(fakeClock);
+  machine.shutdown();
+
+  cmd::Command command;
+  command.payload = cmd::ReconnectCommand{utl::ERobotComponent::ControlPanel};
+  EXPECT_FALSE(machine.submitCommand(std::move(command)));
+
+  std::filesystem::remove(configPath);
+}

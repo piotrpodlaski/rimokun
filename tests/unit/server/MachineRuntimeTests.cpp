@@ -128,3 +128,22 @@ TEST(MachineRuntimeTests, DoubleInitializeIsRejected) {
 
   std::filesystem::remove(configPath);
 }
+
+TEST(MachineRuntimeTests, ConcurrentShutdownCallsCompleteWithoutDeadlock) {
+  const auto configPath = writeTempConfig();
+  utl::Config::instance().setConfigPath(configPath.string());
+
+  MachineRuntime runtime;
+  ASSERT_NO_THROW(runtime.initialize());
+  std::this_thread::sleep_for(20ms);
+
+  const auto start = std::chrono::steady_clock::now();
+  std::thread t1([&]() { EXPECT_NO_THROW(runtime.shutdown()); });
+  std::thread t2([&]() { EXPECT_NO_THROW(runtime.shutdown()); });
+  t1.join();
+  t2.join();
+  const auto elapsed = std::chrono::steady_clock::now() - start;
+  EXPECT_LT(elapsed, 2s);
+
+  std::filesystem::remove(configPath);
+}

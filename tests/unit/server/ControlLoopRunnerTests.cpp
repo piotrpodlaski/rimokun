@@ -66,3 +66,22 @@ TEST(ControlLoopRunnerTests, LargeOverrunTriggersAtMostOneUpdatePerCycle) {
   runner.runOneCycle([]() {}, []() {}, [&]() { ++updateCalls; }, state);
   EXPECT_EQ(updateCalls, 1);
 }
+
+TEST(ControlLoopRunnerTests, OneMillisecondIntervalsStayMonotonicUnderRepeatedOverrun) {
+  FakeClock clock;
+  ControlLoopRunner runner(clock, 1ms, 1ms);
+  auto state = runner.makeInitialState();
+
+  int updateCalls = 0;
+  IClock::time_point previousNextLoopAt = state.nextLoopAt;
+
+  for (int i = 0; i < 10; ++i) {
+    runner.runOneCycle(
+        [&]() { clock.advanceBy(7ms); }, []() {}, [&]() { ++updateCalls; }, state);
+    EXPECT_GT(state.nextLoopAt, previousNextLoopAt);
+    EXPECT_GT(state.nextLoopAt, clock.now());
+    previousNextLoopAt = state.nextLoopAt;
+  }
+
+  EXPECT_EQ(updateCalls, 10);
+}

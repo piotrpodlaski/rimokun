@@ -146,3 +146,62 @@ TEST(MachineStatusBuilderTests, PartialOutputSnapshotSetsValveFlagsToError) {
                 .flags.at(utl::EToolChangerStatusFlags::ClosedValve),
             utl::ELEDState::Error);
 }
+
+TEST(MachineStatusBuilderTests, MissingSnapshotAfterValidUpdateDoesNotLeaveStaleFlags) {
+  MachineStatusBuilder builder;
+  utl::RobotStatus status;
+  FakeComponent contec(MachineComponent::State::Normal);
+  MachineStatusBuilder::ComponentsMap components{
+      {utl::ERobotComponent::Contec, &contec}};
+
+  builder.updateAndPublish(
+      status, components,
+      []() {
+        ControlPanel::Snapshot s;
+        s.x = {0.0, 0.0, 0.0};
+        s.y = {0.0, 0.0, 0.0};
+        s.b = {false, false, false};
+        return s;
+      },
+      []() -> std::optional<signal_map_t> {
+        return signal_map_t{{"button1", true}, {"button2", true}};
+      },
+      []() -> std::optional<signal_map_t> {
+        return signal_map_t{{"toolChangerLeft", true},
+                            {"toolChangerRight", false}};
+      },
+      [](const utl::RobotStatus&) {});
+
+  EXPECT_EQ(status.toolChangers.at(utl::EArm::Left)
+                .flags.at(utl::EToolChangerStatusFlags::ProxSen),
+            utl::ELEDState::On);
+  EXPECT_EQ(status.toolChangers.at(utl::EArm::Left)
+                .flags.at(utl::EToolChangerStatusFlags::OpenValve),
+            utl::ELEDState::On);
+
+  builder.updateAndPublish(
+      status, components,
+      []() {
+        ControlPanel::Snapshot s;
+        s.x = {0.0, 0.0, 0.0};
+        s.y = {0.0, 0.0, 0.0};
+        s.b = {false, false, false};
+        return s;
+      },
+      []() -> std::optional<signal_map_t> { return std::nullopt; },
+      []() -> std::optional<signal_map_t> { return std::nullopt; },
+      [](const utl::RobotStatus&) {});
+
+  EXPECT_EQ(status.toolChangers.at(utl::EArm::Left)
+                .flags.at(utl::EToolChangerStatusFlags::ProxSen),
+            utl::ELEDState::Error);
+  EXPECT_EQ(status.toolChangers.at(utl::EArm::Right)
+                .flags.at(utl::EToolChangerStatusFlags::ProxSen),
+            utl::ELEDState::Error);
+  EXPECT_EQ(status.toolChangers.at(utl::EArm::Left)
+                .flags.at(utl::EToolChangerStatusFlags::OpenValve),
+            utl::ELEDState::Error);
+  EXPECT_EQ(status.toolChangers.at(utl::EArm::Right)
+                .flags.at(utl::EToolChangerStatusFlags::ClosedValve),
+            utl::ELEDState::Error);
+}

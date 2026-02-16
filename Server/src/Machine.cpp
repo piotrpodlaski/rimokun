@@ -187,6 +187,7 @@ void Machine::controlLoopTasks() {
 }
 
 void Machine::initialize() {
+  std::lock_guard<std::mutex> lock(_lifecycleMutex);
   if (!_loopRunner || !_controller || !_componentService || !_statusBuilder ||
       !_commandProcessor || !_commandServer) {
     throw std::runtime_error(
@@ -227,9 +228,13 @@ void Machine::handleReconnectCommand(const cmd::ReconnectCommand& c) {
 }
 
 void Machine::shutdown() {
+  std::lock_guard<std::mutex> lock(_lifecycleMutex);
   SPDLOG_INFO("Shutting down. Joining Threads...");
   _isRunning.store(false, std::memory_order_release);
   _commandQueue.shutdown();
+  while (auto command = _commandQueue.try_pop()) {
+    command->reply.set_value("Machine is shutting down");
+  }
   if (_processThread.joinable()) _processThread.join();
   if (_commandServerThread.joinable()) _commandServerThread.join();
 }

@@ -135,3 +135,53 @@ TEST(MachineCommandServerTests, ShutdownWhileBlockedOnReceiveExitsPromptlyWhenWo
 
   EXPECT_LT(elapsed, 700ms);
 }
+
+TEST(MachineCommandServerTests, MalformedCommandsReturnErrorsAndLoopKeepsServing) {
+  MachineCommandProcessor processor;
+  FakeCommandChannel channel(20ms);
+  MachineCommandServer commandServer(processor, channel);
+  std::atomic<bool> running{true};
+
+  int dispatchCalls = 0;
+  std::thread serverThread([&]() {
+    commandServer.runLoop(
+        running, [&](cmd::Command, const std::chrono::milliseconds) {
+          ++dispatchCalls;
+          return std::string{};
+        });
+  });
+
+  YAML::Node malformedNoType;
+  malformedNoType["system"] = "ControlPanel";
+  channel.enqueueCommand(malformedNoType);
+  auto r1 = channel.popResponseWaitFor(500ms);
+  ASSERT_TRUE(r1.has_value());
+  EXPECT_EQ((*r1)["status"].as<std::string>(), "Error");
+
+  YAML::Node unknownType;
+  unknownType["type"] = "nonsense";
+  channel.enqueueCommand(unknownType);
+  auto r2 = channel.popResponseWaitFor(500ms);
+  ASSERT_TRUE(r2.has_value());
+  EXPECT_EQ((*r2)["status"].as<std::string>(), "Error");
+
+  YAML::Node malformedToolChanger;
+  malformedToolChanger["type"] = "toolChanger";
+  malformedToolChanger["position"] = "Left";
+  channel.enqueueCommand(malformedToolChanger);
+  auto r3 = channel.popResponseWaitFor(500ms);
+  ASSERT_TRUE(r3.has_value());
+  EXPECT_EQ((*r3)["status"].as<std::string>(), "Error");
+
+  YAML::Node valid;
+  valid["type"] = "reset";
+  valid["system"] = "ControlPanel";
+  channel.enqueueCommand(valid);
+  auto r4 = channel.popResponseWaitFor(500ms);
+  ASSERT_TRUE(r4.has_value());
+  EXPECT_EQ((*r4)["status"].as<std::string>(), "OK");
+  EXPECT_EQ(dispatchCalls, 1);
+
+  running.store(false, std::memory_order_release);
+  serverThread.join();
+}

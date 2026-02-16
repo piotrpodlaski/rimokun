@@ -87,3 +87,69 @@ classes:
 
   std::filesystem::remove(configPath);
 }
+
+TEST(ConfigTests, MissingMachineSectionThrowsWhenRequested) {
+  const auto configPath = writeTempConfig(R"yaml(
+classes:
+  Demo:
+    value: 1
+)yaml");
+
+  utl::Config::instance().setConfigPath(configPath.string());
+  EXPECT_THROW((void)utl::Config::instance().getClassConfig("Machine"),
+               std::runtime_error);
+
+  std::filesystem::remove(configPath);
+}
+
+TEST(ConfigTests, MachineIntervalTypeMismatchThrows) {
+  const auto configPath = writeTempConfig(R"yaml(
+classes:
+  Machine:
+    loopIntervalMS: abc
+)yaml");
+
+  utl::Config::instance().setConfigPath(configPath.string());
+  EXPECT_THROW(
+      (void)utl::Config::instance().getOptional<int>("Machine", "loopIntervalMS", 10),
+      std::runtime_error);
+
+  std::filesystem::remove(configPath);
+}
+
+TEST(ConfigTests, ControlPanelTransportConfigCanBeRead) {
+  const auto configPath = writeTempConfig(R"yaml(
+classes:
+  ControlPanel:
+    comm:
+      type: serial
+      serial:
+        port: /dev/ttyS0
+        baudRate: BAUD_115200
+)yaml");
+
+  utl::Config::instance().setConfigPath(configPath.string());
+  const auto controlPanel = utl::Config::instance().getClassConfig("ControlPanel");
+  ASSERT_TRUE(controlPanel["comm"]);
+  EXPECT_EQ(controlPanel["comm"]["type"].as<std::string>(), "serial");
+  EXPECT_EQ(controlPanel["comm"]["serial"]["port"].as<std::string>(), "/dev/ttyS0");
+
+  std::filesystem::remove(configPath);
+}
+
+TEST(ConfigTests, MissingControlPanelTransportTypeThrows) {
+  const auto configPath = writeTempConfig(R"yaml(
+classes:
+  ControlPanel:
+    comm:
+      serial:
+        port: /dev/ttyS0
+)yaml");
+
+  utl::Config::instance().setConfigPath(configPath.string());
+  const auto controlPanel = utl::Config::instance().getClassConfig("ControlPanel");
+  EXPECT_THROW((void)controlPanel["comm"]["type"].as<std::string>(),
+               YAML::Exception);
+
+  std::filesystem::remove(configPath);
+}

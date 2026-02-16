@@ -1,11 +1,17 @@
 #pragma once
 #include <Contec.hpp>
 #include <ControlPanel.hpp>
+#include <IClock.hpp>
 #include <MachineComponent.hpp>
 #include <MotorControl.hpp>
+#include <SteadyClockAdapter.hpp>
 #include <chrono>
+#include <cstddef>
 #include <map>
 #include <atomic>
+#include <future>
+#include <memory>
+#include <string_view>
 #include <CommonDefinitions.hpp>
 #include <CommandInterface.hpp>
 #include <RimoServer.hpp>
@@ -14,25 +20,47 @@ typedef std::map<std::string, bool> signalMap_t;
 
 class Machine {
  public:
+  struct LoopState {
+    IClock::time_point nextLoopAt{};
+    IClock::time_point nextPublishAt{};
+    IClock::time_point nextDutyLogAt{};
+    double dutyCycleSum{0.0};
+    std::size_t dutyCycleSamples{0};
+    bool initialized{false};
+  };
+
   Machine();
+  explicit Machine(std::shared_ptr<IClock> clock);
   ~Machine() = default;
 
   std::optional<signalMap_t> readInputSignals();
   void setOutputs(const signalMap_t& signals);
   std::optional<signalMap_t> readOutputSignals();
+  [[nodiscard]] LoopState makeInitialLoopState() const;
+  void runOneCycle(LoopState& state);
+  bool submitCommand(cmd::Command command);
+  std::string dispatchCommandAndWait(cmd::Command command,
+                                     std::chrono::milliseconds timeout);
+  static void validateMappedIndex(std::string_view signal,
+                                  unsigned int index,
+                                  std::size_t ioSize,
+                                  std::string_view ioKind);
   void initialize();
   void shutdown();
 
  private:
   void commandServerThread();
   void processThread();
-  void controlLoopTasks();
-  void handleToolChangerCommand(const cmd::ToolChangerCommand& c);
-  void handleReconnectCommand(const cmd::ReconnectCommand& c);
+ protected:
+  virtual void controlLoopTasks();
+  virtual void updateStatus();
+  virtual void handleToolChangerCommand(const cmd::ToolChangerCommand& c);
+  virtual void handleReconnectCommand(const cmd::ReconnectCommand& c);
+ private:
   MachineComponent* getComponent(utl::ERobotComponent component);
   static utl::ELEDState stateToLed(MachineComponent::State state);
   void makeDummyStatus();
-  void updateStatus();
+
   Contec _contec;
   ControlPanel _controlPanel;
   MotorControl _motorControl;
@@ -44,6 +72,7 @@ class Machine {
   std::atomic<bool> _isRunning{false};
   std::chrono::milliseconds _loopInterval{10};
   std::chrono::milliseconds _updateInterval{50};
+  std::shared_ptr<IClock> _clock;
   utl::RimoServer<utl::RobotStatus> _robotServer;
   std::thread _commandServerThread;
   std::thread _processThread;

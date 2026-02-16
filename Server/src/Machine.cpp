@@ -20,7 +20,12 @@ unsigned int requireMappingIndex(
 
 }  // namespace
 
-Machine::Machine() {
+Machine::Machine() : Machine(std::make_shared<SteadyClockAdapter>()) {}
+
+Machine::Machine(std::shared_ptr<IClock> clock) : _clock(std::move(clock)) {
+  if (!_clock) {
+    throw std::runtime_error("Machine requires a non-null clock instance.");
+  }
   auto& cfg = utl::Config::instance();
   _inputMapping = cfg.getRequired<std::map<std::string, unsigned int>>(
       "Machine", "inputMapping");
@@ -57,12 +62,7 @@ std::optional<signalMap_t> Machine::readInputSignals() {
   try {
     auto inputs = _contec.readInputs();
     for (const auto& [signal, index] : _inputMapping) {
-      if (index >= inputs.size()) {
-        throw std::runtime_error(std::format(
-            "Input mapping '{}' points outside Contec input range (index={}, "
-            "size={})",
-            signal, index, inputs.size()));
-      }
+      validateMappedIndex(signal, index, inputs.size(), "input");
       inputSignals[signal] = inputs[index];
     }
   } catch (const std::exception& e) {
@@ -84,12 +84,7 @@ void Machine::setOutputs(const signalMap_t& signals) {
         throw std::runtime_error(
             std::format("Unknown output signal '{}'", signal));
       }
-      if (it->second >= outputs.size()) {
-        throw std::runtime_error(std::format(
-            "Output mapping '{}' points outside Contec output range "
-            "(index={}, size={})",
-            signal, it->second, outputs.size()));
-      }
+      validateMappedIndex(signal, it->second, outputs.size(), "output");
       outputs[it->second] = value;
     }
     _contec.setOutputs(outputs);
@@ -106,12 +101,7 @@ std::optional<signalMap_t> Machine::readOutputSignals() {
     auto output = _contec.readOutputs();
     signalMap_t outputSignals;
     for (auto& [signal, index] : _outputMapping) {
-      if (index >= output.size()) {
-        throw std::runtime_error(std::format(
-            "Output mapping '{}' points outside Contec output range "
-            "(index={}, size={})",
-            signal, index, output.size()));
-      }
+      validateMappedIndex(signal, index, output.size(), "output");
       outputSignals[signal] = output[index];
     }
     return outputSignals;
@@ -120,77 +110,114 @@ std::optional<signalMap_t> Machine::readOutputSignals() {
     return std::nullopt;
   }
 }
+
+void Machine::validateMappedIndex(const std::string_view signal,
+                                  const unsigned int index,
+                                  const std::size_t ioSize,
+                                  const std::string_view ioKind) {
+  if (index >= ioSize) {
+    throw std::runtime_error(std::format(
+        "{} mapping '{}' points outside Contec {} range (index={}, size={})",
+        ioKind == "input" ? "Input" : "Output", signal, ioKind, index, ioSize));
+  }
+}
 void Machine::processThread() {
   SPDLOG_INFO("Processing thread started");
-  const auto loopInterval = _loopInterval;
-  const auto updateInterval = _updateInterval;
-  auto nextLoopAt = std::chrono::steady_clock::now();
-  auto nextPublishAt = nextLoopAt;
-  auto nextDutyLogAt = nextLoopAt + 1s;
-  double dutyCycleSum = 0.0;
-  std::size_t dutyCycleSamples = 0;
-
+  auto loopState = makeInitialLoopState();
   while (_isRunning.load(std::memory_order_acquire)) {
-    const auto nowBefore = std::chrono::steady_clock::now();
-    if (nowBefore < nextLoopAt) {
-      std::this_thread::sleep_until(nextLoopAt);
-    }
-    const auto loopStart = std::chrono::steady_clock::now();
-
-    // regular control loop stuff
-    controlLoopTasks();
-    // next we handle commands
-    if (auto command = _commandQueue.try_pop()) {
-      try {
-        std::visit(Overloaded{[this](const cmd::ToolChangerCommand& c) {
-                                handleToolChangerCommand(c);
-                              },
-                              [this](const cmd::ReconnectCommand& c) {
-                                handleReconnectCommand(c);
-                              }},
-                   command->payload);
-        command->reply.set_value("");
-      } catch (const std::runtime_error& e) {
-        SPDLOG_WARN("Exception caught in 'std::visit'! {}", e.what());
-        command->reply.set_value(e.what());
-      }
-    }
-    const auto now = std::chrono::steady_clock::now();
-    if (now >= nextPublishAt) {
-      updateStatus();
-      do {
-        nextPublishAt += updateInterval;
-      } while (nextPublishAt <= now);
-    }
-
-    const auto loopWork = now - loopStart;
-    const auto dutyCycle =
-        std::chrono::duration<double>(loopWork).count() /
-        std::chrono::duration<double>(loopInterval).count();
-    dutyCycleSum += dutyCycle;
-    ++dutyCycleSamples;
-    if (now >= nextDutyLogAt && dutyCycleSamples > 0) {
-      const auto avgDutyCycle = dutyCycleSum / static_cast<double>(dutyCycleSamples);
-      SPDLOG_DEBUG("Machine loop duty cycle avg {:.3f}% (last {:.3f}%)",
-                  avgDutyCycle * 100.0, dutyCycle * 100.0);
-      dutyCycleSum = 0.0;
-      dutyCycleSamples = 0;
-      do {
-        nextDutyLogAt += 1s;
-      } while (nextDutyLogAt <= now);
-    }
-
-    nextLoopAt += loopInterval;
-    if (nextLoopAt <= now) {
-      const auto overrun = std::chrono::duration_cast<std::chrono::milliseconds>(
-          now - nextLoopAt + loopInterval);
-      SPDLOG_WARN("Machine loop overrun by {} ms", overrun.count());
-      do {
-        nextLoopAt += loopInterval;
-      } while (nextLoopAt <= now);
-    }
+    runOneCycle(loopState);
   }
   SPDLOG_INFO("Processing thread finished!");
+}
+
+Machine::LoopState Machine::makeInitialLoopState() const {
+  LoopState state;
+  const auto now = _clock->now();
+  state.nextLoopAt = now;
+  state.nextPublishAt = now;
+  state.nextDutyLogAt = now + 1s;
+  state.initialized = true;
+  return state;
+}
+
+void Machine::runOneCycle(LoopState& state) {
+  if (!state.initialized) {
+    state = makeInitialLoopState();
+  }
+
+  const auto nowBefore = _clock->now();
+  if (nowBefore < state.nextLoopAt) {
+    _clock->sleepUntil(state.nextLoopAt);
+  }
+  const auto loopStart = _clock->now();
+
+  controlLoopTasks();
+  if (auto command = _commandQueue.try_pop()) {
+    try {
+      std::visit(Overloaded{[this](const cmd::ToolChangerCommand& c) {
+                              handleToolChangerCommand(c);
+                            },
+                            [this](const cmd::ReconnectCommand& c) {
+                              handleReconnectCommand(c);
+                            }},
+                 command->payload);
+      command->reply.set_value("");
+    } catch (const std::runtime_error& e) {
+      SPDLOG_WARN("Exception caught in 'std::visit'! {}", e.what());
+      command->reply.set_value(e.what());
+    }
+  }
+
+  const auto now = _clock->now();
+  if (now >= state.nextPublishAt) {
+    updateStatus();
+    do {
+      state.nextPublishAt += _updateInterval;
+    } while (state.nextPublishAt <= now);
+  }
+
+  const auto loopWork = now - loopStart;
+  const auto dutyCycle = std::chrono::duration<double>(loopWork).count() /
+                         std::chrono::duration<double>(_loopInterval).count();
+  state.dutyCycleSum += dutyCycle;
+  ++state.dutyCycleSamples;
+  if (now >= state.nextDutyLogAt && state.dutyCycleSamples > 0) {
+    const auto avgDutyCycle =
+        state.dutyCycleSum / static_cast<double>(state.dutyCycleSamples);
+    SPDLOG_DEBUG("Machine loop duty cycle avg {:.3f}% (last {:.3f}%)",
+                 avgDutyCycle * 100.0, dutyCycle * 100.0);
+    state.dutyCycleSum = 0.0;
+    state.dutyCycleSamples = 0;
+    do {
+      state.nextDutyLogAt += 1s;
+    } while (state.nextDutyLogAt <= now);
+  }
+
+  state.nextLoopAt += _loopInterval;
+  if (state.nextLoopAt <= now) {
+    const auto overrun = std::chrono::duration_cast<std::chrono::milliseconds>(
+        now - state.nextLoopAt + _loopInterval);
+    SPDLOG_WARN("Machine loop overrun by {} ms", overrun.count());
+    do {
+      state.nextLoopAt += _loopInterval;
+    } while (state.nextLoopAt <= now);
+  }
+}
+
+bool Machine::submitCommand(cmd::Command command) {
+  return _commandQueue.push(std::move(command));
+}
+
+std::string Machine::dispatchCommandAndWait(cmd::Command command,
+                                            const std::chrono::milliseconds timeout) {
+  auto future = command.reply.get_future();
+  if (!submitCommand(std::move(command))) {
+    return "Machine is shutting down";
+  }
+  if (future.wait_for(timeout) != std::future_status::ready) {
+    return "Command processing timed out";
+  }
+  return future.get();
 }
 
 void Machine::controlLoopTasks() {
@@ -259,20 +286,7 @@ void Machine::commandServerThread() {
         const auto position = (*command)["position"].as<utl::EArm>();
         cmd::Command c;
         c.payload = cmd::ToolChangerCommand(position, action);
-        auto fut = c.reply.get_future();
-        if (!_commandQueue.push(std::move(c))) {
-          response["status"] = "Error";
-          response["message"] = "Machine is shutting down";
-          _robotServer.sendResponse(response);
-          continue;
-        }
-        if (fut.wait_for(2s) != std::future_status::ready) {
-          response["status"] = "Error";
-          response["message"] = "Command processing timed out";
-          _robotServer.sendResponse(response);
-          continue;
-        }
-        std::string reply = fut.get();
+        std::string reply = dispatchCommandAndWait(std::move(c), 2s);
         response["message"] = "";
         if (reply.empty()) {  // everything OK
           response["status"] = "OK";
@@ -286,20 +300,7 @@ void Machine::commandServerThread() {
         auto robotComponent = (*command)["system"].as<utl::ERobotComponent>();
         cmd::Command c;
         c.payload = cmd::ReconnectCommand(robotComponent);
-        auto fut = c.reply.get_future();
-        if (!_commandQueue.push(std::move(c))) {
-          response["status"] = "Error";
-          response["message"] = "Machine is shutting down";
-          _robotServer.sendResponse(response);
-          continue;
-        }
-        if (fut.wait_for(2s) != std::future_status::ready) {
-          response["status"] = "Error";
-          response["message"] = "Command processing timed out";
-          _robotServer.sendResponse(response);
-          continue;
-        }
-        std::string reply = fut.get();
+        std::string reply = dispatchCommandAndWait(std::move(c), 2s);
         response["message"] = "";
         if (reply.empty()) {  // everything OK
           response["status"] = "OK";

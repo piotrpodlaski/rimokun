@@ -3,6 +3,7 @@ project(rimokun)
 
 set(CMAKE_CXX_STANDARD 23)
 
+include(CTest)
 
 include(FetchContent)
 FetchContent_Declare(
@@ -34,7 +35,18 @@ FetchContent_Declare(
         GIT_TAG v3.2
 )
 option(CPPZMQ_BUILD_TESTS OFF)
+if (BUILD_TESTING)
+    FetchContent_Declare(
+            googletest
+            GIT_REPOSITORY https://github.com/google/googletest.git
+            GIT_TAG v1.15.2
+    )
+    set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
+endif()
 FetchContent_MakeAvailable(yaml-cpp magic_enum cppzmq spdlog argparse)
+if (BUILD_TESTING)
+    FetchContent_MakeAvailable(googletest)
+endif()
 
 #Handle spdlog debug level:
 if (${CMAKE_BUILD_TYPE} STREQUAL "Debug")
@@ -48,3 +60,6 @@ add_compile_definitions(SPDLOG_COMPILED_LIB)
 add_subdirectory(Utilities)
 add_subdirectory(GUI)
 add_subdirectory(Server)
+if (BUILD_TESTING)
+    add_subdirectory(tests)
+endif()

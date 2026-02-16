@@ -9,6 +9,7 @@
 #include <fstream>
 #include <future>
 #include <memory>
+#include <stdexcept>
 #include <string>
 
 #include "server/fakes/FakeClock.hpp"
@@ -89,6 +90,27 @@ class CommandTestMachine final : public Machine {
   }
   void handleToolChangerCommand(const cmd::ToolChangerCommand&) override {}
 };
+
+class FlakyCommandTestMachine final : public Machine {
+ public:
+  explicit FlakyCommandTestMachine(const std::shared_ptr<IClock>& clock)
+      : Machine(clock) {}
+
+  int reconnectCalls{0};
+  bool failNextReconnect{true};
+
+ protected:
+  void controlLoopTasks() override {}
+  void updateStatus() override {}
+  void handleReconnectCommand(const cmd::ReconnectCommand&) override {
+    if (failNextReconnect) {
+      failNextReconnect = false;
+      throw std::runtime_error("forced reconnect failure");
+    }
+    ++reconnectCalls;
+  }
+  void handleToolChangerCommand(const cmd::ToolChangerCommand&) override {}
+};
 }  // namespace
 
 TEST(MachineCommandTests, ValidCommandReturnsOkResponse) {
@@ -126,6 +148,54 @@ TEST(MachineCommandTests, CommandTimeoutReturnsError) {
   const auto reply = machine.dispatchCommandAndWait(std::move(command), 5ms);
   EXPECT_EQ(reply, "Command processing timed out");
   EXPECT_EQ(machine.reconnectCalls, 0);
+
+  std::filesystem::remove(configPath);
+}
+
+TEST(MachineCommandTests, CommandFailureIsReturnedAndSubsequentCommandSucceeds) {
+  const auto configPath = writeTempConfig();
+  utl::Config::instance().setConfigPath(configPath.string());
+
+  auto fakeClock = std::make_shared<FakeClock>();
+  FlakyCommandTestMachine machine(fakeClock);
+  MachineRuntime::wireMachine(machine);
+  auto state = machine.makeInitialLoopState();
+
+  cmd::Command failingCommand;
+  failingCommand.payload =
+      cmd::ReconnectCommand{utl::ERobotComponent::ControlPanel};
+  auto failingFuture = failingCommand.reply.get_future();
+  ASSERT_TRUE(machine.submitCommand(std::move(failingCommand)));
+  machine.runOneCycle(state);
+  ASSERT_EQ(failingFuture.wait_for(50ms), std::future_status::ready);
+  EXPECT_EQ(failingFuture.get(), "forced reconnect failure");
+
+  cmd::Command succeedingCommand;
+  succeedingCommand.payload =
+      cmd::ReconnectCommand{utl::ERobotComponent::ControlPanel};
+  auto succeedingFuture = succeedingCommand.reply.get_future();
+  ASSERT_TRUE(machine.submitCommand(std::move(succeedingCommand)));
+  machine.runOneCycle(state);
+  ASSERT_EQ(succeedingFuture.wait_for(50ms), std::future_status::ready);
+  EXPECT_EQ(succeedingFuture.get(), "");
+  EXPECT_EQ(machine.reconnectCalls, 1);
+
+  std::filesystem::remove(configPath);
+}
+
+TEST(MachineCommandTests, DispatchAfterShutdownReturnsMachineShuttingDown) {
+  const auto configPath = writeTempConfig();
+  utl::Config::instance().setConfigPath(configPath.string());
+
+  auto fakeClock = std::make_shared<FakeClock>();
+  CommandTestMachine machine(fakeClock);
+  machine.shutdown();
+
+  cmd::Command command;
+  command.payload = cmd::ReconnectCommand{utl::ERobotComponent::ControlPanel};
+
+  const auto reply = machine.dispatchCommandAndWait(std::move(command), 5ms);
+  EXPECT_EQ(reply, "Machine is shutting down");
 
   std::filesystem::remove(configPath);
 }

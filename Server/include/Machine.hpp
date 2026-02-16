@@ -1,8 +1,14 @@
 #pragma once
 #include <Contec.hpp>
 #include <ControlPanel.hpp>
+#include <ControlLoopRunner.hpp>
 #include <IClock.hpp>
 #include <MachineComponent.hpp>
+#include <MachineCommandProcessor.hpp>
+#include <MachineCommandServer.hpp>
+#include <MachineComponentService.hpp>
+#include <MachineController.hpp>
+#include <MachineStatusBuilder.hpp>
 #include <MotorControl.hpp>
 #include <SteadyClockAdapter.hpp>
 #include <chrono>
@@ -20,14 +26,7 @@ typedef std::map<std::string, bool> signalMap_t;
 
 class Machine {
  public:
-  struct LoopState {
-    IClock::time_point nextLoopAt{};
-    IClock::time_point nextPublishAt{};
-    IClock::time_point nextDutyLogAt{};
-    double dutyCycleSum{0.0};
-    std::size_t dutyCycleSamples{0};
-    bool initialized{false};
-  };
+  using LoopState = ControlLoopRunner::State;
 
   Machine();
   explicit Machine(std::shared_ptr<IClock> clock);
@@ -57,8 +56,6 @@ class Machine {
   virtual void handleToolChangerCommand(const cmd::ToolChangerCommand& c);
   virtual void handleReconnectCommand(const cmd::ReconnectCommand& c);
  private:
-  MachineComponent* getComponent(utl::ERobotComponent component);
-  static utl::ELEDState stateToLed(MachineComponent::State state);
   void makeDummyStatus();
 
   Contec _contec;
@@ -76,4 +73,10 @@ class Machine {
   utl::RimoServer<utl::RobotStatus> _robotServer;
   std::thread _commandServerThread;
   std::thread _processThread;
+  std::unique_ptr<ControlLoopRunner> _loopRunner;
+  std::unique_ptr<MachineController> _controller;
+  std::unique_ptr<MachineComponentService> _componentService;
+  std::unique_ptr<MachineStatusBuilder> _statusBuilder;
+  std::unique_ptr<MachineCommandProcessor> _commandProcessor;
+  std::unique_ptr<MachineCommandServer> _commandServer;
 };

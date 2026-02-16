@@ -14,6 +14,10 @@ include(GoogleTest)
 gtest_discover_tests(utilities_unit_tests)
 
 add_executable(server_unit_tests
+        server/ControlLoopRunnerTests.cpp
+        server/MachineControllerTests.cpp
+        server/MachineCommandProcessorTests.cpp
+        server/MachineStatusBuilderTests.cpp
         server/CommandQueueTests.cpp
         server/MachineLoopTests.cpp
         server/MachineCommandTests.cpp

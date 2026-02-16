@@ -193,11 +193,20 @@ void Machine::initialize() {
         "Machine collaborators are not wired. Use MachineRuntime::wireMachine "
         "before initialize().");
   }
+  bool expected = false;
+  if (!_isRunning.compare_exchange_strong(expected, true,
+                                          std::memory_order_acq_rel)) {
+    throw std::runtime_error("Machine is already running.");
+  }
   makeDummyStatus();
   _componentService->initializeAll();
-  _isRunning = true;
-  _commandServerThread = std::thread(&Machine::commandServerThread, this);
-  _processThread = std::thread(&Machine::processThread, this);
+  try {
+    _commandServerThread = std::thread(&Machine::commandServerThread, this);
+    _processThread = std::thread(&Machine::processThread, this);
+  } catch (...) {
+    _isRunning.store(false, std::memory_order_release);
+    throw;
+  }
 }
 void Machine::commandServerThread() {
   _commandServer->runLoop(

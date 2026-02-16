@@ -116,3 +116,15 @@ TEST(MachineRuntimeTests, ShutdownIsSafeWithoutInitializeAndWhenRepeated) {
 
   std::filesystem::remove(configPath);
 }
+
+TEST(MachineRuntimeTests, DoubleInitializeIsRejected) {
+  const auto configPath = writeTempConfig();
+  utl::Config::instance().setConfigPath(configPath.string());
+
+  MachineRuntime runtime;
+  ASSERT_NO_THROW(runtime.initialize());
+  EXPECT_THROW((void)runtime.initialize(), std::runtime_error);
+  EXPECT_NO_THROW(runtime.shutdown());
+
+  std::filesystem::remove(configPath);
+}

@@ -38,3 +38,31 @@ TEST(ControlLoopRunnerTests, OverrunResynchronizesNextLoopTick) {
   runner.runOneCycle([&]() { clock.advanceBy(25ms); }, []() {}, []() {}, state);
   EXPECT_EQ(state.nextLoopAt, IClock::time_point{60ms});
 }
+
+TEST(ControlLoopRunnerTests, DutyCycleWindowResetsAndSchedulesNextLogSecond) {
+  FakeClock clock;
+  ControlLoopRunner runner(clock, 10ms, 50ms);
+  auto state = runner.makeInitialState();
+  state.nextDutyLogAt = IClock::time_point{0ms};
+
+  runner.runOneCycle([&]() { clock.advanceBy(5ms); }, []() {}, []() {}, state);
+
+  EXPECT_EQ(state.dutyCycleSamples, 0u);
+  EXPECT_DOUBLE_EQ(state.dutyCycleSum, 0.0);
+  EXPECT_EQ(state.nextDutyLogAt, IClock::time_point{1s});
+}
+
+TEST(ControlLoopRunnerTests, LargeOverrunTriggersAtMostOneUpdatePerCycle) {
+  FakeClock clock;
+  ControlLoopRunner runner(clock, 10ms, 50ms);
+  auto state = runner.makeInitialState();
+  int updateCalls = 0;
+
+  runner.runOneCycle([&]() { clock.advanceBy(220ms); }, []() {},
+                     [&]() { ++updateCalls; }, state);
+  EXPECT_EQ(updateCalls, 1);
+  EXPECT_EQ(state.nextUpdateAt, IClock::time_point{250ms});
+
+  runner.runOneCycle([]() {}, []() {}, [&]() { ++updateCalls; }, state);
+  EXPECT_EQ(updateCalls, 1);
+}

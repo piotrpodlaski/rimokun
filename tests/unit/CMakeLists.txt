@@ -30,6 +30,7 @@ add_executable(server_unit_tests
         server/ArKd2RegisterMapTests.cpp
         server/ControlPanelCommFactoryTests.cpp
         server/SerialControlPanelCommTests.cpp
+        server/ControlPanelTests.cpp
 )
 
 target_include_directories(server_unit_tests

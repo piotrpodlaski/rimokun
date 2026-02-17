@@ -5,7 +5,22 @@
 
 #include <algorithm>
 #include <sstream>
+#include <stdexcept>
 #include <utility>
+
+ControlPanel::ControlPanel(std::unique_ptr<IControlPanelComm> comm,
+                           const std::size_t movingAverageDepth,
+                           const std::size_t baselineSamples,
+                           const std::size_t buttonDebounceSamples)
+    : _comm(std::move(comm)),
+      _movingAverageDepth(std::max<std::size_t>(1u, movingAverageDepth)),
+      _baselineSamples(std::max<std::size_t>(1u, baselineSamples)),
+      _buttonDebounceSamples(std::max<std::size_t>(1u, buttonDebounceSamples)) {
+  if (!_comm) {
+    throw std::runtime_error("ControlPanel communication backend is null.");
+  }
+  resetSignalProcessingState();
+}
 
 ControlPanel::ControlPanel() {
   auto& cfg = utl::Config::instance();
@@ -55,6 +70,9 @@ ControlPanel::ControlPanel() {
       std::max<std::size_t>(1u, getProcessingOrLegacy("baselineSamples", 50u));
   _buttonDebounceSamples = std::max<std::size_t>(
       1u, getProcessingOrLegacy("buttonDebounceSamples", 3u));
+  if (!_comm) {
+    throw std::runtime_error("ControlPanel communication backend is null.");
+  }
   resetSignalProcessingState();
 }
 

@@ -21,6 +21,10 @@ class ControlPanel final : public MachineComponent {
   };
 
   ControlPanel();
+  ControlPanel(std::unique_ptr<IControlPanelComm> comm,
+               std::size_t movingAverageDepth,
+               std::size_t baselineSamples,
+               std::size_t buttonDebounceSamples);
   ~ControlPanel() override;
   void initialize() override;
   void reset() override;

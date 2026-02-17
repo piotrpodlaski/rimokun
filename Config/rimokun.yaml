@@ -63,6 +63,24 @@ classes:
   Machine:
     loopIntervalMS: 10
     updateIntervalMS: 50
+    motion:
+      neutralAxisActivationThreshold: 0.10
+      axes:
+        leftArmX:
+          maxLinearSpeedMmPerSec: 80.0
+          stepsPerMm: 100.0
+        leftArmY:
+          maxLinearSpeedMmPerSec: 80.0
+          stepsPerMm: 100.0
+        rightArmX:
+          maxLinearSpeedMmPerSec: 80.0
+          stepsPerMm: 100.0
+        rightArmY:
+          maxLinearSpeedMmPerSec: 80.0
+          stepsPerMm: 100.0
+        gantryZ:
+          maxLinearSpeedMmPerSec: 80.0
+          stepsPerMm: 100.0
     inputMapping:
       safetyON : 8
       button1 : 9

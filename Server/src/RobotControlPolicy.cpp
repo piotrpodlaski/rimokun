@@ -1,7 +1,10 @@
 #include "RobotControlPolicy.hpp"
 
+#include <Config.hpp>
+
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <stdexcept>
 #include <utility>
 
@@ -32,17 +35,6 @@ double clampAxis(const double value) {
   return std::clamp(value, -1.0, 1.0);
 }
 
-std::int32_t scaledSpeedFromAxis(const double axis, const std::int32_t maxSpeed) {
-  const auto magnitude = std::abs(clampAxis(axis));
-  return static_cast<std::int32_t>(magnitude * static_cast<double>(maxSpeed));
-}
-
-std::int32_t scaledPositionFromAxis(const double axis,
-                                    const std::int32_t maxPositionStep) {
-  return static_cast<std::int32_t>(
-      clampAxis(axis) * static_cast<double>(maxPositionStep));
-}
-
 utl::JoystickStatus joystickOrNeutral(const utl::RobotStatus& status,
                                       const utl::EArm arm) {
   const auto it = status.joystics.find(arm);
@@ -52,41 +44,66 @@ utl::JoystickStatus joystickOrNeutral(const utl::RobotStatus& status,
   return it->second;
 }
 
-void appendAxisIntents(std::vector<IRobotControlPolicy::MotorIntent>& intents,
-                       const utl::EMotor m1, const utl::EMotor m2,
-                       const utl::JoystickStatus& joystick,
-                       const double deadband, const std::int32_t maxSpeed,
-                       const std::int32_t maxPositionStep) {
-  const auto speedCmd = scaledSpeedFromAxis(joystick.y, maxSpeed);
-  const auto direction = joystick.y >= 0.0 ? MotorControlDirection::Forward
-                                           : MotorControlDirection::Reverse;
-  const auto positionStep = scaledPositionFromAxis(joystick.x, maxPositionStep);
-
-  if (std::abs(clampAxis(joystick.y)) < deadband &&
-      std::abs(clampAxis(joystick.x)) < deadband) {
-    intents.push_back({.motorId = m1, .stopMovement = true});
-    intents.push_back({.motorId = m2, .stopMovement = true});
-    return;
-  }
-
-  for (const auto motor : {m1, m2}) {
-    IRobotControlPolicy::MotorIntent intent;
-    intent.motorId = motor;
-    if (joystick.btn) {
-      intent.mode = MotorControlMode::Position;
-      intent.position = positionStep;
-      intent.speed = std::max<std::int32_t>(100, maxSpeed / 2);
-      intent.startMovement = true;
-    } else {
-      intent.mode = MotorControlMode::Speed;
-      intent.direction = direction;
-      intent.speed = std::max<std::int32_t>(50, speedCmd);
-      intent.startMovement = true;
-    }
-    intents.push_back(intent);
-  }
+std::int32_t speedStepsPerSecFromAxis(const double axis,
+                                      const double maxLinearSpeedMmPerSec,
+                                      const double stepsPerMm) {
+  const auto linear = std::abs(clampAxis(axis)) * maxLinearSpeedMmPerSec;
+  return static_cast<std::int32_t>(std::llround(linear * stepsPerMm));
 }
 }  // namespace
+
+RimoKunControlPolicy::RimoKunControlPolicy() {
+  try {
+    const auto machineCfg = utl::Config::instance().getClassConfig("Machine");
+    const auto motionCfg = machineCfg["motion"];
+    if (!motionCfg || !motionCfg.IsMap()) {
+      return;
+    }
+    if (const auto commonThreshold = motionCfg["neutralAxisActivationThreshold"];
+        commonThreshold) {
+      const auto value = commonThreshold.as<double>();
+      _motion.leftArmX.neutralAxisActivationThreshold = value;
+      _motion.leftArmY.neutralAxisActivationThreshold = value;
+      _motion.rightArmX.neutralAxisActivationThreshold = value;
+      _motion.rightArmY.neutralAxisActivationThreshold = value;
+      _motion.gantryZ.neutralAxisActivationThreshold = value;
+    }
+    const auto axesCfg = motionCfg["axes"];
+    if (!axesCfg || !axesCfg.IsMap()) {
+      return;
+    }
+
+    const auto readAxis = [](const YAML::Node& axesNode, const char* key,
+                             AxisConfig& axis) {
+      const auto axisNode = axesNode[key];
+      if (!axisNode || !axisNode.IsMap()) {
+        return;
+      }
+      if (const auto threshold = axisNode["neutralAxisActivationThreshold"];
+          threshold) {
+        axis.neutralAxisActivationThreshold = threshold.as<double>();
+      }
+      if (const auto maxSpeed = axisNode["maxLinearSpeedMmPerSec"]; maxSpeed) {
+        axis.maxLinearSpeedMmPerSec = maxSpeed.as<double>();
+      }
+      if (const auto stepsPerMm = axisNode["stepsPerMm"]; stepsPerMm) {
+        axis.stepsPerMm = stepsPerMm.as<double>();
+      }
+    };
+
+    readAxis(axesCfg, "leftArmX", _motion.leftArmX);
+    readAxis(axesCfg, "leftArmY", _motion.leftArmY);
+    readAxis(axesCfg, "rightArmX", _motion.rightArmX);
+    readAxis(axesCfg, "rightArmY", _motion.rightArmY);
+    readAxis(axesCfg, "gantryZ", _motion.gantryZ);
+    if (const auto gantryYNode = axesCfg["gantryY"];
+        gantryYNode && gantryYNode.IsMap()) {
+      readAxis(axesCfg, "gantryY", _motion.gantryZ);
+    }
+  } catch (const std::exception&) {
+    // Keep defaults when config is unavailable in unit-test contexts.
+  }
+}
 
 IRobotControlPolicy::ControlDecision RimoKunControlPolicy::decide(
     const std::optional<SignalMap>& inputs, const std::optional<SignalMap>& outputs,
@@ -105,21 +122,42 @@ IRobotControlPolicy::ControlDecision RimoKunControlPolicy::decide(
   ioOutputs["light1"] = inputs->at("button1");
   ioOutputs["light2"] = inputs->at("button2");
 
-  constexpr double kDeadband = 0.10;
-  constexpr std::int32_t kMaxSpeed = 3000;
-  constexpr std::int32_t kMaxPositionStep = 2000;
-
   std::vector<MotorIntent> motorIntents;
   motorIntents.reserve(6);
-  appendAxisIntents(motorIntents, utl::EMotor::XLeft, utl::EMotor::XRight,
-                    joystickOrNeutral(robotStatus, utl::EArm::Left), kDeadband,
-                    kMaxSpeed, kMaxPositionStep);
-  appendAxisIntents(motorIntents, utl::EMotor::YLeft, utl::EMotor::YRight,
-                    joystickOrNeutral(robotStatus, utl::EArm::Right), kDeadband,
-                    kMaxSpeed, kMaxPositionStep);
-  appendAxisIntents(motorIntents, utl::EMotor::ZLeft, utl::EMotor::ZRight,
-                    joystickOrNeutral(robotStatus, utl::EArm::Gantry), kDeadband,
-                    kMaxSpeed, kMaxPositionStep);
+  const auto leftJs = joystickOrNeutral(robotStatus, utl::EArm::Left);
+  const auto rightJs = joystickOrNeutral(robotStatus, utl::EArm::Right);
+  const auto gantryJs = joystickOrNeutral(robotStatus, utl::EArm::Gantry);
+
+  const auto appendSpeedIntent = [&](const utl::EMotor motorId,
+                                     const double axisValue,
+                                     const AxisConfig& axisCfg) {
+    MotorIntent intent;
+    intent.motorId = motorId;
+    if (std::abs(clampAxis(axisValue)) <
+        axisCfg.neutralAxisActivationThreshold) {
+      intent.stopMovement = true;
+      motorIntents.push_back(intent);
+      return;
+    }
+    intent.mode = MotorControlMode::Speed;  // default operating mode
+    intent.direction = axisValue >= 0.0 ? MotorControlDirection::Forward
+                                        : MotorControlDirection::Reverse;
+    intent.speed = std::max<std::int32_t>(
+        1, speedStepsPerSecFromAxis(axisValue, axisCfg.maxLinearSpeedMmPerSec,
+                                    axisCfg.stepsPerMm));
+    intent.startMovement = true;
+    motorIntents.push_back(intent);
+  };
+
+  // One joystick per arm: left joystick drives left X/Y, right joystick drives right X/Y.
+  appendSpeedIntent(utl::EMotor::XLeft, leftJs.x, _motion.leftArmX);
+  appendSpeedIntent(utl::EMotor::YLeft, leftJs.y, _motion.leftArmY);
+  appendSpeedIntent(utl::EMotor::XRight, rightJs.x, _motion.rightArmX);
+  appendSpeedIntent(utl::EMotor::YRight, rightJs.y, _motion.rightArmY);
+
+  // Gantry Z: single joystick axis drives both Z motors with the same command.
+  appendSpeedIntent(utl::EMotor::ZLeft, gantryJs.y, _motion.gantryZ);
+  appendSpeedIntent(utl::EMotor::ZRight, gantryJs.y, _motion.gantryZ);
 
   return {.outputs = std::move(ioOutputs),
           .motorIntents = std::move(motorIntents),

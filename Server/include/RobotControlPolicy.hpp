@@ -48,8 +48,27 @@ class DefaultRobotControlPolicy final : public IRobotControlPolicy {
 
 class RimoKunControlPolicy final : public IRobotControlPolicy {
  public:
+  RimoKunControlPolicy();
+
   ControlDecision decide(const std::optional<SignalMap>& inputs,
                          const std::optional<SignalMap>& outputs,
                          MachineComponent::State contecState,
                          const utl::RobotStatus& robotStatus) const override;
+
+ private:
+  struct AxisConfig {
+    double neutralAxisActivationThreshold{0.10};
+    double maxLinearSpeedMmPerSec{80.0};
+    double stepsPerMm{100.0};
+  };
+
+  struct MotionConfig {
+    AxisConfig leftArmX;
+    AxisConfig leftArmY;
+    AxisConfig rightArmX;
+    AxisConfig rightArmY;
+    AxisConfig gantryZ;
+  };
+
+  MotionConfig _motion;
 };

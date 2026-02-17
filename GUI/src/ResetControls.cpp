@@ -1,6 +1,4 @@
 #include <ResetControls.hpp>
-#include <RobotStatusViewModel.hpp>
-#include <optional>
 #include "spdlog/spdlog.h"
 #include "ui_ResetControls.h"
 
@@ -28,6 +26,16 @@ ResetControls::ResetControls(QWidget* parent) : QWidget(parent), _ui(new Ui::Res
   connect(_bResetControlPanel, &QPushButton::clicked, this, &ResetControls::handleButtons);
 }
 
+void ResetControls::applyViewModel(const ResetControlsViewModel& vm) const {
+  _lServerLed->setState(vm.server);
+  _lContecLed->setState(vm.contec);
+  _lMotorLed->setState(vm.motor);
+  _lControlPanelLed->setState(vm.controlPanel);
+  _bResetContec->setEnabled(vm.resetContecEnabled);
+  _bResetMotors->setEnabled(vm.resetMotorEnabled);
+  _bResetControlPanel->setEnabled(vm.resetControlPanelEnabled);
+}
+
 void ResetControls::handleButtons() {
   const auto sender = dynamic_cast<QPushButton*>(QObject::sender());
   GuiCommand command;
@@ -46,27 +54,4 @@ void ResetControls::handleButtons() {
     return;
 
   emit buttonPressed(command);
-}
-
-void ResetControls::updateRobotStatus(
-    const RobotStatus& robotStatus) const {
-  const auto vm =
-      RobotStatusViewModel::resetControlsForStatus(std::make_optional(robotStatus));
-  _lServerLed->setState(vm.server);
-  _lContecLed->setState(vm.contec);
-  _lMotorLed->setState(vm.motor);
-  _lControlPanelLed->setState(vm.controlPanel);
-  _bResetContec->setEnabled(vm.resetContecEnabled);
-  _bResetMotors->setEnabled(vm.resetMotorEnabled);
-  _bResetControlPanel->setEnabled(vm.resetControlPanelEnabled);
-}
-void ResetControls::announceServerError() {
-  const auto vm = RobotStatusViewModel::resetControlsForStatus(std::nullopt);
-  _lServerLed->setState(vm.server);
-  _lContecLed->setState(vm.contec);
-  _lMotorLed->setState(vm.motor);
-  _lControlPanelLed->setState(vm.controlPanel);
-  _bResetContec->setEnabled(vm.resetContecEnabled);
-  _bResetMotors->setEnabled(vm.resetMotorEnabled);
-  _bResetControlPanel->setEnabled(vm.resetControlPanelEnabled);
 }

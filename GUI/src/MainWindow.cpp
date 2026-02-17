@@ -20,45 +20,44 @@ MainWindow::MainWindow(QWidget* parent)
   // setWindowIcon(QIcon(":/resources/rimoKunLogo.png"));
 
   for (auto& [eMot, motStat] : _motorStats) {
-    motStat->setMotorId(eMot);
     motStat->setCurrentPosition(4010.2);
     motStat->setSpeed(2137);
     motStat->setTargetPosition(420);
     motStat->setTorque(69);
     motStat->setBrake(utl::ELEDState::Off);
     motStat->setEnabled(utl::ELEDState::Error);
-    connect(&_updater, &Updater::newDataArrived,
-            dynamic_cast<MotorStats*>(motStat), &MotorStats::handleUpdate);
+    _motorPresenters.push_back(
+        std::make_unique<MotorStatsPresenter>(
+            dynamic_cast<MotorStats*>(motStat), eMot, &_stateStore, this));
   }
   const auto leftChanger = _ui->leftChanger;
   const auto rightChanger = _ui->rightChanger;
-  leftChanger->setArm(utl::EArm::Left);
-  rightChanger->setArm(utl::EArm::Right);
   const auto robotVis = _ui->robotVis;
-  _updater.startUpdaterThread();
 
-  connect(&_updater, &Updater::newDataArrived, robotVis,
+  _leftToolChangerPresenter = std::make_unique<ToolChangerPresenter>(
+      leftChanger, utl::EArm::Left, &_stateStore, this);
+  _rightToolChangerPresenter = std::make_unique<ToolChangerPresenter>(
+      rightChanger, utl::EArm::Right, &_stateStore, this);
+  _resetControlsPresenter = std::make_unique<ResetControlsPresenter>(
+      _ui->resetControls, &_stateStore, this);
+
+  connect(_leftToolChangerPresenter.get(), &ToolChangerPresenter::commandIssued,
+          &_updater, &Updater::sendCommand);
+  connect(_rightToolChangerPresenter.get(), &ToolChangerPresenter::commandIssued,
+          &_updater, &Updater::sendCommand);
+  connect(_resetControlsPresenter.get(), &ResetControlsPresenter::commandIssued,
+          &_updater, &Updater::sendCommand);
+
+  connect(&_updater, &Updater::newDataArrived, &_stateStore,
+          &GuiStateStore::onStatusReceived);
+  connect(&_updater, &Updater::serverNotConnected, &_stateStore,
+          &GuiStateStore::onServerDisconnected);
+  connect(&_stateStore, &GuiStateStore::statusUpdated, robotVis,
           &RobotVisualisation::updateRobotStatus);
-  connect(&_updater, &Updater::newDataArrived, leftChanger,
-          &ToolChanger::updateRobotStatus);
-  connect(&_updater, &Updater::newDataArrived, rightChanger,
-          &ToolChanger::updateRobotStatus);
-
-  connect(leftChanger, &ToolChanger::buttonPressed, &_updater,
-          &Updater::sendCommand);
-  connect(rightChanger, &ToolChanger::buttonPressed, &_updater,
-          &Updater::sendCommand);
-
-  connect(_ui->resetControls, &ResetControls::buttonPressed, &_updater,
-          &Updater::sendCommand);
-
-  connect(&_updater, &Updater::newDataArrived, _ui->resetControls,
-          &ResetControls::updateRobotStatus);
   connect(&_updater, &Updater::newDataArrived, this,
           &MainWindow::onRobotStatusUpdate);
 
-  connect(&_updater, &Updater::serverNotConnected, _ui->resetControls,
-          &ResetControls::announceServerError);
+  _updater.startUpdaterThread();
 
 
   _consoleSink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();

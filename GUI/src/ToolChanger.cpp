@@ -1,6 +1,5 @@
 #include "ToolChanger.hpp"
 
-#include "RobotStatusViewModel.hpp"
 #include "StyledPopup.hpp"
 #include "magic_enum/magic_enum.hpp"
 #include "spdlog/spdlog.h"
@@ -18,22 +17,14 @@ ToolChanger::ToolChanger(QWidget* parent)
           &ToolChanger::handleButtons);
 }
 void ToolChanger::setArm(EArm arm) { this->_arm = arm; }
-void ToolChanger::updateRobotStatus(const RobotStatus& robotStatus) const {
-  const auto vm = RobotStatusViewModel::toolChangerForArm(robotStatus, _arm);
-  if (!vm.has_value()) {
-    SPDLOG_WARN(
-        "Status of ToolChanger {} not provided in the update message from "
-        "server!",
-        magic_enum::enum_name(_arm));
-    return;
-  }
-  _ui->proxLamp->setState(vm->prox);
-  _ui->openLamp->setState(vm->openSensor);
-  _ui->closedLamp->setState(vm->closedSensor);
-  _ui->valveOpenLamp->setState(vm->openValve);
-  _ui->valveClosedLamp->setState(vm->closedValve);
-  _ui->closeButton->setEnabled(vm->closeButtonEnabled);
-  _ui->openButon->setEnabled(vm->openButtonEnabled);
+void ToolChanger::applyViewModel(const ToolChangerViewModel& vm) const {
+  _ui->proxLamp->setState(vm.prox);
+  _ui->openLamp->setState(vm.openSensor);
+  _ui->closedLamp->setState(vm.closedSensor);
+  _ui->valveOpenLamp->setState(vm.openValve);
+  _ui->valveClosedLamp->setState(vm.closedValve);
+  _ui->closeButton->setEnabled(vm.closeButtonEnabled);
+  _ui->openButon->setEnabled(vm.openButtonEnabled);
 }
 void ToolChanger::handleButtons() {
   const auto sender = QObject::sender();

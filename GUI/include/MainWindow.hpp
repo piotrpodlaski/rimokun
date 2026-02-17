@@ -1,10 +1,16 @@
 #pragma once
 
 #include <QMainWindow>
+#include <memory>
+#include <vector>
 
 #include "CommonDefinitions.hpp"
+#include "GuiStateStore.hpp"
 #include "JoystickPanelWindow.h"
 #include "MotorStats.hpp"
+#include "MotorStatsPresenter.hpp"
+#include "ResetControlsPresenter.hpp"
+#include "ToolChangerPresenter.hpp"
 #include "Updater.hpp"
 #include "spdlog/sinks/stdout_color_sinks.h"
 #include "QtLogSink.hpp"
@@ -27,8 +33,13 @@ class MainWindow : public QMainWindow {
  private:
   void onRobotStatusUpdate(const utl::RobotStatus& status);
   Updater _updater;
+  GuiStateStore _stateStore;
   Ui::MainWindow *_ui;
   MotorStatsMap_t _motorStats;
+  std::vector<std::unique_ptr<MotorStatsPresenter>> _motorPresenters;
+  std::unique_ptr<ToolChangerPresenter> _leftToolChangerPresenter;
+  std::unique_ptr<ToolChangerPresenter> _rightToolChangerPresenter;
+  std::unique_ptr<ResetControlsPresenter> _resetControlsPresenter;
   std::shared_ptr<spdlog::logger> _logger;
   std::shared_ptr<spdlog::sinks::stdout_color_sink_mt> _consoleSink;
   std::shared_ptr<QtLogSink> _qtSink;

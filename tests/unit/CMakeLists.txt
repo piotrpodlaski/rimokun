@@ -73,6 +73,60 @@ target_link_libraries(motor_unit_tests
 
 gtest_discover_tests(motor_unit_tests PROPERTIES LABELS "unit")
 
+add_executable(gui_glue_unit_tests
+        gui/GuiCommandYamlAdapterTests.cpp
+        gui/RobotStatusViewModelTests.cpp
+        ${CMAKE_SOURCE_DIR}/GUI/src/GuiCommandYamlAdapter.cpp
+        ${CMAKE_SOURCE_DIR}/GUI/src/RobotStatusViewModel.cpp
+)
+
+target_include_directories(gui_glue_unit_tests
+        PRIVATE
+        ${CMAKE_SOURCE_DIR}/GUI/include
+        ${CMAKE_SOURCE_DIR}/Utilities/include
+        ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
+target_link_libraries(gui_glue_unit_tests
+        PRIVATE
+        utilities
+        yaml-cpp::yaml-cpp
+        GTest::gtest_main
+)
+
+gtest_discover_tests(gui_glue_unit_tests PROPERTIES LABELS "unit")
+
+find_package(Qt6 COMPONENTS Core Test REQUIRED)
+
+add_executable(gui_qt_tests
+        qt/GuiStateStoreQtTests.cpp
+        ${CMAKE_SOURCE_DIR}/GUI/src/GuiStateStore.cpp
+        ${CMAKE_SOURCE_DIR}/GUI/include/GuiStateStore.hpp
+)
+
+set_target_properties(gui_qt_tests PROPERTIES
+        AUTOMOC ON
+        AUTOUIC OFF
+        AUTORCC OFF
+)
+
+target_include_directories(gui_qt_tests
+        PRIVATE
+        ${CMAKE_SOURCE_DIR}/GUI/include
+        ${CMAKE_SOURCE_DIR}/Utilities/include
+        ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
+target_link_libraries(gui_qt_tests
+        PRIVATE
+        utilities
+        Qt6::Core
+        Qt6::Test
+)
+
+add_test(NAME GuiStateStoreQtTests COMMAND gui_qt_tests)
+set_tests_properties(GuiStateStoreQtTests PROPERTIES LABELS "unit")
+
 if (ENABLE_COVERAGE)
     string(REPLACE "." ";" CXX_VERSION_PARTS "${CMAKE_CXX_COMPILER_VERSION}")
     list(GET CXX_VERSION_PARTS 0 CXX_VERSION_MAJOR)

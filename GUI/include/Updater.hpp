@@ -1,5 +1,4 @@
 #pragma once
-#include <QMetaType>
 #include <QPointer>
 #include <qobject.h>
 
@@ -10,9 +9,8 @@
 
 #include "CommonDefinitions.hpp"
 #include "GuiCommand.hpp"
+#include "GuiMetaTypes.hpp"
 #include "RimoTransportWorker.hpp"
-
-Q_DECLARE_METATYPE(utl::RobotStatus);
 
 class Updater final : public QObject {
   Q_OBJECT

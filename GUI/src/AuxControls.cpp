@@ -18,19 +18,24 @@ AuxControls::AuxControls(QWidget* parent)
   connect(_bSave, &QPushButton::clicked, this, &AuxControls::handleButtons);
 }
 
-void AuxControls::processResponse(const YAML::Node response) {
-  SPDLOG_WARN(response.as<std::string>());
+void AuxControls::processResponse(const GuiResponse& response) {
+  if (response.ok) {
+    SPDLOG_INFO("AuxControls response OK: {}", response.message);
+  } else {
+    SPDLOG_WARN("AuxControls response error: {}", response.message);
+  }
 }
 
 void AuxControls::handleButtons() {
   const auto sender = QObject::sender();
-  YAML::Node command;
-  command["type"] = "reset";
+  GuiCommand command;
   if (sender == _ui->enableButton) {
-    command["system"] = "Contec";
+    command.payload = GuiReconnectCommand{.component = utl::ERobotComponent::Contec};
   }
   else if (sender == _ui->disableButton) {
-    command["action"] = "disableMotors";
+    YAML::Node raw;
+    raw["type"] = "disableMotors";
+    command.payload = GuiRawCommand{.node = raw};
   }
   else
     return;

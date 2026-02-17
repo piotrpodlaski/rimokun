@@ -4,12 +4,13 @@
 #include <qobject.h>
 
 #include <atomic>
+#include <cstdint>
 #include <mutex>
-#include <queue>
-#include <thread>
+#include <unordered_map>
 
 #include "CommonDefinitions.hpp"
-#include "RimoClient.hpp"
+#include "GuiCommand.hpp"
+#include "RimoTransportWorker.hpp"
 
 Q_DECLARE_METATYPE(utl::RobotStatus);
 
@@ -22,26 +23,23 @@ class Updater final : public QObject {
   void stopUpdaterThread();
 
  signals:
-  void newDataArrived(const utl::RobotStatus& staus);
+  void newDataArrived(const utl::RobotStatus& status);
   void serverNotConnected();
 
  public slots:
-  void sendCommand(const YAML::Node& command);
+  void sendCommand(const GuiCommand& command);
 
  private:
-  struct PendingCommand {
-    YAML::Node command;
+  struct PendingRequestMeta {
     QPointer<QObject> sender;
     bool expectsResponse{false};
     QString senderClassName;
   };
-
-  void runner();
-  void processPendingCommands();
+  void handleResponse(const RimoTransportWorker::ResponseEvent& event);
+  std::uint64_t nextRequestId();
   std::atomic<bool> _running{false};
-  std::mutex _commandMutex;
-  std::queue<PendingCommand> _pendingCommands;
-
-  utl::RimoClient<utl::RobotStatus> _client;
-  std::thread _updaterThread;
+  std::atomic<std::uint64_t> _requestCounter{1};
+  std::mutex _pendingMutex;
+  std::unordered_map<std::uint64_t, PendingRequestMeta> _pendingById;
+  RimoTransportWorker _worker;
 };

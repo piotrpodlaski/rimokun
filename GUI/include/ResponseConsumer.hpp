@@ -1,11 +1,9 @@
 #pragma once
 
-#include <yaml-cpp/yaml.h>
-
-#include <chrono>
+#include "GuiCommand.hpp"
 
 class ResponseConsumer {
  public:
   virtual ~ResponseConsumer() = default;
-  virtual void processResponse(YAML::Node response) = 0;
+  virtual void processResponse(const GuiResponse& response) = 0;
 };

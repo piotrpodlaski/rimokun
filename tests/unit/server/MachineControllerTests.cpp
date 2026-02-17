@@ -26,7 +26,7 @@ class FakeControlPolicy final : public IRobotControlPolicy {
 };
 }  // namespace
 
-TEST(MachineControllerTests, ErrorStateSetsToolChangersToBlinkingError) {
+TEST(MachineControllerTests, ErrorDecisionDoesNotMutateToolChangerStatusInController) {
   utl::RobotStatus status;
   status.toolChangers[utl::EArm::Left].flags[utl::EToolChangerStatusFlags::ProxSen] =
       utl::ELEDState::Off;
@@ -56,10 +56,10 @@ TEST(MachineControllerTests, ErrorStateSetsToolChangersToBlinkingError) {
   EXPECT_FALSE(outputsCalled);
   EXPECT_EQ(status.toolChangers.at(utl::EArm::Left)
                 .flags.at(utl::EToolChangerStatusFlags::ProxSen),
-            utl::ELEDState::ErrorBlinking);
+            utl::ELEDState::Off);
   EXPECT_EQ(status.toolChangers.at(utl::EArm::Right)
                 .flags.at(utl::EToolChangerStatusFlags::ProxSen),
-            utl::ELEDState::ErrorBlinking);
+            utl::ELEDState::Off);
 }
 
 TEST(MachineControllerTests, ToolChangerCommandSetsExpectedOutputSignal) {

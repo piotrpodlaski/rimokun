@@ -3,8 +3,8 @@
 #include <QPushButton>
 #include <QWidget>
 
+#include "GuiCommand.hpp"
 #include "LedIndicator.hpp"
-#include "yaml-cpp/node/node.h"
 
 namespace Ui {
 class ResetControls;
@@ -21,7 +21,7 @@ class ResetControls : public QWidget {
   void announceServerError();
 
  signals:
-  void buttonPressed(YAML::Node button) const;
+  void buttonPressed(const GuiCommand& command) const;
 
  private:
   Ui::ResetControls* _ui;

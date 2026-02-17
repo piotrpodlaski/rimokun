@@ -38,11 +38,6 @@ void MachineController::runControlLoopTasks() const {
       _controlPolicy->decide(_readInputs(), _readOutputs(), _contecState(),
                              _robotStatus);
   if (decision.setToolChangerErrorBlinking) {
-    for (auto& [_, tc] : _robotStatus.toolChangers) {
-      for (auto& [__, flag] : tc.flags) {
-        flag = utl::ELEDState::ErrorBlinking;
-      }
-    }
     return;
   }
   if (decision.outputs) {

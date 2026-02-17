@@ -1,8 +1,10 @@
 #include "Updater.hpp"
 
+#include <utility>
+
 #include "Logger.hpp"
-#include "StyledPopup.hpp"
 #include "ResponseConsumer.hpp"
+#include "StyledPopup.hpp"
 
 using namespace std::string_literals;
 
@@ -27,16 +29,24 @@ void Updater::startUpdaterThread() {
   }
   SPDLOG_INFO("Spawning updater thread.");
 
-  // cleanup, just in case
-  if (_updaterThread.joinable()) {
-    _updaterThread.join();
-  }
-
   _running.store(true, std::memory_order_release);
-  _updaterThread = std::thread(&Updater::runner, this);
+  _worker.start(
+      [this](const utl::RobotStatus& status) {
+        QMetaObject::invokeMethod(
+            this, [this, status]() { emit newDataArrived(status); },
+            Qt::QueuedConnection);
+      },
+      [this]() {
+        QMetaObject::invokeMethod(
+            this, [this]() { emit serverNotConnected(); }, Qt::QueuedConnection);
+      },
+      [this](const RimoTransportWorker::ResponseEvent& event) {
+        QMetaObject::invokeMethod(
+            this, [this, event]() { handleResponse(event); }, Qt::QueuedConnection);
+      });
 }
 
-void Updater::sendCommand(const YAML::Node& command) {
+void Updater::sendCommand(const GuiCommand& command) {
   if (!_running.load(std::memory_order_acquire)) {
     SPDLOG_ERROR("Updater thread is not running; command not sent.");
     StyledPopup::showErrorAsync("Error", "Updater thread is not running.");
@@ -44,114 +54,81 @@ void Updater::sendCommand(const YAML::Node& command) {
   }
 
   auto* senderObject = QObject::sender();
-  PendingCommand pending;
-  pending.command = command;
-  pending.sender = senderObject;
-  pending.expectsResponse =
-      dynamic_cast<ResponseConsumer*>(senderObject) != nullptr;
+  PendingRequestMeta meta;
+  meta.sender = senderObject;
+  meta.expectsResponse = dynamic_cast<ResponseConsumer*>(senderObject) != nullptr;
   if (senderObject) {
-    pending.senderClassName = senderObject->metaObject()->className();
+    meta.senderClassName = senderObject->metaObject()->className();
   } else {
-    pending.senderClassName = "UnknownSender";
+    meta.senderClassName = "UnknownSender";
   }
-
-  std::lock_guard<std::mutex> lock(_commandMutex);
-  _pendingCommands.push(std::move(pending));
+  const auto requestId = nextRequestId();
+  {
+    std::lock_guard<std::mutex> lock(_pendingMutex);
+    _pendingById.emplace(requestId, std::move(meta));
+  }
+  _worker.enqueue({.id = requestId, .command = command});
 }
 
-void Updater::runner() {
-  _client.init();
-  while (_running.load(std::memory_order_acquire)) {
-    processPendingCommands();
-    auto status = _client.receiveRobotStatus();
-    if (!status) {
-      emit serverNotConnected();
-      continue;
+void Updater::handleResponse(const RimoTransportWorker::ResponseEvent& event) {
+  PendingRequestMeta meta;
+  {
+    std::lock_guard<std::mutex> lock(_pendingMutex);
+    const auto it = _pendingById.find(event.id);
+    if (it == _pendingById.end()) {
+      return;
     }
-    emit newDataArrived(*status);
-    processPendingCommands();
+    meta = it->second;
+    _pendingById.erase(it);
   }
-  processPendingCommands();
-}
 
-void Updater::processPendingCommands() {
-  while (true) {
-    PendingCommand pending;
-    {
-      std::lock_guard<std::mutex> lock(_commandMutex);
-      if (_pendingCommands.empty()) {
-        return;
-      }
-      pending = std::move(_pendingCommands.front());
-      _pendingCommands.pop();
-    }
-
-    auto result = _client.sendCommand(pending.command);
-    if (!result) {
-      SPDLOG_ERROR("Failed to send command and/or get the response!");
-      QMetaObject::invokeMethod(
-          this,
-          []() {
-            StyledPopup::showErrorAsync(
-                "Error", "Failed to send command and/or get response.");
-          },
-          Qt::QueuedConnection);
-      continue;
-    }
-    if ((*result)["status"].as<std::string>() != "OK") {
-      const auto msgNode = (*result)["message"];
-      auto message = msgNode.as<std::string>();
-      if (message.empty()) {
-        message = "Server did not provide any messages..."s;
-      }
-      SPDLOG_ERROR("Server returned error status with message: '{}'", message);
-      QMetaObject::invokeMethod(
-          this,
-          [message = QString::fromStdString(message)]() {
-            StyledPopup::showErrorAsync("Error", message);
-          },
-          Qt::QueuedConnection);
-    }
-
-    const auto response = (*result)["response"];
-    auto* senderObject = pending.sender.data();
-    if (pending.expectsResponse) {
-      if (!response) {
-        SPDLOG_CRITICAL(
-            "Class {} was expecting a response, but server did not provide!",
-            pending.senderClassName.toStdString());
-        continue;
-      }
-      if (!senderObject) {
-        SPDLOG_WARN(
-            "Sender {} was destroyed before response arrived. Dropping "
-            "response.",
-            pending.senderClassName.toStdString());
-        continue;
-      }
-      auto responseCopy = YAML::Clone(response);
-      QMetaObject::invokeMethod(
-          this,
-          [senderObject, responseCopy]() mutable {
-            auto* consumer = dynamic_cast<ResponseConsumer*>(senderObject);
-            if (!consumer) {
-              return;
-            }
-            consumer->processResponse(responseCopy);
-          },
-          Qt::QueuedConnection);
-    } else if (response) {
-      SPDLOG_WARN(
-          "Class {} received unexpected response payload; ignoring.",
-          pending.senderClassName.toStdString());
-    }
+  if (!event.response.has_value()) {
+    SPDLOG_ERROR("Failed to send command and/or get the response!");
+    StyledPopup::showErrorAsync("Error", "Failed to send command and/or get response.");
+    return;
   }
+
+  auto response = *event.response;
+  if (!response.ok) {
+    if (response.message.empty()) {
+      response.message = "Server did not provide any message..."s;
+    }
+    SPDLOG_ERROR("Server returned error status with message: '{}'", response.message);
+    StyledPopup::showErrorAsync("Error", QString::fromStdString(response.message));
+  }
+
+  auto* senderObject = meta.sender.data();
+  if (!meta.expectsResponse) {
+    if (response.payload.has_value()) {
+      SPDLOG_WARN("Class {} received unexpected response payload; ignoring.",
+                  meta.senderClassName.toStdString());
+    }
+    return;
+  }
+  if (!senderObject) {
+    SPDLOG_WARN("Sender {} was destroyed before response arrived. Dropping response.",
+                meta.senderClassName.toStdString());
+    return;
+  }
+  auto* consumer = dynamic_cast<ResponseConsumer*>(senderObject);
+  if (!consumer) {
+    return;
+  }
+  consumer->processResponse(response);
 }
 
 void Updater::stopUpdaterThread() {
   SPDLOG_INFO("Stopping updater thread");
   _running.store(false, std::memory_order_release);
-  if (_updaterThread.joinable()) {
-    _updaterThread.join();
+  _worker.stop();
+  std::lock_guard<std::mutex> lock(_pendingMutex);
+  _pendingById.clear();
+}
+
+std::uint64_t Updater::nextRequestId() {
+  auto id = _requestCounter.fetch_add(1, std::memory_order_acq_rel);
+  if (id == 0) {
+    id = _requestCounter.fetch_add(1, std::memory_order_acq_rel);
   }
+  return id;
 }

@@ -1,7 +1,8 @@
 #include <ResetControls.hpp>
+#include <RobotStatusViewModel.hpp>
+#include <optional>
 #include "spdlog/spdlog.h"
 #include "ui_ResetControls.h"
-#include <yaml-cpp/yaml.h>
 
 using namespace utl;
 
@@ -29,16 +30,17 @@ ResetControls::ResetControls(QWidget* parent) : QWidget(parent), _ui(new Ui::Res
 
 void ResetControls::handleButtons() {
   const auto sender = dynamic_cast<QPushButton*>(QObject::sender());
-  YAML::Node command;
-  command["type"] = "reset";
+  GuiCommand command;
   if (sender == _ui->resetContec) {
-    command["system"] = "Contec";
+    command.payload = GuiReconnectCommand{.component = ERobotComponent::Contec};
   }
   else if (sender == _ui->resetMotors) {
-    command["system"] = "MotorControl";
+    command.payload =
+        GuiReconnectCommand{.component = ERobotComponent::MotorControl};
   }
   else if (sender == _ui->resetControlPanel) {
-    command["system"] = "ControlPanel";
+    command.payload =
+        GuiReconnectCommand{.component = ERobotComponent::ControlPanel};
   }
   else
     return;
@@ -48,31 +50,23 @@ void ResetControls::handleButtons() {
 
 void ResetControls::updateRobotStatus(
     const RobotStatus& robotStatus) const {
-  if (robotStatus.robotComponents.contains(ERobotComponent::Contec)) {
-    auto status = robotStatus.robotComponents.at(ERobotComponent::Contec);
-    _lContecLed->setState(status);
-    _bResetContec->setEnabled(status==ELEDState::Error);
-  }
-  if (robotStatus.robotComponents.contains(ERobotComponent::MotorControl)) {
-    auto status = robotStatus.robotComponents.at(ERobotComponent::MotorControl);
-    _lMotorLed->setState(status);
-    _bResetMotors->setEnabled(status==ELEDState::Error);
-  }
-  if (robotStatus.robotComponents.contains(ERobotComponent::ControlPanel)) {
-    auto status = robotStatus.robotComponents.at(ERobotComponent::ControlPanel);
-    _lControlPanelLed->setState(status);
-    _bResetControlPanel->setEnabled(status==ELEDState::Error);
-  }
-  _lServerLed->setState(ELEDState::On);
+  const auto vm =
+      RobotStatusViewModel::resetControlsForStatus(std::make_optional(robotStatus));
+  _lServerLed->setState(vm.server);
+  _lContecLed->setState(vm.contec);
+  _lMotorLed->setState(vm.motor);
+  _lControlPanelLed->setState(vm.controlPanel);
+  _bResetContec->setEnabled(vm.resetContecEnabled);
+  _bResetMotors->setEnabled(vm.resetMotorEnabled);
+  _bResetControlPanel->setEnabled(vm.resetControlPanelEnabled);
 }
 void ResetControls::announceServerError() {
-  _lServerLed->setState(ELEDState::Error);
-  _lContecLed->setState(ELEDState::Off);
-  _lMotorLed->setState(ELEDState::Off);
-  _lControlPanelLed->setState(ELEDState::Off);
-
-  _bResetContec->setEnabled(false);
-  _bResetMotors->setEnabled(false);
-  _bResetControlPanel->setEnabled(false);
-
+  const auto vm = RobotStatusViewModel::resetControlsForStatus(std::nullopt);
+  _lServerLed->setState(vm.server);
+  _lContecLed->setState(vm.contec);
+  _lMotorLed->setState(vm.motor);
+  _lControlPanelLed->setState(vm.controlPanel);
+  _bResetContec->setEnabled(vm.resetContecEnabled);
+  _bResetMotors->setEnabled(vm.resetMotorEnabled);
+  _bResetControlPanel->setEnabled(vm.resetControlPanelEnabled);
 }

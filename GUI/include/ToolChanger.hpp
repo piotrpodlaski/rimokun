@@ -1,8 +1,8 @@
 #pragma once
 
 #include "CommonDefinitions.hpp"
+#include "GuiCommand.hpp"
 #include "QWidget"
-#include "yaml-cpp/node/node.h"
 
 namespace Ui {
 class ToolChanger;
@@ -23,7 +23,7 @@ class ToolChanger final : public QWidget {
   void handleButtons();
 
  signals:
-  void buttonPressed(YAML::Node button) const;
+  void buttonPressed(const GuiCommand& command) const;
 
  private:
   Ui::ToolChanger* _ui;

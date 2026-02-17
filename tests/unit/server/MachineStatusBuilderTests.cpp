@@ -98,6 +98,69 @@ TEST(MachineStatusBuilderTests, MissingInputSnapshotSetsProximityFlagsToError) {
             utl::ELEDState::Error);
 }
 
+TEST(MachineStatusBuilderTests, ContecErrorSetsAllToolChangerFlagsToError) {
+  MachineStatusBuilder builder;
+  utl::RobotStatus status;
+  status.toolChangers[utl::EArm::Left].flags[utl::EToolChangerStatusFlags::ProxSen] =
+      utl::ELEDState::Off;
+  status.toolChangers[utl::EArm::Left].flags[utl::EToolChangerStatusFlags::OpenSen] =
+      utl::ELEDState::Off;
+  status.toolChangers[utl::EArm::Left]
+      .flags[utl::EToolChangerStatusFlags::ClosedSen] = utl::ELEDState::Off;
+  status.toolChangers[utl::EArm::Left]
+      .flags[utl::EToolChangerStatusFlags::OpenValve] = utl::ELEDState::Off;
+  status.toolChangers[utl::EArm::Left]
+      .flags[utl::EToolChangerStatusFlags::ClosedValve] = utl::ELEDState::Off;
+
+  status.toolChangers[utl::EArm::Right]
+      .flags[utl::EToolChangerStatusFlags::ProxSen] = utl::ELEDState::On;
+  status.toolChangers[utl::EArm::Right]
+      .flags[utl::EToolChangerStatusFlags::OpenSen] = utl::ELEDState::On;
+  status.toolChangers[utl::EArm::Right]
+      .flags[utl::EToolChangerStatusFlags::ClosedSen] = utl::ELEDState::On;
+  status.toolChangers[utl::EArm::Right]
+      .flags[utl::EToolChangerStatusFlags::OpenValve] = utl::ELEDState::On;
+  status.toolChangers[utl::EArm::Right]
+      .flags[utl::EToolChangerStatusFlags::ClosedValve] = utl::ELEDState::On;
+
+  FakeComponent contec(MachineComponent::State::Error);
+  MachineStatusBuilder::ComponentsMap components{
+      {utl::ERobotComponent::Contec, &contec}};
+
+  bool published = false;
+  builder.updateAndPublish(
+      status, components,
+      []() {
+        ControlPanel::Snapshot s;
+        s.x = {0.0, 0.0, 0.0};
+        s.y = {0.0, 0.0, 0.0};
+        s.b = {false, false, false};
+        return s;
+      },
+      []() -> std::optional<signal_map_t> {
+        return signal_map_t{{"button1", true}, {"button2", true}};
+      },
+      []() -> std::optional<signal_map_t> {
+        return signal_map_t{{"toolChangerLeft", true},
+                            {"toolChangerRight", false}};
+      },
+      [&](const utl::RobotStatus&) { published = true; });
+
+  ASSERT_TRUE(published);
+  for (const auto arm : {utl::EArm::Left, utl::EArm::Right}) {
+    EXPECT_EQ(status.toolChangers.at(arm).flags.at(utl::EToolChangerStatusFlags::ProxSen),
+              utl::ELEDState::Error);
+    EXPECT_EQ(status.toolChangers.at(arm).flags.at(utl::EToolChangerStatusFlags::OpenSen),
+              utl::ELEDState::Error);
+    EXPECT_EQ(status.toolChangers.at(arm).flags.at(utl::EToolChangerStatusFlags::ClosedSen),
+              utl::ELEDState::Error);
+    EXPECT_EQ(status.toolChangers.at(arm).flags.at(utl::EToolChangerStatusFlags::OpenValve),
+              utl::ELEDState::Error);
+    EXPECT_EQ(status.toolChangers.at(arm).flags.at(utl::EToolChangerStatusFlags::ClosedValve),
+              utl::ELEDState::Error);
+  }
+}
+
 TEST(MachineStatusBuilderTests, PartialOutputSnapshotSetsValveFlagsToError) {
   MachineStatusBuilder builder;
   utl::RobotStatus status;

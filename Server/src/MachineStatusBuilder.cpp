@@ -1,5 +1,7 @@
 #include "MachineStatusBuilder.hpp"
 
+#include <array>
+
 void MachineStatusBuilder::updateAndPublish(
     utl::RobotStatus& status, const ComponentsMap& components,
     const SnapshotFn& readJoystickSnapshot, const ReadSignalsFn& readInputSignals,
@@ -7,6 +9,11 @@ void MachineStatusBuilder::updateAndPublish(
   for (const auto& [componentType, component] : components) {
     status.robotComponents[componentType] = stateToLed(component->state());
   }
+
+  const auto contecIt = components.find(utl::ERobotComponent::Contec);
+  const bool contecInError =
+      contecIt != components.end() && contecIt->second != nullptr &&
+      contecIt->second->state() == MachineComponent::State::Error;
 
   const auto joystick = readJoystickSnapshot();
   status.joystics[utl::EArm::Left] = {
@@ -18,6 +25,20 @@ void MachineStatusBuilder::updateAndPublish(
 
   auto inputs = readInputSignals();
   auto outputs = readOutputSignals();
+  const auto setAllToolChangerFlags = [&status](const utl::ELEDState ledState) {
+    constexpr std::array flags = {
+        utl::EToolChangerStatusFlags::ProxSen,
+        utl::EToolChangerStatusFlags::OpenSen,
+        utl::EToolChangerStatusFlags::ClosedSen,
+        utl::EToolChangerStatusFlags::OpenValve,
+        utl::EToolChangerStatusFlags::ClosedValve,
+    };
+    for (const auto arm : {utl::EArm::Left, utl::EArm::Right}) {
+      for (const auto flag : flags) {
+        status.toolChangers[arm].flags[flag] = ledState;
+      }
+    }
+  };
   const auto setProxUnknown = [&status]() {
     status.toolChangers[utl::EArm::Left].flags[utl::EToolChangerStatusFlags::ProxSen] =
         utl::ELEDState::Error;
@@ -34,6 +55,12 @@ void MachineStatusBuilder::updateAndPublish(
     status.toolChangers[utl::EArm::Right]
         .flags[utl::EToolChangerStatusFlags::OpenValve] = utl::ELEDState::Error;
   };
+
+  if (contecInError) {
+    setAllToolChangerFlags(utl::ELEDState::Error);
+    publish(status);
+    return;
+  }
 
   if (inputs && inputs->contains("button1") && inputs->contains("button2")) {
     status.toolChangers[utl::EArm::Left].flags[utl::EToolChangerStatusFlags::ProxSen] =

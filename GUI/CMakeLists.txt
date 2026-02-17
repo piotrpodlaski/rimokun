@@ -8,9 +8,9 @@ qt_standard_project_setup()
 
 set(CMAKE_AUTOUIC_SEARCH_PATHS ${CMAKE_CURRENT_SOURCE_DIR}/forms)
 
-file(GLOB_RECURSE gui_sources "src/*.cpp")
-file(GLOB_RECURSE gui_headers "include/*.hpp")
-file(GLOB_RECURSE gui_forms "forms/*.ui")
+file(GLOB_RECURSE gui_sources CONFIGURE_DEPENDS "src/*.cpp")
+file(GLOB_RECURSE gui_headers CONFIGURE_DEPENDS "include/*.hpp")
+file(GLOB_RECURSE gui_forms CONFIGURE_DEPENDS "forms/*.ui")
 
 
 qt_add_executable(rimokunControl

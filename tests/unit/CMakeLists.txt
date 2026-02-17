@@ -80,9 +80,12 @@ if (ENABLE_COVERAGE)
     )
     find_program(LCOV_BIN lcov)
     find_program(GENHTML_BIN genhtml)
-    if (LCOV_BIN AND GENHTML_BIN AND GCOV_BIN)
+    find_program(BASH_BIN bash)
+    if (LCOV_BIN AND GENHTML_BIN AND GCOV_BIN AND BASH_BIN)
         set(COVERAGE_OUTPUT_DIR ${CMAKE_BINARY_DIR}/coverage)
         set(COVERAGE_INFO ${COVERAGE_OUTPUT_DIR}/coverage.info)
+        set(COVERAGE_GATE_SCRIPT
+                ${CMAKE_SOURCE_DIR}/tests/unit/scripts/check_coverage_thresholds.sh)
 
         add_custom_target(coverage
                 COMMAND ${CMAKE_COMMAND} -E make_directory ${COVERAGE_OUTPUT_DIR}
@@ -103,11 +106,16 @@ if (ENABLE_COVERAGE)
                 ${CMAKE_BINARY_DIR}/*
                 --output-file ${COVERAGE_INFO}
                 COMMAND ${GENHTML_BIN} ${COVERAGE_INFO} --output-directory ${COVERAGE_OUTPUT_DIR}/html
+                COMMAND ${BASH_BIN} ${COVERAGE_GATE_SCRIPT} ${COVERAGE_INFO}
+                Server/src/Machine.cpp:55
+                Server/src/MachineCommandProcessor.cpp:85
+                Server/src/ControlPanel.cpp:40
+                Server/src/MotorControl.cpp:20
                 WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
                 COMMENT "Running tests and generating coverage report in ${COVERAGE_OUTPUT_DIR}/html"
                 VERBATIM
         )
     else ()
-        message(WARNING "ENABLE_COVERAGE is ON but gcov/lcov/genhtml were not found; 'coverage' target will not be available.")
+        message(WARNING "ENABLE_COVERAGE is ON but gcov/lcov/genhtml/bash were not found; 'coverage' target will not be available.")
     endif ()
 endif ()

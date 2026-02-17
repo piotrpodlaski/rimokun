@@ -4,6 +4,7 @@
 
 #include <chrono>
 #include <string>
+#include <vector>
 
 using namespace std::chrono_literals;
 
@@ -30,6 +31,30 @@ TEST(MachineCommandProcessorTests, UnknownTypeReturnsError) {
   EXPECT_EQ(response["status"].as<std::string>(), "Error");
   EXPECT_TRUE(response["message"].as<std::string>().find("Unknown command type") !=
               std::string::npos);
+}
+
+TEST(MachineCommandProcessorTests, MissingOrNonScalarTypeReturnsErrorWithoutDispatch) {
+  MachineCommandProcessor processor;
+  std::vector<YAML::Node> cases;
+  cases.emplace_back(YAML::Node(YAML::NodeType::Map));
+  {
+    YAML::Node n;
+    n["type"] = YAML::Load("{nested: value}");
+    cases.emplace_back(n);
+  }
+
+  for (const auto& command : cases) {
+    bool dispatched = false;
+    const auto response = processor.processCommand(
+        command, [&](cmd::Command, std::chrono::milliseconds) {
+          dispatched = true;
+          return std::string{};
+        });
+    EXPECT_FALSE(dispatched);
+    EXPECT_EQ(response["status"].as<std::string>(), "Error");
+    EXPECT_TRUE(response["message"].as<std::string>().find("type") !=
+                std::string::npos);
+  }
 }
 
 TEST(MachineCommandProcessorTests, ToolChangerDispatchesWithTwoSecondTimeout) {
@@ -148,4 +173,77 @@ TEST(MachineCommandProcessorTests, ResetInvalidEnumReturnsError) {
   EXPECT_EQ(response["status"].as<std::string>(), "Error");
   EXPECT_TRUE(response["message"].as<std::string>().find("Invalid reset command") !=
               std::string::npos);
+}
+
+TEST(MachineCommandProcessorTests,
+     ToolChangerInvalidPayloadMatrixReturnsErrorWithoutDispatch) {
+  MachineCommandProcessor processor;
+  std::vector<YAML::Node> cases;
+  {
+    YAML::Node n;
+    n["type"] = "toolChanger";
+    n["position"] = YAML::Load("{bad: map}");
+    n["action"] = "Open";
+    cases.emplace_back(n);
+  }
+  {
+    YAML::Node n;
+    n["type"] = "toolChanger";
+    n["position"] = "Left";
+    n["action"] = YAML::Load("[bad]");
+    cases.emplace_back(n);
+  }
+  {
+    YAML::Node n;
+    n["type"] = "toolChanger";
+    n["position"] = "Left";
+    n["action"] = "NotAnAction";
+    cases.emplace_back(n);
+  }
+
+  for (const auto& command : cases) {
+    bool dispatched = false;
+    const auto response = processor.processCommand(
+        command, [&](cmd::Command, std::chrono::milliseconds) {
+          dispatched = true;
+          return std::string{};
+        });
+
+    EXPECT_FALSE(dispatched);
+    EXPECT_EQ(response["status"].as<std::string>(), "Error");
+    EXPECT_TRUE(response["message"].as<std::string>().find("Invalid toolChanger command") !=
+                std::string::npos);
+  }
+}
+
+TEST(MachineCommandProcessorTests,
+     ResetInvalidPayloadMatrixReturnsErrorWithoutDispatch) {
+  MachineCommandProcessor processor;
+  std::vector<YAML::Node> cases;
+  {
+    YAML::Node n;
+    n["type"] = "reset";
+    n["system"] = YAML::Load("{bad: map}");
+    cases.emplace_back(n);
+  }
+  {
+    YAML::Node n;
+    n["type"] = "reset";
+    n["system"] = "NotAComponent";
+    cases.emplace_back(n);
+  }
+
+  for (const auto& command : cases) {
+    bool dispatched = false;
+    const auto response = processor.processCommand(
+        command, [&](cmd::Command, std::chrono::milliseconds) {
+          dispatched = true;
+          return std::string{};
+        });
+
+    EXPECT_FALSE(dispatched);
+    EXPECT_EQ(response["status"].as<std::string>(), "Error");
+    EXPECT_TRUE(response["message"].as<std::string>().find("Invalid reset command") !=
+                std::string::npos);
+  }
 }

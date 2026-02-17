@@ -11,6 +11,7 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 #include "server/fakes/FakeClock.hpp"
 
@@ -108,6 +109,22 @@ class FlakyCommandTestMachine final : public Machine {
       throw std::runtime_error("forced reconnect failure");
     }
     ++reconnectCalls;
+  }
+  void handleToolChangerCommand(const cmd::ToolChangerCommand&) override {}
+};
+
+class OrderedCommandTestMachine final : public Machine {
+ public:
+  explicit OrderedCommandTestMachine(const std::shared_ptr<IClock>& clock)
+      : Machine(clock) {}
+
+  std::vector<utl::ERobotComponent> reconnectOrder;
+
+ protected:
+  void controlLoopTasks() override {}
+  void updateStatus() override {}
+  void handleReconnectCommand(const cmd::ReconnectCommand& command) override {
+    reconnectOrder.push_back(command.robotComponent);
   }
   void handleToolChangerCommand(const cmd::ToolChangerCommand&) override {}
 };
@@ -231,6 +248,100 @@ TEST(MachineCommandTests, SubmitCommandAfterShutdownIsRejected) {
   cmd::Command command;
   command.payload = cmd::ReconnectCommand{utl::ERobotComponent::ControlPanel};
   EXPECT_FALSE(machine.submitCommand(std::move(command)));
+
+  std::filesystem::remove(configPath);
+}
+
+TEST(MachineCommandTests, CommandsAreProcessedInFifoOrderOnePerCycle) {
+  const auto configPath = writeTempConfig();
+  utl::Config::instance().setConfigPath(configPath.string());
+
+  auto fakeClock = std::make_shared<FakeClock>();
+  OrderedCommandTestMachine machine(fakeClock);
+  MachineRuntime::wireMachine(machine);
+  auto state = machine.makeInitialLoopState();
+
+  std::vector<std::future<std::string>> futures;
+  for (const auto component : {utl::ERobotComponent::ControlPanel,
+                               utl::ERobotComponent::Contec,
+                               utl::ERobotComponent::MotorControl}) {
+    cmd::Command command;
+    command.payload = cmd::ReconnectCommand{component};
+    futures.push_back(command.reply.get_future());
+    ASSERT_TRUE(machine.submitCommand(std::move(command)));
+  }
+
+  machine.runOneCycle(state);
+  machine.runOneCycle(state);
+  machine.runOneCycle(state);
+
+  for (auto& future : futures) {
+    ASSERT_EQ(future.wait_for(50ms), std::future_status::ready);
+    EXPECT_EQ(future.get(), "");
+  }
+
+  ASSERT_EQ(machine.reconnectOrder.size(), 3u);
+  EXPECT_EQ(machine.reconnectOrder[0], utl::ERobotComponent::ControlPanel);
+  EXPECT_EQ(machine.reconnectOrder[1], utl::ERobotComponent::Contec);
+  EXPECT_EQ(machine.reconnectOrder[2], utl::ERobotComponent::MotorControl);
+
+  std::filesystem::remove(configPath);
+}
+
+TEST(MachineCommandTests,
+     TimedOutCommandCanFinishLaterAndSubsequentCommandStillSucceeds) {
+  const auto configPath = writeTempConfig();
+  utl::Config::instance().setConfigPath(configPath.string());
+
+  auto fakeClock = std::make_shared<FakeClock>();
+  CommandTestMachine machine(fakeClock);
+  MachineRuntime::wireMachine(machine);
+  auto state = machine.makeInitialLoopState();
+
+  cmd::Command timedOutCommand;
+  timedOutCommand.payload =
+      cmd::ReconnectCommand{utl::ERobotComponent::ControlPanel};
+  const auto timeoutReply = machine.dispatchCommandAndWait(std::move(timedOutCommand), 1ms);
+  EXPECT_EQ(timeoutReply, "Command processing timed out");
+  EXPECT_EQ(machine.reconnectCalls, 0);
+
+  machine.runOneCycle(state);
+  EXPECT_EQ(machine.reconnectCalls, 1);
+
+  cmd::Command nextCommand;
+  nextCommand.payload = cmd::ReconnectCommand{utl::ERobotComponent::Contec};
+  auto nextFuture = nextCommand.reply.get_future();
+  ASSERT_TRUE(machine.submitCommand(std::move(nextCommand)));
+  machine.runOneCycle(state);
+  ASSERT_EQ(nextFuture.wait_for(50ms), std::future_status::ready);
+  EXPECT_EQ(nextFuture.get(), "");
+  EXPECT_EQ(machine.reconnectCalls, 2);
+
+  std::filesystem::remove(configPath);
+}
+
+TEST(MachineCommandTests, ShutdownFlushesAllQueuedCommandsWithShutdownReply) {
+  const auto configPath = writeTempConfig();
+  utl::Config::instance().setConfigPath(configPath.string());
+
+  auto fakeClock = std::make_shared<FakeClock>();
+  CommandTestMachine machine(fakeClock);
+
+  std::vector<std::future<std::string>> futures;
+  for (int i = 0; i < 3; ++i) {
+    cmd::Command command;
+    command.payload = cmd::ReconnectCommand{utl::ERobotComponent::ControlPanel};
+    futures.push_back(command.reply.get_future());
+    ASSERT_TRUE(machine.submitCommand(std::move(command)));
+  }
+
+  machine.shutdown();
+
+  for (auto& future : futures) {
+    ASSERT_EQ(future.wait_for(50ms), std::future_status::ready);
+    EXPECT_EQ(future.get(), "Machine is shutting down");
+  }
+  EXPECT_EQ(machine.reconnectCalls, 0);
 
   std::filesystem::remove(configPath);
 }

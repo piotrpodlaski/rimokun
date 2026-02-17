@@ -3,11 +3,14 @@
 #include <MachineController.hpp>
 
 #include <stdexcept>
+#include <string>
+#include <vector>
 
 namespace {
 class FakeControlPolicy final : public IRobotControlPolicy {
  public:
   ControlDecision decide(const std::optional<SignalMap>& inputs,
+                         const std::optional<SignalMap>&,
                          const MachineComponent::State contecState,
                          const utl::RobotStatus&) const override {
     ++decideCalls;
@@ -38,7 +41,14 @@ TEST(MachineControllerTests, ErrorStateSetsToolChangersToBlinkingError) {
       []() -> std::optional<signal_map_t> { return signal_map_t{{"button1", true}}; },
       [&](const signal_map_t&) { outputsCalled = true; },
       []() -> std::optional<signal_map_t> { return std::nullopt; },
-      []() { return MachineComponent::State::Error; }, status, std::move(policy));
+      []() { return MachineComponent::State::Error; },
+      [](utl::EMotor, MotorControlMode) {},
+      [](utl::EMotor, std::int32_t) {},
+      [](utl::EMotor, std::int32_t) {},
+      [](utl::EMotor, MotorControlDirection) {},
+      [](utl::EMotor) {},
+      [](utl::EMotor) {},
+      status, std::move(policy));
 
   controller.runControlLoopTasks();
 
@@ -63,7 +73,14 @@ TEST(MachineControllerTests, ToolChangerCommandSetsExpectedOutputSignal) {
       []() -> std::optional<signal_map_t> {
         return signal_map_t{{"toolChangerLeft", true}};
       },
-      []() { return MachineComponent::State::Normal; }, status, std::move(policy));
+      []() { return MachineComponent::State::Normal; },
+      [](utl::EMotor, MotorControlMode) {},
+      [](utl::EMotor, std::int32_t) {},
+      [](utl::EMotor, std::int32_t) {},
+      [](utl::EMotor, MotorControlDirection) {},
+      [](utl::EMotor) {},
+      [](utl::EMotor) {},
+      status, std::move(policy));
 
   controller.handleToolChangerCommand(
       cmd::ToolChangerCommand{utl::EArm::Left, utl::EToolChangerAction::Open});
@@ -82,7 +99,14 @@ TEST(MachineControllerTests, PolicyOutputsAreForwardedToOutputsWriter) {
       []() -> std::optional<signal_map_t> { return signal_map_t{{"button1", true}}; },
       [&](const signal_map_t& outputs) { seenOutputs = outputs; },
       []() -> std::optional<signal_map_t> { return std::nullopt; },
-      []() { return MachineComponent::State::Normal; }, status, std::move(policy));
+      []() { return MachineComponent::State::Normal; },
+      [](utl::EMotor, MotorControlMode) {},
+      [](utl::EMotor, std::int32_t) {},
+      [](utl::EMotor, std::int32_t) {},
+      [](utl::EMotor, MotorControlDirection) {},
+      [](utl::EMotor) {},
+      [](utl::EMotor) {},
+      status, std::move(policy));
 
   controller.runControlLoopTasks();
 
@@ -101,7 +125,14 @@ TEST(MachineControllerTests, ToolChangerCommandThrowsWhenContecIsInErrorState) {
       []() -> std::optional<signal_map_t> { return signal_map_t{}; },
       [&](const signal_map_t&) { outputsCalled = true; },
       []() -> std::optional<signal_map_t> { return signal_map_t{}; },
-      []() { return MachineComponent::State::Error; }, status, std::move(policy));
+      []() { return MachineComponent::State::Error; },
+      [](utl::EMotor, MotorControlMode) {},
+      [](utl::EMotor, std::int32_t) {},
+      [](utl::EMotor, std::int32_t) {},
+      [](utl::EMotor, MotorControlDirection) {},
+      [](utl::EMotor) {},
+      [](utl::EMotor) {},
+      status, std::move(policy));
 
   EXPECT_THROW((void)controller.handleToolChangerCommand(
                    cmd::ToolChangerCommand{utl::EArm::Right,
@@ -119,11 +150,51 @@ TEST(MachineControllerTests, ToolChangerCommandThrowsWhenOutputReadbackFails) {
       []() -> std::optional<signal_map_t> { return signal_map_t{}; },
       [&](const signal_map_t&) { outputsCalled = true; },
       []() -> std::optional<signal_map_t> { return std::nullopt; },
-      []() { return MachineComponent::State::Normal; }, status, std::move(policy));
+      []() { return MachineComponent::State::Normal; },
+      [](utl::EMotor, MotorControlMode) {},
+      [](utl::EMotor, std::int32_t) {},
+      [](utl::EMotor, std::int32_t) {},
+      [](utl::EMotor, MotorControlDirection) {},
+      [](utl::EMotor) {},
+      [](utl::EMotor) {},
+      status, std::move(policy));
 
   EXPECT_THROW((void)controller.handleToolChangerCommand(
                    cmd::ToolChangerCommand{utl::EArm::Left,
                                            utl::EToolChangerAction::Close}),
                std::runtime_error);
   EXPECT_TRUE(outputsCalled);
+}
+
+TEST(MachineControllerTests, PolicyMotorIntentsAreAppliedInExpectedOrder) {
+  utl::RobotStatus status;
+  auto policy = std::make_unique<FakeControlPolicy>();
+  policy->decisionToReturn.motorIntents.push_back(
+      {.motorId = utl::EMotor::XLeft,
+       .mode = MotorControlMode::Speed,
+       .direction = MotorControlDirection::Reverse,
+       .speed = 1200,
+       .startMovement = true});
+
+  std::vector<std::string> applied;
+  MachineController controller(
+      []() -> std::optional<signal_map_t> { return signal_map_t{{"button1", true}}; },
+      [](const signal_map_t&) {},
+      []() -> std::optional<signal_map_t> { return signal_map_t{}; },
+      []() { return MachineComponent::State::Normal; },
+      [&](utl::EMotor, MotorControlMode) { applied.emplace_back("mode"); },
+      [&](utl::EMotor, std::int32_t) { applied.emplace_back("speed"); },
+      [&](utl::EMotor, std::int32_t) { applied.emplace_back("position"); },
+      [&](utl::EMotor, MotorControlDirection) { applied.emplace_back("direction"); },
+      [&](utl::EMotor) { applied.emplace_back("start"); },
+      [&](utl::EMotor) { applied.emplace_back("stop"); },
+      status, std::move(policy));
+
+  controller.runControlLoopTasks();
+
+  ASSERT_EQ(applied.size(), 4u);
+  EXPECT_EQ(applied[0], "mode");
+  EXPECT_EQ(applied[1], "direction");
+  EXPECT_EQ(applied[2], "speed");
+  EXPECT_EQ(applied[3], "start");
 }

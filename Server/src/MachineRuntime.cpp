@@ -10,8 +10,26 @@ void MachineRuntime::wireMachine(Machine& machine) {
         [&machine]() { return machine.readInputSignals(); },
         [&machine](const signal_map_t& outputs) { machine.setOutputs(outputs); },
         [&machine]() { return machine.readOutputSignals(); },
-        [&machine]() { return machine._contec.state(); }, machine._robotStatus,
-        std::make_unique<DefaultRobotControlPolicy>());
+        [&machine]() { return machine._contec.state(); },
+        [&machine](const utl::EMotor motorId, const MotorControlMode mode) {
+          machine._motorControl.setMode(motorId, mode);
+        },
+        [&machine](const utl::EMotor motorId, const std::int32_t speed) {
+          machine._motorControl.setSpeed(motorId, speed);
+        },
+        [&machine](const utl::EMotor motorId, const std::int32_t position) {
+          machine._motorControl.setPosition(motorId, position);
+        },
+        [&machine](const utl::EMotor motorId, const MotorControlDirection direction) {
+          machine._motorControl.setDirection(motorId, direction);
+        },
+        [&machine](const utl::EMotor motorId) {
+          machine._motorControl.startMovement(motorId);
+        },
+        [&machine](const utl::EMotor motorId) {
+          machine._motorControl.stopMovement(motorId);
+        },
+        machine._robotStatus, std::make_unique<RimoKunControlPolicy>());
   }
   if (!machine._componentService) {
     machine._componentService =

@@ -11,7 +11,7 @@ target_link_libraries(utilities_unit_tests
 )
 
 include(GoogleTest)
-gtest_discover_tests(utilities_unit_tests)
+gtest_discover_tests(utilities_unit_tests PROPERTIES LABELS "unit")
 
 add_executable(server_unit_tests
         server/ControlLoopRunnerTests.cpp
@@ -29,6 +29,7 @@ add_executable(server_unit_tests
         server/ArKd2DiagnosticsTests.cpp
         server/ArKd2RegisterMapTests.cpp
         server/ControlPanelCommFactoryTests.cpp
+        server/ControlPanelCommContractTests.cpp
         server/SerialControlPanelCommTests.cpp
         server/ControlPanelTests.cpp
 )
@@ -47,7 +48,7 @@ target_link_libraries(server_unit_tests
         GTest::gtest_main
 )
 
-gtest_discover_tests(server_unit_tests)
+gtest_discover_tests(server_unit_tests PROPERTIES LABELS "unit")
 
 add_executable(motor_unit_tests
         server/MotorTests.cpp
@@ -70,7 +71,7 @@ target_link_libraries(motor_unit_tests
         GTest::gtest_main
 )
 
-gtest_discover_tests(motor_unit_tests)
+gtest_discover_tests(motor_unit_tests PROPERTIES LABELS "unit")
 
 if (ENABLE_COVERAGE)
     string(REPLACE "." ";" CXX_VERSION_PARTS "${CMAKE_CXX_COMPILER_VERSION}")

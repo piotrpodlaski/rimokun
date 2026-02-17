@@ -73,11 +73,19 @@ target_link_libraries(motor_unit_tests
 
 gtest_discover_tests(motor_unit_tests PROPERTIES LABELS "unit")
 
+find_package(Qt6 COMPONENTS Core Gui Widgets Test REQUIRED)
+
 add_executable(gui_glue_unit_tests
         gui/GuiCommandYamlAdapterTests.cpp
         gui/RobotStatusViewModelTests.cpp
+        gui/UpdaterCoordinationTests.cpp
+        gui/RimoTransportWorkerTests.cpp
         ${CMAKE_SOURCE_DIR}/GUI/src/GuiCommandYamlAdapter.cpp
         ${CMAKE_SOURCE_DIR}/GUI/src/RobotStatusViewModel.cpp
+        ${CMAKE_SOURCE_DIR}/GUI/src/Updater.cpp
+        ${CMAKE_SOURCE_DIR}/GUI/src/RimoTransportWorker.cpp
+        ${CMAKE_SOURCE_DIR}/GUI/src/StyledPopup.cpp
+        ${CMAKE_SOURCE_DIR}/GUI/include/Updater.hpp
 )
 
 target_include_directories(gui_glue_unit_tests
@@ -91,41 +99,123 @@ target_link_libraries(gui_glue_unit_tests
         PRIVATE
         utilities
         yaml-cpp::yaml-cpp
+        cppzmq
+        Qt6::Core
+        Qt6::Gui
+        Qt6::Widgets
+        Qt6::Test
         GTest::gtest_main
 )
 
+set_target_properties(gui_glue_unit_tests PROPERTIES AUTOMOC ON)
+
 gtest_discover_tests(gui_glue_unit_tests PROPERTIES LABELS "unit")
 
-find_package(Qt6 COMPONENTS Core Test REQUIRED)
-
-add_executable(gui_qt_tests
+add_executable(gui_state_store_qt_tests
         qt/GuiStateStoreQtTests.cpp
         ${CMAKE_SOURCE_DIR}/GUI/src/GuiStateStore.cpp
         ${CMAKE_SOURCE_DIR}/GUI/include/GuiStateStore.hpp
 )
 
-set_target_properties(gui_qt_tests PROPERTIES
+set_target_properties(gui_state_store_qt_tests PROPERTIES
         AUTOMOC ON
         AUTOUIC OFF
         AUTORCC OFF
 )
 
-target_include_directories(gui_qt_tests
+target_include_directories(gui_state_store_qt_tests
         PRIVATE
         ${CMAKE_SOURCE_DIR}/GUI/include
         ${CMAKE_SOURCE_DIR}/Utilities/include
         ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
-target_link_libraries(gui_qt_tests
+target_link_libraries(gui_state_store_qt_tests
         PRIVATE
         utilities
         Qt6::Core
         Qt6::Test
 )
 
-add_test(NAME GuiStateStoreQtTests COMMAND gui_qt_tests)
+add_test(NAME GuiStateStoreQtTests COMMAND gui_state_store_qt_tests)
 set_tests_properties(GuiStateStoreQtTests PROPERTIES LABELS "unit")
+
+add_executable(tool_changer_presenter_qt_tests
+        qt/ToolChangerPresenterQtTests.cpp
+        ${CMAKE_SOURCE_DIR}/GUI/src/GuiStateStore.cpp
+        ${CMAKE_SOURCE_DIR}/GUI/src/ToolChangerPresenter.cpp
+        ${CMAKE_SOURCE_DIR}/GUI/src/ToolChanger.cpp
+        ${CMAKE_SOURCE_DIR}/GUI/src/StyledPopup.cpp
+        ${CMAKE_SOURCE_DIR}/GUI/src/RobotStatusViewModel.cpp
+        ${CMAKE_SOURCE_DIR}/GUI/src/LedIndicator.cpp
+        ${CMAKE_SOURCE_DIR}/GUI/include/GuiStateStore.hpp
+        ${CMAKE_SOURCE_DIR}/GUI/include/ToolChangerPresenter.hpp
+        ${CMAKE_SOURCE_DIR}/GUI/include/ToolChanger.hpp
+        ${CMAKE_SOURCE_DIR}/GUI/include/LedIndicator.hpp
+)
+
+set_target_properties(tool_changer_presenter_qt_tests PROPERTIES
+        AUTOMOC ON
+        AUTOUIC ON
+        AUTORCC OFF
+        AUTOUIC_SEARCH_PATHS "${CMAKE_SOURCE_DIR}/GUI/forms"
+)
+
+target_include_directories(tool_changer_presenter_qt_tests
+        PRIVATE
+        ${CMAKE_SOURCE_DIR}/GUI/include
+        ${CMAKE_SOURCE_DIR}/Utilities/include
+        ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
+target_link_libraries(tool_changer_presenter_qt_tests
+        PRIVATE
+        utilities
+        Qt6::Core
+        Qt6::Widgets
+        Qt6::Test
+)
+
+add_test(NAME ToolChangerPresenterQtTests COMMAND tool_changer_presenter_qt_tests)
+set_tests_properties(ToolChangerPresenterQtTests PROPERTIES LABELS "unit")
+
+add_executable(reset_controls_presenter_qt_tests
+        qt/ResetControlsPresenterQtTests.cpp
+        ${CMAKE_SOURCE_DIR}/GUI/src/GuiStateStore.cpp
+        ${CMAKE_SOURCE_DIR}/GUI/src/ResetControlsPresenter.cpp
+        ${CMAKE_SOURCE_DIR}/GUI/src/ResetControls.cpp
+        ${CMAKE_SOURCE_DIR}/GUI/src/RobotStatusViewModel.cpp
+        ${CMAKE_SOURCE_DIR}/GUI/src/LedIndicator.cpp
+        ${CMAKE_SOURCE_DIR}/GUI/include/GuiStateStore.hpp
+        ${CMAKE_SOURCE_DIR}/GUI/include/ResetControlsPresenter.hpp
+        ${CMAKE_SOURCE_DIR}/GUI/include/ResetControls.hpp
+        ${CMAKE_SOURCE_DIR}/GUI/include/LedIndicator.hpp
+)
+
+set_target_properties(reset_controls_presenter_qt_tests PROPERTIES
+        AUTOMOC ON
+        AUTOUIC ON
+        AUTORCC OFF
+        AUTOUIC_SEARCH_PATHS "${CMAKE_SOURCE_DIR}/GUI/forms"
+)
+
+target_include_directories(reset_controls_presenter_qt_tests
+        PRIVATE
+        ${CMAKE_SOURCE_DIR}/GUI/include
+        ${CMAKE_SOURCE_DIR}/Utilities/include
+        ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
+target_link_libraries(reset_controls_presenter_qt_tests
+        PRIVATE
+        utilities
+        Qt6::Core
+        Qt6::Widgets
+        Qt6::Test
+)
+
+add_test(NAME ResetControlsPresenterQtTests COMMAND reset_controls_presenter_qt_tests)
+set_tests_properties(ResetControlsPresenterQtTests PROPERTIES LABELS "unit")
 
 if (ENABLE_COVERAGE)
     string(REPLACE "." ";" CXX_VERSION_PARTS "${CMAKE_CXX_COMPILER_VERSION}")

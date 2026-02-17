@@ -3,6 +3,8 @@
 #include <optional>
 #include <variant>
 
+#include <QMetaType>
+
 #include "CommonDefinitions.hpp"
 #include "yaml-cpp/yaml.h"
 
@@ -28,3 +30,5 @@ struct GuiResponse {
   std::string message;
   std::optional<YAML::Node> payload;
 };
+
+Q_DECLARE_METATYPE(GuiCommand)

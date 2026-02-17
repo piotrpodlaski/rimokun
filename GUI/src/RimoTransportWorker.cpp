@@ -3,7 +3,28 @@
 #include "GuiCommandYamlAdapter.hpp"
 #include "Logger.hpp"
 
-RimoTransportWorker::RimoTransportWorker() = default;
+namespace {
+class ZmqRimoGuiClient final : public IRimoGuiClient {
+ public:
+  void init() override { _client.init(); }
+  std::optional<utl::RobotStatus> receiveRobotStatus() override {
+    return _client.receiveRobotStatus();
+  }
+  std::optional<YAML::Node> sendCommand(const YAML::Node& command) override {
+    return _client.sendCommand(command);
+  }
+
+ private:
+  utl::RimoClient<utl::RobotStatus> _client;
+};
+}  // namespace
+
+RimoTransportWorker::RimoTransportWorker(std::unique_ptr<IRimoGuiClient> client)
+    : _client(std::move(client)) {
+  if (!_client) {
+    _client = std::make_unique<ZmqRimoGuiClient>();
+  }
+}
 
 RimoTransportWorker::~RimoTransportWorker() { stop(); }
 
@@ -37,10 +58,10 @@ void RimoTransportWorker::enqueue(Request request) {
 }
 
 void RimoTransportWorker::runner() {
-  _client.init();
+  _client->init();
   while (_running.load(std::memory_order_acquire)) {
     processPendingCommands();
-    auto status = _client.receiveRobotStatus();
+    auto status = _client->receiveRobotStatus();
     if (!status) {
       if (_onConnectionLost) {
         _onConnectionLost();
@@ -68,7 +89,7 @@ void RimoTransportWorker::processPendingCommands() {
     }
 
     const auto yamlCommand = GuiCommandYamlAdapter::toYaml(request.command);
-    const auto rawResult = _client.sendCommand(yamlCommand);
+    const auto rawResult = _client->sendCommand(yamlCommand);
     ResponseEvent responseEvent;
     responseEvent.id = request.id;
     if (rawResult) {

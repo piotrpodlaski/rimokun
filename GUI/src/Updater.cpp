@@ -3,6 +3,7 @@
 #include <utility>
 
 #include "Logger.hpp"
+#include "RimoTransportWorker.hpp"
 #include "ResponseConsumer.hpp"
 #include "StyledPopup.hpp"
 
@@ -16,8 +17,20 @@ void ensureMetaTypesRegistered() {
 }
 }  // namespace
 
-Updater::Updater(QObject* parent) : QObject(parent) {
+Updater::Updater(QObject* parent, std::unique_ptr<ITransportWorker> worker,
+                 ErrorNotifier errorNotifier)
+    : QObject(parent),
+      _worker(std::move(worker)),
+      _errorNotifier(std::move(errorNotifier)) {
   ensureMetaTypesRegistered();
+  if (!_worker) {
+    _worker = std::make_unique<RimoTransportWorker>();
+  }
+  if (!_errorNotifier) {
+    _errorNotifier = [](const QString& title, const QString& message) {
+      StyledPopup::showErrorAsync(title, message);
+    };
+  }
 }
 
 Updater::~Updater() { stopUpdaterThread(); }
@@ -30,7 +43,7 @@ void Updater::startUpdaterThread() {
   SPDLOG_INFO("Spawning updater thread.");
 
   _running.store(true, std::memory_order_release);
-  _worker.start(
+  _worker->start(
       [this](const utl::RobotStatus& status) {
         QMetaObject::invokeMethod(
             this, [this, status]() { emit newDataArrived(status); },
@@ -40,7 +53,7 @@ void Updater::startUpdaterThread() {
         QMetaObject::invokeMethod(
             this, [this]() { emit serverNotConnected(); }, Qt::QueuedConnection);
       },
-      [this](const RimoTransportWorker::ResponseEvent& event) {
+      [this](const ITransportWorker::ResponseEvent& event) {
         QMetaObject::invokeMethod(
             this, [this, event]() { handleResponse(event); }, Qt::QueuedConnection);
       });
@@ -49,7 +62,7 @@ void Updater::startUpdaterThread() {
 void Updater::sendCommand(const GuiCommand& command) {
   if (!_running.load(std::memory_order_acquire)) {
     SPDLOG_ERROR("Updater thread is not running; command not sent.");
-    StyledPopup::showErrorAsync("Error", "Updater thread is not running.");
+    _errorNotifier("Error", "Updater thread is not running.");
     return;
   }
 
@@ -67,10 +80,10 @@ void Updater::sendCommand(const GuiCommand& command) {
     std::lock_guard<std::mutex> lock(_pendingMutex);
     _pendingById.emplace(requestId, std::move(meta));
   }
-  _worker.enqueue({.id = requestId, .command = command});
+  _worker->enqueue({.id = requestId, .command = command});
 }
 
-void Updater::handleResponse(const RimoTransportWorker::ResponseEvent& event) {
+void Updater::handleResponse(const ITransportWorker::ResponseEvent& event) {
   PendingRequestMeta meta;
   {
     std::lock_guard<std::mutex> lock(_pendingMutex);
@@ -84,7 +97,7 @@ void Updater::handleResponse(const RimoTransportWorker::ResponseEvent& event) {
 
   if (!event.response.has_value()) {
     SPDLOG_ERROR("Failed to send command and/or get the response!");
-    StyledPopup::showErrorAsync("Error", "Failed to send command and/or get response.");
+    _errorNotifier("Error", "Failed to send command and/or get response.");
     return;
   }
 
@@ -94,7 +107,7 @@ void Updater::handleResponse(const RimoTransportWorker::ResponseEvent& event) {
       response.message = "Server did not provide any message..."s;
     }
     SPDLOG_ERROR("Server returned error status with message: '{}'", response.message);
-    StyledPopup::showErrorAsync("Error", QString::fromStdString(response.message));
+    _errorNotifier("Error", QString::fromStdString(response.message));
   }
 
   auto* senderObject = meta.sender.data();
@@ -120,7 +133,7 @@ void Updater::handleResponse(const RimoTransportWorker::ResponseEvent& event) {
 void Updater::stopUpdaterThread() {
   SPDLOG_INFO("Stopping updater thread");
   _running.store(false, std::memory_order_release);
-  _worker.stop();
+  _worker->stop();
   std::lock_guard<std::mutex> lock(_pendingMutex);
   _pendingById.clear();
 }

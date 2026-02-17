@@ -11,6 +11,7 @@
 #include <string>
 #include <string_view>
 #include <thread>
+#include <vector>
 
 #include <yaml-cpp/yaml.h>
 #include <zmq.hpp>
@@ -31,7 +32,13 @@ struct ScopedConfig {
   Endpoints endpoints;
 };
 
-ScopedConfig writeIntegrationConfig() {
+struct IntegrationConfigOverrides {
+  std::string controlPanelPort = "/dev/null";
+  std::string motorDevice = "/dev/null";
+};
+
+ScopedConfig writeIntegrationConfig(
+    const IntegrationConfigOverrides& overrides = {}) {
   const auto stamp =
       std::chrono::high_resolution_clock::now().time_since_epoch().count();
   const auto suffix = std::to_string(stamp);
@@ -61,7 +68,7 @@ ScopedConfig writeIntegrationConfig() {
   out << "    comm:\n";
   out << "      type: \"serial\"\n";
   out << "      serial:\n";
-  out << "        port: \"/dev/null\"\n";
+  out << "        port: \"" << overrides.controlPanelPort << "\"\n";
   out << "        baudRate: \"BAUD_115200\"\n";
   out << "    processing:\n";
   out << "      movingAverageDepth: 5\n";
@@ -69,7 +76,7 @@ ScopedConfig writeIntegrationConfig() {
   out << "      buttonDebounceSamples: 2\n";
   out << "  MotorControl:\n";
   out << "    model: \"AR-KD2\"\n";
-  out << "    device: \"/dev/null\"\n";
+  out << "    device: \"" << overrides.motorDevice << "\"\n";
   out << "    baud: 115200\n";
   out << "    parity: \"E\"\n";
   out << "    dataBits: 8\n";
@@ -119,6 +126,29 @@ std::optional<YAML::Node> sendCommand(const std::string& address,
   return YAML::Load(reply.to_string());
 }
 
+class StatusSubscriber {
+ public:
+  explicit StatusSubscriber(const std::string& address)
+      : _context(1), _socket(_context, zmq::socket_type::sub) {
+    _socket.set(zmq::sockopt::subscribe, "");
+    _socket.connect(address);
+  }
+
+  std::optional<utl::RobotStatus> receiveFor(
+      const std::chrono::milliseconds timeout) {
+    _socket.set(zmq::sockopt::rcvtimeo, static_cast<int>(timeout.count()));
+    zmq::message_t msg;
+    if (!_socket.recv(msg)) {
+      return std::nullopt;
+    }
+    return YAML::Load(msg.to_string()).as<utl::RobotStatus>();
+  }
+
+ private:
+  zmq::context_t _context;
+  zmq::socket_t _socket;
+};
+
 bool isPermissionDeniedError(const std::exception& e) {
   return std::string_view(e.what()).find("Operation not permitted") !=
          std::string_view::npos;
@@ -129,12 +159,19 @@ bool isSocketPathLimitError(const std::exception& e) {
          std::string_view::npos;
 }
 
+bool isSocketTransportUnavailable(const std::exception& e) {
+  const std::string_view what{e.what()};
+  return what.find("Address family not supported") != std::string_view::npos ||
+         what.find("Protocol not supported") != std::string_view::npos;
+}
+
 template <typename Fn>
 void runOrSkipIfTransportUnavailable(Fn&& fn) {
   try {
     fn();
   } catch (const std::exception& e) {
-    if (isPermissionDeniedError(e) || isSocketPathLimitError(e)) {
+    if (isPermissionDeniedError(e) || isSocketPathLimitError(e) ||
+        isSocketTransportUnavailable(e)) {
       GTEST_SKIP() << "Socket transport unavailable in this environment: "
                    << e.what();
     }
@@ -253,6 +290,186 @@ TEST(MachineRuntimeIntegrationTests,
     if (response.has_value()) {
       EXPECT_TRUE((*response)["status"]);
     }
+
+    std::filesystem::remove(scoped.path);
+    std::filesystem::remove(scoped.statusSocketPath);
+    std::filesystem::remove(scoped.commandSocketPath);
+  });
+}
+
+TEST(MachineRuntimeIntegrationTests,
+     PartialStartupFailuresStillServeCommandsAndPublishErrorStates) {
+  runOrSkipIfTransportUnavailable([&] {
+    IntegrationConfigOverrides overrides;
+    overrides.controlPanelPort = "/dev/definitely_missing_control_panel";
+    overrides.motorDevice = "/dev/definitely_missing_modbus";
+    const auto scoped = writeIntegrationConfig(overrides);
+    utl::Config::instance().setConfigPath(scoped.path.string());
+
+    Machine machine;
+    MachineRuntime::wireMachine(machine);
+    StatusSubscriber subscriber(scoped.endpoints.statusAddress);
+    machine.initialize();
+
+    YAML::Node command;
+    command["type"] = "reset";
+    command["system"] = "Contec";
+    const auto response = sendCommand(scoped.endpoints.commandAddress, command);
+    ASSERT_TRUE(response.has_value());
+    EXPECT_EQ((*response)["status"].as<std::string>(), "OK");
+
+    bool sawErrorState = false;
+    const auto deadline = std::chrono::steady_clock::now() + 1500ms;
+    while (std::chrono::steady_clock::now() < deadline && !sawErrorState) {
+      const auto status = subscriber.receiveFor(150ms);
+      if (!status.has_value()) {
+        continue;
+      }
+      const auto cpIt =
+          status->robotComponents.find(utl::ERobotComponent::ControlPanel);
+      const auto mcIt =
+          status->robotComponents.find(utl::ERobotComponent::MotorControl);
+      if (cpIt != status->robotComponents.end() &&
+          mcIt != status->robotComponents.end() &&
+          cpIt->second == utl::ELEDState::Error &&
+          mcIt->second == utl::ELEDState::Error) {
+        sawErrorState = true;
+      }
+    }
+    EXPECT_TRUE(sawErrorState);
+    machine.shutdown();
+
+    std::filesystem::remove(scoped.path);
+    std::filesystem::remove(scoped.statusSocketPath);
+    std::filesystem::remove(scoped.commandSocketPath);
+  });
+}
+
+TEST(MachineRuntimeIntegrationTests,
+     ToolChangerCommandsPropagateToPublishedStatus) {
+  runOrSkipIfTransportUnavailable([&] {
+    const auto scoped = writeIntegrationConfig();
+    utl::Config::instance().setConfigPath(scoped.path.string());
+
+    Machine machine;
+    MachineRuntime::wireMachine(machine);
+    StatusSubscriber subscriber(scoped.endpoints.statusAddress);
+    machine.initialize();
+
+    YAML::Node openCmd;
+    openCmd["type"] = "toolChanger";
+    openCmd["position"] = "Left";
+    openCmd["action"] = "Open";
+    const auto openResponse = sendCommand(scoped.endpoints.commandAddress, openCmd);
+    ASSERT_TRUE(openResponse.has_value());
+    EXPECT_EQ((*openResponse)["status"].as<std::string>(), "OK");
+
+    bool sawOpenState = false;
+    const auto openDeadline = std::chrono::steady_clock::now() + 1500ms;
+    while (std::chrono::steady_clock::now() < openDeadline && !sawOpenState) {
+      const auto status = subscriber.receiveFor(120ms);
+      if (!status.has_value()) {
+        continue;
+      }
+      const auto tcIt = status->toolChangers.find(utl::EArm::Left);
+      if (tcIt == status->toolChangers.end()) {
+        continue;
+      }
+      const auto& flags = tcIt->second.flags;
+      const auto openIt = flags.find(utl::EToolChangerStatusFlags::OpenValve);
+      const auto closedIt =
+          flags.find(utl::EToolChangerStatusFlags::ClosedValve);
+      if (openIt != flags.end() && closedIt != flags.end() &&
+          openIt->second == utl::ELEDState::On &&
+          closedIt->second == utl::ELEDState::Off) {
+        sawOpenState = true;
+      }
+    }
+    EXPECT_TRUE(sawOpenState);
+
+    YAML::Node closeCmd;
+    closeCmd["type"] = "toolChanger";
+    closeCmd["position"] = "Left";
+    closeCmd["action"] = "Close";
+    const auto closeResponse =
+        sendCommand(scoped.endpoints.commandAddress, closeCmd);
+    ASSERT_TRUE(closeResponse.has_value());
+    EXPECT_EQ((*closeResponse)["status"].as<std::string>(), "OK");
+
+    bool sawCloseState = false;
+    const auto closeDeadline = std::chrono::steady_clock::now() + 1500ms;
+    while (std::chrono::steady_clock::now() < closeDeadline && !sawCloseState) {
+      const auto status = subscriber.receiveFor(120ms);
+      if (!status.has_value()) {
+        continue;
+      }
+      const auto tcIt = status->toolChangers.find(utl::EArm::Left);
+      if (tcIt == status->toolChangers.end()) {
+        continue;
+      }
+      const auto& flags = tcIt->second.flags;
+      const auto openIt = flags.find(utl::EToolChangerStatusFlags::OpenValve);
+      const auto closedIt =
+          flags.find(utl::EToolChangerStatusFlags::ClosedValve);
+      if (openIt != flags.end() && closedIt != flags.end() &&
+          openIt->second == utl::ELEDState::Off &&
+          closedIt->second == utl::ELEDState::On) {
+        sawCloseState = true;
+      }
+    }
+    EXPECT_TRUE(sawCloseState);
+
+    machine.shutdown();
+
+    std::filesystem::remove(scoped.path);
+    std::filesystem::remove(scoped.statusSocketPath);
+    std::filesystem::remove(scoped.commandSocketPath);
+  });
+}
+
+TEST(MachineRuntimeIntegrationTests,
+     ShutdownDuringParallelRequestBurstDoesNotDeadlock) {
+  runOrSkipIfTransportUnavailable([&] {
+    const auto scoped = writeIntegrationConfig();
+    utl::Config::instance().setConfigPath(scoped.path.string());
+
+    Machine machine;
+    MachineRuntime::wireMachine(machine);
+    machine.initialize();
+    std::this_thread::sleep_for(40ms);
+
+    std::atomic<bool> keepSending{true};
+    std::atomic<int> completedRequests{0};
+    std::vector<std::thread> requesters;
+    requesters.reserve(4);
+
+    for (int i = 0; i < 4; ++i) {
+      requesters.emplace_back([&] {
+        while (keepSending.load(std::memory_order_acquire)) {
+          YAML::Node command;
+          command["type"] = "reset";
+          command["system"] = "Contec";
+          auto response =
+              sendCommand(scoped.endpoints.commandAddress, command, 250ms);
+          if (response.has_value()) {
+            ++completedRequests;
+          }
+        }
+      });
+    }
+
+    std::this_thread::sleep_for(80ms);
+    const auto start = std::chrono::steady_clock::now();
+    machine.shutdown();
+    const auto elapsed = std::chrono::steady_clock::now() - start;
+    keepSending.store(false, std::memory_order_release);
+
+    for (auto& t : requesters) {
+      t.join();
+    }
+
+    EXPECT_LT(elapsed, 2s);
+    EXPECT_GE(completedRequests.load(), 0);
 
     std::filesystem::remove(scoped.path);
     std::filesystem::remove(scoped.statusSocketPath);

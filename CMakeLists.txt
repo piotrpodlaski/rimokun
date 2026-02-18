@@ -5,19 +5,22 @@ set(CMAKE_CXX_STANDARD 23)
 
 include(CTest)
 
+if (CMAKE_VERSION VERSION_GREATER_EQUAL "4.0")
+    # Allow older third-party CMakeLists (e.g. yaml-cpp) under CMake 4+.
+    set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
+endif ()
+
 option(ENABLE_COVERAGE "Enable code coverage instrumentation" OFF)
 option(ENABLE_TIMING_METRICS
        "Enable runtime timing metrics instrumentation and periodic reports" OFF)
 option(ENABLE_PROFILING
        "Enable profiler-friendly instrumentation (debug symbols + frame pointers)" OFF)
-option(ENABLE_PROFILING_IN_RELEASE
-       "Automatically enable profiler-friendly flags for Release builds" ON)
 
 include(FetchContent)
 FetchContent_Declare(
         yaml-cpp
         GIT_REPOSITORY https://github.com/jbeder/yaml-cpp.git
-        GIT_TAG 0.8.0
+        GIT_TAG master
 )
 FetchContent_Declare(
         magic_enum
@@ -83,15 +86,8 @@ else ()
     add_compile_definitions(RIMOKUN_TIMING_ENABLED=0)
 endif ()
 
-set(_profiling_enabled OFF)
 if (ENABLE_PROFILING)
-    set(_profiling_enabled ON)
-elseif (ENABLE_PROFILING_IN_RELEASE AND CMAKE_BUILD_TYPE STREQUAL "Release")
-    set(_profiling_enabled ON)
-endif ()
-
-if (_profiling_enabled)
-    message(STATUS "Profiler-friendly build flags enabled")
+    message(STATUS "Profiler-friendly build flags enabled for all configurations")
     if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         add_compile_options(-g -fno-omit-frame-pointer)
     elseif (MSVC)

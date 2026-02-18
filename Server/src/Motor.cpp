@@ -413,6 +413,14 @@ void Motor::setOperationDeceleration(ModbusClient& bus, const std::uint8_t opId,
   writeInt32(bus, operationAddr(_map.decelerationNo0, opId), deceleration);
 }
 
+void Motor::setRunCurrent(ModbusClient& bus, const std::int32_t current) const {
+  writeInt32(bus, _map.runCurrent, current);
+}
+
+void Motor::setStopCurrent(ModbusClient& bus, const std::int32_t current) const {
+  writeInt32(bus, _map.stopCurrent, current);
+}
+
 void Motor::configureConstantSpeedPair(ModbusClient& bus,
                                        const std::int32_t speedOp0,
                                        const std::int32_t speedOp1,

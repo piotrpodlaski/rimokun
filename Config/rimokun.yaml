@@ -47,12 +47,19 @@ classes:
       buttonDebounceSamples: 3
   MotorControl:
     model: "AR-KD2"
-    device: "/dev/ttyr01"
-    baud: 115200
-    parity: "E"
-    dataBits: 8
-    stopBits: 1
-    responseTimeoutMS: 1000
+    transport:
+      type: "rawTcpRtu" # default path for motors
+      tcp:
+        host: "10.1.1.50"
+        port: 4001
+      serial:
+        device: "/dev/ttyr01"
+        baud: 115200
+        parity: "E"
+        dataBits: 8
+        stopBits: 1
+    responseTimeoutMS: 100
+    connectTimeoutMS: 100
     motorAddresses:
       XLeft: 1
 #      XRight: 2
@@ -60,6 +67,10 @@ classes:
 #      YRight: 4
 #      ZLeft: 5
 #      ZRight: 6
+    motorCurrents:
+      XLeft:
+        runCurrent: 1000
+        stopCurrent: 500
   Machine:
     loopIntervalMS: 60
     updateIntervalMS: 200

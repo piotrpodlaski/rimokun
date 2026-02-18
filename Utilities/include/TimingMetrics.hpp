@@ -11,10 +11,8 @@
 
 #include "Logger.hpp"
 
-#define RIMOKUN_TIMING_ENABLED 1
-
 #ifndef RIMOKUN_TIMING_ENABLED
-#define RIMOKUN_TIMING_ENABLED 1
+#define RIMOKUN_TIMING_ENABLED 0
 #endif
 
 namespace utl {

@@ -58,6 +58,15 @@ class Machine {
   virtual void handleToolChangerCommand(const cmd::ToolChangerCommand& c);
   virtual void handleReconnectCommand(const cmd::ReconnectCommand& c);
  private:
+  struct IoSignalCache {
+    std::uint64_t cycle{0};
+    bool valid{false};
+    std::optional<signalMap_t> value;
+  };
+
+  void cacheInputSignals(std::optional<signalMap_t> value);
+  void cacheOutputSignals(std::optional<signalMap_t> value);
+
   void makeDummyStatus();
 
   Contec _contec;
@@ -76,6 +85,9 @@ class Machine {
   std::thread _commandServerThread;
   std::thread _processThread;
   std::mutex _lifecycleMutex;
+  std::uint64_t _ioCacheCycle{0};
+  IoSignalCache _inputSignalsCache;
+  IoSignalCache _outputSignalsCache;
   std::unique_ptr<ControlLoopRunner> _loopRunner;
   std::unique_ptr<MachineController> _controller;
   std::unique_ptr<MachineComponentService> _componentService;

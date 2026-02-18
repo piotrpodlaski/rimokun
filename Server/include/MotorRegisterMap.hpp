@@ -18,6 +18,8 @@ struct MotorRegisterMap {
   int commandSpeed{0x00C8};
   int actualPosition{0x00CC};
   int actualSpeed{0x00CE};
+  int runCurrent{0x0240};
+  int stopCurrent{0x0242};
 
   // Operation data No.0 base addresses (each entry is 32-bit, upper/lower).
   int positionNo0{0x0400};

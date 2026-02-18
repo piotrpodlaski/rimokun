@@ -24,6 +24,22 @@ const Motor& requireMotor(const std::map<utl::EMotor, Motor>& motors,
 
 }  // namespace
 
+namespace {
+constexpr std::int32_t kDefaultRunCurrent = 1000;
+constexpr std::int32_t kDefaultStopCurrent = 500;
+constexpr std::int32_t kMinCurrent = 0;
+constexpr std::int32_t kMaxCurrent = 1000;
+
+void validateCurrentRange(const std::int32_t current, const std::string_view field,
+                          const std::string_view motorName) {
+  if (current < kMinCurrent || current > kMaxCurrent) {
+    throw std::runtime_error(std::format(
+        "MotorControl.motorCurrents.{}.{} must be in range {}..{} (got {})",
+        motorName, field, kMinCurrent, kMaxCurrent, current));
+  }
+}
+}  // namespace
+
 MotorControl::MotorControl() {
   auto& cfg = utl::Config::instance();
   const auto model =
@@ -34,7 +50,7 @@ MotorControl::MotorControl() {
     throw std::runtime_error(
         std::format("Unsupported MotorControl model '{}'", model));
   }
-  _rtuConfig.device = cfg.getRequired<std::string>("MotorControl", "device");
+  _rtuConfig.device = cfg.getOptional<std::string>("MotorControl", "device", "");
   _rtuConfig.baud = cfg.getOptional<int>("MotorControl", "baud", 9600);
   const auto parity =
       cfg.getOptional<std::string>("MotorControl", "parity", "N");
@@ -43,27 +59,113 @@ MotorControl::MotorControl() {
   _rtuConfig.stopBits = cfg.getOptional<int>("MotorControl", "stopBits", 1);
   _rtuConfig.responseTimeoutMS =
       cfg.getOptional<unsigned>("MotorControl", "responseTimeoutMS", 1000u);
+  _rtuConfig.connectTimeoutMS =
+      cfg.getOptional<unsigned>("MotorControl", "connectTimeoutMS", 1000u);
+
+  const auto motorCfg = cfg.getClassConfig("MotorControl");
+  const auto transportCfg = motorCfg["transport"];
+  if (transportCfg && transportCfg.IsMap()) {
+    const auto type = transportCfg["type"].as<std::string>("rawTcpRtu");
+    if (type == "rawTcpRtu" || type == "rtuTcpRaw" || type == "tcpRawRtu") {
+      _transportType = TransportType::RawTcpRtu;
+      const auto tcpCfg = transportCfg["tcp"];
+      if (!tcpCfg || !tcpCfg.IsMap()) {
+        throw std::runtime_error(
+            "MotorControl.transport.tcp is required for rawTcpRtu transport.");
+      }
+      _rawTcpConfig.host = tcpCfg["host"].as<std::string>();
+      _rawTcpConfig.port = tcpCfg["port"].as<int>();
+    } else if (type == "serialRtu" || type == "serial" || type == "rtuSerial") {
+      _transportType = TransportType::SerialRtu;
+      const auto serialCfg = transportCfg["serial"];
+      if (!serialCfg || !serialCfg.IsMap()) {
+        throw std::runtime_error(
+            "MotorControl.transport.serial is required for serialRtu transport.");
+      }
+      _rtuConfig.device = serialCfg["device"].as<std::string>();
+      _rtuConfig.baud = serialCfg["baud"].as<int>(9600);
+      const auto parity = serialCfg["parity"].as<std::string>("N");
+      _rtuConfig.parity = parity.empty() ? 'N' : parity.front();
+      _rtuConfig.dataBits = serialCfg["dataBits"].as<int>(8);
+      _rtuConfig.stopBits = serialCfg["stopBits"].as<int>(1);
+    } else {
+      throw std::runtime_error(
+          std::format("Unsupported MotorControl transport type '{}'", type));
+    }
+  } else {
+    // Legacy config path: keep existing serial keys behavior.
+    _transportType = TransportType::SerialRtu;
+    if (_rtuConfig.device.empty()) {
+      throw std::runtime_error(
+          "MotorControl.device is required when using legacy serial config.");
+    }
+  }
 
   _motorAddresses = cfg.getRequired<std::map<utl::EMotor, int>>(
       "MotorControl", "motorAddresses");
+
+  for (const auto& [motorId, _] : _motorAddresses) {
+    _motorCurrents[motorId] = MotorCurrentConfig{
+        .runCurrent = kDefaultRunCurrent, .stopCurrent = kDefaultStopCurrent};
+  }
+
+  const auto motorCurrentsNode = motorCfg["motorCurrents"];
+  if (motorCurrentsNode && motorCurrentsNode.IsMap()) {
+    for (const auto& kv : motorCurrentsNode) {
+      auto motorId = kv.first.as<utl::EMotor>();
+      const auto entry = kv.second;
+      if (!entry || !entry.IsMap()) {
+        throw std::runtime_error(std::format(
+            "MotorControl.motorCurrents.{} must be a map with runCurrent/stopCurrent",
+            magic_enum::enum_name(motorId)));
+      }
+      auto runCurrent = entry["runCurrent"].as<std::int32_t>(kDefaultRunCurrent);
+      auto stopCurrent =
+          entry["stopCurrent"].as<std::int32_t>(kDefaultStopCurrent);
+      validateCurrentRange(runCurrent, "runCurrent", magic_enum::enum_name(motorId));
+      validateCurrentRange(stopCurrent, "stopCurrent",
+                           magic_enum::enum_name(motorId));
+      _motorCurrents[motorId] = MotorCurrentConfig{
+          .runCurrent = runCurrent, .stopCurrent = stopCurrent};
+    }
+  }
 }
 
 void MotorControl::initialize() {
   _motors.clear();
   _runtime.clear();
   try {
-    auto busRes = ModbusClient::rtu(_rtuConfig.device, _rtuConfig.baud,
-                                    _rtuConfig.parity, _rtuConfig.dataBits,
-                                    _rtuConfig.stopBits, 1);
+    ModbusResult<ModbusClient> busRes =
+        std::unexpected(ModbusError{EINVAL, "Motor transport is not configured"});
+    if (_transportType == TransportType::SerialRtu) {
+      busRes = ModbusClient::rtu(_rtuConfig.device, _rtuConfig.baud,
+                                 _rtuConfig.parity, _rtuConfig.dataBits,
+                                 _rtuConfig.stopBits, 1);
+    } else {
+      busRes = ModbusClient::rtu_over_tcp(_rawTcpConfig.host, _rawTcpConfig.port,
+                                          1);
+    }
     if (!busRes) {
-      auto msg = std::format("Failed to create RTU bus client: {}",
+      auto msg = std::format("Failed to create motor bus client: {}",
                              busRes.error().message);
       throw std::runtime_error(msg);
     }
     _bus.emplace(std::move(*busRes));
+    if (auto ct = _bus->set_connect_timeout(
+            std::chrono::milliseconds{_rtuConfig.connectTimeoutMS});
+        !ct) {
+      auto msg = std::format("Failed to set motor bus connect timeout: {}",
+                             ct.error().message);
+      _bus.reset();
+      throw std::runtime_error(msg);
+    }
     if (auto c = _bus->connect(); !c) {
-      auto msg = std::format("Failed to connect RTU bus on '{}': {}",
-                             _rtuConfig.device, c.error().message);
+      const auto endpoint =
+          _transportType == TransportType::SerialRtu
+              ? _rtuConfig.device
+              : std::format("{}:{}", _rawTcpConfig.host, _rawTcpConfig.port);
+      auto msg = std::format("Failed to connect motor bus on '{}': {}",
+                             endpoint, c.error().message);
       _bus.reset();
       throw std::runtime_error(msg);
     }
@@ -91,6 +193,11 @@ void MotorControl::initialize() {
       {
         std::lock_guard<std::mutex> lock(_busMutex);
         it->second.initialize(*_bus);
+        const auto currentIt = _motorCurrents.find(motorId);
+        if (currentIt != _motorCurrents.end()) {
+          it->second.setRunCurrent(*_bus, currentIt->second.runCurrent);
+          it->second.setStopCurrent(*_bus, currentIt->second.stopCurrent);
+        }
       }
     }
     setState(State::Normal);
@@ -409,6 +516,24 @@ void MotorControl::setOperationDeceleration(const utl::EMotor motorId,
   std::lock_guard<std::mutex> lock(_busMutex);
   if (!_bus) throw std::runtime_error("MotorControl bus is not initialized");
   motor.setOperationDeceleration(*_bus, opId, deceleration);
+}
+
+void MotorControl::setRunCurrent(const utl::EMotor motorId,
+                                 const std::int32_t current) {
+  validateCurrentRange(current, "runCurrent", magic_enum::enum_name(motorId));
+  const auto& motor = requireMotor(_motors, motorId);
+  std::lock_guard<std::mutex> lock(_busMutex);
+  if (!_bus) throw std::runtime_error("MotorControl bus is not initialized");
+  motor.setRunCurrent(*_bus, current);
+}
+
+void MotorControl::setStopCurrent(const utl::EMotor motorId,
+                                  const std::int32_t current) {
+  validateCurrentRange(current, "stopCurrent", magic_enum::enum_name(motorId));
+  const auto& motor = requireMotor(_motors, motorId);
+  std::lock_guard<std::mutex> lock(_busMutex);
+  if (!_bus) throw std::runtime_error("MotorControl bus is not initialized");
+  motor.setStopCurrent(*_bus, current);
 }
 
 void MotorControl::configureConstantSpeedPair(const utl::EMotor motorId,

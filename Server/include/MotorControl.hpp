@@ -6,6 +6,7 @@
 #include <map>
 #include <mutex>
 #include <optional>
+#include <string>
 
 enum class MotorControlMode {
   Speed,
@@ -58,6 +59,8 @@ class MotorControl final : public MachineComponent {
                                 std::int32_t acceleration);
   void setOperationDeceleration(utl::EMotor motorId, std::uint8_t opId,
                                 std::int32_t deceleration);
+  void setRunCurrent(utl::EMotor motorId, std::int32_t current);
+  void setStopCurrent(utl::EMotor motorId, std::int32_t current);
   void configureConstantSpeedPair(utl::EMotor motorId, std::int32_t speedOp0,
                                   std::int32_t speedOp1, std::int32_t acceleration,
                                   std::int32_t deceleration);
@@ -71,7 +74,19 @@ class MotorControl final : public MachineComponent {
       utl::EMotor motorId);
 
  private:
+  enum class TransportType {
+    SerialRtu,
+    RawTcpRtu,
+  };
+
+  struct MotorRawTcpConfig {
+    std::string host;
+    int port{0};
+  };
+
+  TransportType _transportType{TransportType::RawTcpRtu};
   MotorRtuConfig _rtuConfig;
+  MotorRawTcpConfig _rawTcpConfig;
   MotorRegisterMap _registerMap;
   std::map<utl::EMotor, int> _motorAddresses;
   std::map<utl::EMotor, Motor> _motors;
@@ -86,7 +101,12 @@ class MotorControl final : public MachineComponent {
     bool speedPairPrepared{false};
     bool positionPrepared{false};
   };
+  struct MotorCurrentConfig {
+    std::int32_t runCurrent{0};
+    std::int32_t stopCurrent{0};
+  };
   std::map<utl::EMotor, MotorRuntimeState> _runtime;
+  std::map<utl::EMotor, MotorCurrentConfig> _motorCurrents;
 
   std::optional<ModbusClient> _bus;
   std::mutex _busMutex;

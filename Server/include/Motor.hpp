@@ -16,6 +16,7 @@ struct MotorRtuConfig {
   char parity{'N'};
   int dataBits{8};
   int stopBits{1};
+  unsigned connectTimeoutMS{1000};
   unsigned responseTimeoutMS{1000};
 };
 
@@ -151,6 +152,8 @@ class Motor {
                                 std::int32_t acceleration) const;
   void setOperationDeceleration(ModbusClient& bus, std::uint8_t opId,
                                 std::int32_t deceleration) const;
+  void setRunCurrent(ModbusClient& bus, std::int32_t current) const;
+  void setStopCurrent(ModbusClient& bus, std::int32_t current) const;
   void configureConstantSpeedPair(ModbusClient& bus, std::int32_t speedOp0,
                                   std::int32_t speedOp1, std::int32_t acceleration,
                                   std::int32_t deceleration) const;

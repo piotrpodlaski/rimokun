@@ -56,7 +56,11 @@ Machine::Machine(std::shared_ptr<IClock> clock) : _clock(std::move(clock)) {
 }
 
 std::optional<signalMap_t> Machine::readInputSignals() {
+  if (_inputSignalsCache.valid && _inputSignalsCache.cycle == _ioCacheCycle) {
+    return _inputSignalsCache.value;
+  }
   if (_contec.state() == MachineComponent::State::Error) {
+    cacheInputSignals(std::nullopt);
     return std::nullopt;
   }
   signalMap_t inputSignals;
@@ -66,8 +70,10 @@ std::optional<signalMap_t> Machine::readInputSignals() {
       validateMappedIndex(signal, index, inputs.size(), "input");
       inputSignals[signal] = inputs[index];
     }
+    cacheInputSignals(inputSignals);
   } catch (const std::exception& e) {
     SPDLOG_ERROR("Exception caught in 'readInputSignals'! {}", e.what());
+    cacheInputSignals(std::nullopt);
     return std::nullopt;
   }
   return inputSignals;
@@ -89,13 +95,25 @@ void Machine::setOutputs(const signalMap_t& signals) {
       outputs[it->second] = value;
     }
     _contec.setOutputs(outputs);
+
+    signalMap_t outputSignals;
+    for (const auto& [signal, index] : _outputMapping) {
+      validateMappedIndex(signal, index, outputs.size(), "output");
+      outputSignals[signal] = outputs[index];
+    }
+    cacheOutputSignals(std::move(outputSignals));
   } catch (const std::exception& e) {
     SPDLOG_ERROR("Exception caught in 'setOutputs'! {}", e.what());
+    cacheOutputSignals(std::nullopt);
   }
 }
 
 std::optional<signalMap_t> Machine::readOutputSignals() {
+  if (_outputSignalsCache.valid && _outputSignalsCache.cycle == _ioCacheCycle) {
+    return _outputSignalsCache.value;
+  }
   if (_contec.state() == MachineComponent::State::Error) {
+    cacheOutputSignals(std::nullopt);
     return std::nullopt;
   }
   try {
@@ -105,9 +123,11 @@ std::optional<signalMap_t> Machine::readOutputSignals() {
       validateMappedIndex(signal, index, output.size(), "output");
       outputSignals[signal] = output[index];
     }
+    cacheOutputSignals(outputSignals);
     return outputSignals;
   } catch (const std::exception& e) {
     SPDLOG_WARN("Exception caught in 'readOutputSignals'! {}", e.what());
+    cacheOutputSignals(std::nullopt);
     return std::nullopt;
   }
 }
@@ -144,6 +164,9 @@ void Machine::runOneCycle(LoopState& state) {
     throw std::runtime_error("Machine is not wired. Call MachineRuntime::wireMachine first.");
   }
   try {
+    ++_ioCacheCycle;
+    _inputSignalsCache.valid = false;
+    _outputSignalsCache.valid = false;
     _loopRunner->runOneCycle(
         [this]() { controlLoopTasks(); },
         [this]() {
@@ -195,6 +218,18 @@ void Machine::runOneCycle(LoopState& state) {
       _controlPanel.reset();
     }
   }
+}
+
+void Machine::cacheInputSignals(std::optional<signalMap_t> value) {
+  _inputSignalsCache.cycle = _ioCacheCycle;
+  _inputSignalsCache.valid = true;
+  _inputSignalsCache.value = std::move(value);
+}
+
+void Machine::cacheOutputSignals(std::optional<signalMap_t> value) {
+  _outputSignalsCache.cycle = _ioCacheCycle;
+  _outputSignalsCache.valid = true;
+  _outputSignalsCache.value = std::move(value);
 }
 
 bool Machine::submitCommand(cmd::Command command) {

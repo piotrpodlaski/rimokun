@@ -21,6 +21,8 @@ MotorRegisterMap makeArKd2RegisterMap() {
   map.commandSpeed = 0x00C8;
   map.actualPosition = 0x00CC;
   map.actualSpeed = 0x00CE;
+  map.runCurrent = 0x0240;
+  map.stopCurrent = 0x0242;
 
   // Operation data No.0 registers (32-bit)
   map.positionNo0 = 0x0400;

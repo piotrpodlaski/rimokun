@@ -2,6 +2,7 @@
 #include <ControlPanelCommFactory.hpp>
 #include <Config.hpp>
 #include <Logger.hpp>
+#include <TimingMetrics.hpp>
 
 #include <algorithm>
 #include <sstream>
@@ -113,6 +114,7 @@ void ControlPanel::reset() {
 }
 
 void ControlPanel::readerLoop() {
+  RIMO_TIMED_SCOPE("ControlPanel::readerLoop");
   auto sanitizeLine = [](std::string& line) {
     while (!line.empty() &&
            (line.back() == '\r' || line.back() == '\n' || line.back() == '\0')) {
@@ -150,6 +152,7 @@ void ControlPanel::readerLoop() {
 }
 
 void ControlPanel::processLine(const std::string& line) {
+  RIMO_TIMED_SCOPE("ControlPanel::processLine");
   std::array<std::string, 9> tokens{};
   std::istringstream iss(line);
   for (std::size_t i = 0; i < tokens.size(); ++i) {

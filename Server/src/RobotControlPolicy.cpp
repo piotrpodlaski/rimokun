@@ -1,6 +1,7 @@
 #include "RobotControlPolicy.hpp"
 
 #include <Config.hpp>
+#include <Logger.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -50,6 +51,15 @@ std::int32_t speedStepsPerSecFromAxis(const double axis,
   const auto linear = std::abs(clampAxis(axis)) * maxLinearSpeedMmPerSec;
   return static_cast<std::int32_t>(std::llround(linear * stepsPerMm));
 }
+
+std::optional<utl::ELEDState> componentStateFromStatus(
+    const utl::RobotStatus& status, const utl::ERobotComponent component) {
+  const auto it = status.robotComponents.find(component);
+  if (it == status.robotComponents.end()) {
+    return std::nullopt;
+  }
+  return it->second;
+}
 }  // namespace
 
 RimoKunControlPolicy::RimoKunControlPolicy() {
@@ -68,6 +78,15 @@ RimoKunControlPolicy::RimoKunControlPolicy() {
       _motion.rightArmY.neutralAxisActivationThreshold = value;
       _motion.gantryZ.neutralAxisActivationThreshold = value;
     }
+    if (const auto commonDelta = motionCfg["speedUpdateAxisDeltaThreshold"];
+        commonDelta) {
+      const auto value = commonDelta.as<double>();
+      _motion.leftArmX.speedUpdateAxisDeltaThreshold = value;
+      _motion.leftArmY.speedUpdateAxisDeltaThreshold = value;
+      _motion.rightArmX.speedUpdateAxisDeltaThreshold = value;
+      _motion.rightArmY.speedUpdateAxisDeltaThreshold = value;
+      _motion.gantryZ.speedUpdateAxisDeltaThreshold = value;
+    }
     const auto axesCfg = motionCfg["axes"];
     if (!axesCfg || !axesCfg.IsMap()) {
       return;
@@ -82,6 +101,10 @@ RimoKunControlPolicy::RimoKunControlPolicy() {
       if (const auto threshold = axisNode["neutralAxisActivationThreshold"];
           threshold) {
         axis.neutralAxisActivationThreshold = threshold.as<double>();
+      }
+      if (const auto deltaThreshold = axisNode["speedUpdateAxisDeltaThreshold"];
+          deltaThreshold) {
+        axis.speedUpdateAxisDeltaThreshold = deltaThreshold.as<double>();
       }
       if (const auto maxSpeed = axisNode["maxLinearSpeedMmPerSec"]; maxSpeed) {
         axis.maxLinearSpeedMmPerSec = maxSpeed.as<double>();
@@ -110,17 +133,81 @@ IRobotControlPolicy::ControlDecision RimoKunControlPolicy::decide(
     const MachineComponent::State contecState,
     const utl::RobotStatus& robotStatus) const {
   (void)outputs;
-  if (!inputs || contecState == MachineComponent::State::Error) {
+
+  const auto contecStatus =
+      componentStateFromStatus(robotStatus, utl::ERobotComponent::Contec);
+  const auto motorControlStatus =
+      componentStateFromStatus(robotStatus, utl::ERobotComponent::MotorControl);
+  const auto controlPanelStatus =
+      componentStateFromStatus(robotStatus, utl::ERobotComponent::ControlPanel);
+
+  if (!contecStatus.has_value()) {
+    warnOnce(_warningState.missingContecStatus,
+             "Robot status does not include Contec state yet. "
+             "Control policy is waiting for component initialization.");
+  } else {
+    setWarningFlag(_warningState.missingContecStatus, false);
+  }
+  if (!motorControlStatus.has_value()) {
+    warnOnce(_warningState.missingMotorControlStatus,
+             "Robot status does not include MotorControl state yet. "
+             "Motor commands are suspended.");
+  } else {
+    setWarningFlag(_warningState.missingMotorControlStatus, false);
+  }
+  if (!controlPanelStatus.has_value()) {
+    warnOnce(_warningState.missingControlPanelStatus,
+             "Robot status does not include ControlPanel state yet. "
+             "Joystick-driven control is suspended.");
+  } else {
+    setWarningFlag(_warningState.missingControlPanelStatus, false);
+  }
+
+  const bool contecAvailable =
+      contecState == MachineComponent::State::Normal &&
+      contecStatus.has_value() && *contecStatus == utl::ELEDState::On;
+  if (!contecAvailable) {
+    warnOnce(_warningState.contecUnavailable,
+             "Contec is unavailable. Tool changer and light outputs are disabled.");
     return {.outputs = std::nullopt, .setToolChangerErrorBlinking = true};
   }
-  if (!inputs->contains("button1") || !inputs->contains("button2")) {
-    throw std::runtime_error(
-        "Missing required input signals 'button1'/'button2' for control policy.");
+  setWarningFlag(_warningState.contecUnavailable, false);
+
+  if (!inputs || !inputs->contains("button1") || !inputs->contains("button2")) {
+    warnOnce(_warningState.missingInputSignals,
+             "Missing required input signals 'button1'/'button2'. "
+             "Skipping this control cycle.");
+    return {.outputs = std::nullopt, .setToolChangerErrorBlinking = false};
   }
+  setWarningFlag(_warningState.missingInputSignals, false);
 
   SignalMap ioOutputs;
   ioOutputs["light1"] = inputs->at("button1");
   ioOutputs["light2"] = inputs->at("button2");
+
+  const bool motorControlAvailable =
+      motorControlStatus.has_value() && *motorControlStatus == utl::ELEDState::On;
+  const bool controlPanelAvailable =
+      controlPanelStatus.has_value() && *controlPanelStatus == utl::ELEDState::On;
+
+  if (!motorControlAvailable) {
+    warnOnce(_warningState.motorControlUnavailable,
+             "MotorControl is unavailable. Motor commands are suspended.");
+  } else {
+    setWarningFlag(_warningState.motorControlUnavailable, false);
+  }
+  if (!controlPanelAvailable) {
+    warnOnce(_warningState.controlPanelUnavailable,
+             "ControlPanel is unavailable. Joystick-driven control is suspended.");
+  } else {
+    setWarningFlag(_warningState.controlPanelUnavailable, false);
+  }
+
+  if (!motorControlAvailable || !controlPanelAvailable) {
+    return {.outputs = std::move(ioOutputs),
+            .motorIntents = {},
+            .setToolChangerErrorBlinking = false};
+  }
 
   std::vector<MotorIntent> motorIntents;
   motorIntents.reserve(6);
@@ -131,22 +218,67 @@ IRobotControlPolicy::ControlDecision RimoKunControlPolicy::decide(
   const auto appendSpeedIntent = [&](const utl::EMotor motorId,
                                      const double axisValue,
                                      const AxisConfig& axisCfg) {
+    std::lock_guard<std::mutex> runtimeLock(_runtimeMutex);
+    auto& runtime = _motorRuntime[motorId];
+    const auto clampedAxis = clampAxis(axisValue);
+    const auto active =
+        std::abs(clampedAxis) >= axisCfg.neutralAxisActivationThreshold;
+
     MotorIntent intent;
     intent.motorId = motorId;
-    if (std::abs(clampAxis(axisValue)) <
-        axisCfg.neutralAxisActivationThreshold) {
+    if (!active) {
+      runtime.hasLastAxis = false;
+      runtime.lastDirection.reset();
+      if (!runtime.wasActive) {
+        return;
+      }
+      runtime.wasActive = false;
       intent.stopMovement = true;
       motorIntents.push_back(intent);
       return;
     }
-    intent.mode = MotorControlMode::Speed;  // default operating mode
-    intent.direction = axisValue >= 0.0 ? MotorControlDirection::Forward
-                                        : MotorControlDirection::Reverse;
-    intent.speed = std::max<std::int32_t>(
-        1, speedStepsPerSecFromAxis(axisValue, axisCfg.maxLinearSpeedMmPerSec,
+
+    const auto desiredDirection =
+        clampedAxis >= 0.0 ? MotorControlDirection::Forward
+                           : MotorControlDirection::Reverse;
+    const auto shouldUpdateSpeed =
+        !runtime.hasLastAxis ||
+        std::abs(clampedAxis - runtime.lastAxis) >=
+            axisCfg.speedUpdateAxisDeltaThreshold;
+
+    if (!runtime.wasActive) {
+      intent.mode = MotorControlMode::Speed;  // default operating mode
+      intent.direction = desiredDirection;
+      intent.speed = std::max<std::int32_t>(
+          1, speedStepsPerSecFromAxis(clampedAxis, axisCfg.maxLinearSpeedMmPerSec,
                                     axisCfg.stepsPerMm));
-    intent.startMovement = true;
-    motorIntents.push_back(intent);
+      intent.startMovement = true;
+      runtime.wasActive = true;
+      runtime.hasLastAxis = true;
+      runtime.lastAxis = clampedAxis;
+      runtime.lastDirection = desiredDirection;
+      motorIntents.push_back(intent);
+      return;
+    }
+
+    if (!runtime.lastDirection.has_value() ||
+        runtime.lastDirection != desiredDirection) {
+      intent.direction = desiredDirection;
+      runtime.lastDirection = desiredDirection;
+    }
+    if (shouldUpdateSpeed) {
+      intent.speed = std::max<std::int32_t>(
+          1, speedStepsPerSecFromAxis(clampedAxis, axisCfg.maxLinearSpeedMmPerSec,
+                                      axisCfg.stepsPerMm));
+      runtime.hasLastAxis = true;
+      runtime.lastAxis = clampedAxis;
+    }
+    runtime.wasActive = true;
+
+    if (intent.direction || intent.speed || intent.startMovement || intent.stopMovement ||
+        intent.mode || intent.position) {
+      motorIntents.push_back(intent);
+    }
   };
 
   // One joystick per arm: left joystick drives left X/Y, right joystick drives right X/Y.
@@ -162,4 +294,18 @@ IRobotControlPolicy::ControlDecision RimoKunControlPolicy::decide(
   return {.outputs = std::move(ioOutputs),
           .motorIntents = std::move(motorIntents),
           .setToolChangerErrorBlinking = false};
+}
+
+void RimoKunControlPolicy::warnOnce(bool& flag, const std::string& message) const {
+  std::lock_guard<std::mutex> lock(_warningMutex);
+  if (flag) {
+    return;
+  }
+  flag = true;
+  SPDLOG_WARN("{}", message);
+}
+
+void RimoKunControlPolicy::setWarningFlag(bool& flag, const bool value) const {
+  std::lock_guard<std::mutex> lock(_warningMutex);
+  flag = value;
 }

@@ -1,5 +1,6 @@
 #include <Config.hpp>
 #include <Machine.hpp>
+#include <TimingMetrics.hpp>
 
 #include <chrono>
 #include <future>
@@ -138,29 +139,62 @@ Machine::LoopState Machine::makeInitialLoopState() const {
 }
 
 void Machine::runOneCycle(LoopState& state) {
+  RIMO_TIMED_SCOPE("Machine::runOneCycle");
   if (!_loopRunner) {
     throw std::runtime_error("Machine is not wired. Call MachineRuntime::wireMachine first.");
   }
-  _loopRunner->runOneCycle(
-      [this]() { controlLoopTasks(); },
-      [this]() {
-        if (auto command = _commandQueue.try_pop()) {
-          try {
-            std::visit(Overloaded{[this](const cmd::ToolChangerCommand& c) {
-                                    handleToolChangerCommand(c);
-                                  },
-                                  [this](const cmd::ReconnectCommand& c) {
-                                    handleReconnectCommand(c);
-                                  }},
-                       command->payload);
-            command->reply.set_value("");
-          } catch (const std::runtime_error& e) {
-            SPDLOG_WARN("Exception caught in 'std::visit'! {}", e.what());
-            command->reply.set_value(e.what());
+  try {
+    _loopRunner->runOneCycle(
+        [this]() { controlLoopTasks(); },
+        [this]() {
+          if (auto command = _commandQueue.try_pop()) {
+            try {
+              std::visit(Overloaded{[this](const cmd::ToolChangerCommand& c) {
+                                      handleToolChangerCommand(c);
+                                    },
+                                    [this](const cmd::ReconnectCommand& c) {
+                                      handleReconnectCommand(c);
+                                    }},
+                         command->payload);
+              command->reply.set_value("");
+            } catch (const std::exception& e) {
+              SPDLOG_WARN("Exception caught in 'std::visit'! {}", e.what());
+              command->reply.set_value(e.what());
+            } catch (...) {
+              SPDLOG_WARN("Unknown exception caught in 'std::visit'!");
+              command->reply.set_value("Unknown exception while processing command");
+            }
           }
-        }
-      },
-      [this]() { updateStatus(); }, state);
+        },
+        [this]() { updateStatus(); }, state);
+  } catch (const std::exception& e) {
+    SPDLOG_ERROR(
+        "Unhandled exception in machine loop cycle: {}. "
+        "Forcing components into error state.",
+        e.what());
+    if (_motorControl.state() != MachineComponent::State::Error) {
+      _motorControl.reset();
+    }
+    if (_contec.state() != MachineComponent::State::Error) {
+      _contec.reset();
+    }
+    if (_controlPanel.state() != MachineComponent::State::Error) {
+      _controlPanel.reset();
+    }
+  } catch (...) {
+    SPDLOG_ERROR(
+        "Unhandled unknown exception in machine loop cycle. "
+        "Forcing components into error state.");
+    if (_motorControl.state() != MachineComponent::State::Error) {
+      _motorControl.reset();
+    }
+    if (_contec.state() != MachineComponent::State::Error) {
+      _contec.reset();
+    }
+    if (_controlPanel.state() != MachineComponent::State::Error) {
+      _controlPanel.reset();
+    }
+  }
 }
 
 bool Machine::submitCommand(cmd::Command command) {
@@ -180,10 +214,27 @@ std::string Machine::dispatchCommandAndWait(cmd::Command command,
 }
 
 void Machine::controlLoopTasks() {
+  RIMO_TIMED_SCOPE("Machine::controlLoopTasks");
   if (!_controller) {
     throw std::runtime_error("Machine controller is not wired.");
   }
-  _controller->runControlLoopTasks();
+  try {
+    _controller->runControlLoopTasks();
+  } catch (const std::exception& e) {
+    SPDLOG_ERROR(
+        "Control loop task failed: {}. Putting MotorControl into error state.",
+        e.what());
+    if (_motorControl.state() != MachineComponent::State::Error) {
+      _motorControl.reset();
+    }
+  } catch (...) {
+    SPDLOG_ERROR(
+        "Control loop task failed with unknown exception. "
+        "Putting MotorControl into error state.");
+    if (_motorControl.state() != MachineComponent::State::Error) {
+      _motorControl.reset();
+    }
+  }
 }
 
 void Machine::initialize() {
@@ -262,6 +313,7 @@ void Machine::makeDummyStatus() {
 }
 
 void Machine::updateStatus() {
+  RIMO_TIMED_SCOPE("Machine::updateStatus");
   _statusBuilder->updateAndPublish(
       _robotStatus, _components,
       [this]() { return _controlPanel.getSnapshot(); },

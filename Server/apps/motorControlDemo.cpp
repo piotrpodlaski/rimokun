@@ -143,14 +143,16 @@ int main(int argc, char** argv) {
     SPDLOG_INFO("Current warning code=0x{:02X}, type='{}'", warning.code, warning.type);
     SPDLOG_INFO("Current comm error code=0x{:02X}, type='{}'", comm.code, comm.type);
 
-    // Mimic python-style speed run: configure speed mode, run, update speed while moving,
-    // flip direction on the fly, then stop.
+    // Speed-mode run: movement is level-controlled by FWD/RVS bits in 0x007D.
+    // No START/STOP pulses are used in speed mode.
+    // Stop is performed by clearing 0x007D (via MotorControl::stopMovement).
     mc.setMode(motorId, MotorControlMode::Speed);
     mc.setDirection(motorId, MotorControlDirection::Forward);
     mc.setSpeed(motorId, args.speed1);
     mc.startMovement(motorId);
-    SPDLOG_INFO("Started motor {} in speed mode, speed={}.", args.motorName,
-                args.speed1);
+    SPDLOG_INFO(
+        "Started motor {} in speed mode (FWD), speed={}.",
+        args.motorName, args.speed1);
 
     std::this_thread::sleep_for(std::chrono::seconds{std::max(1, args.runSeconds / 3)});
 
@@ -159,14 +161,14 @@ int main(int argc, char** argv) {
 
     std::this_thread::sleep_for(std::chrono::seconds{std::max(1, args.runSeconds / 3)});
 
-    mc.setDirection(motorId, MotorControlDirection::Reverse);
-    SPDLOG_INFO("Changed direction on the fly: REVERSE.");
+    mc.setDirection(motorId, MotorControlDirection::Reverse);  // FWD=0, RVS=1
+    SPDLOG_INFO("Changed direction on the fly: REVERSE (RVS high).");
 
     std::this_thread::sleep_for(
         std::chrono::seconds{std::max(1, args.runSeconds - 2 * std::max(1, args.runSeconds / 3))});
 
-    mc.setDirection(motorId, MotorControlDirection::Forward);
-    SPDLOG_INFO("Changed direction on the fly: FORWARD.");
+    mc.setDirection(motorId, MotorControlDirection::Forward);  // RVS=0, FWD=1
+    SPDLOG_INFO("Changed direction on the fly: FORWARD (FWD high).");
 
     const auto input = mc.readInputStatus(motorId);
     const auto output = mc.readOutputStatus(motorId);
@@ -182,7 +184,7 @@ int main(int argc, char** argv) {
     std::cout << "]\n";
 
     mc.stopMovement(motorId);
-    SPDLOG_INFO("Stopped motor {}.", args.motorName);
+    SPDLOG_INFO("Stopped motor {} by clearing 0x007D.", args.motorName);
 
     mc.reset();
     return 0;

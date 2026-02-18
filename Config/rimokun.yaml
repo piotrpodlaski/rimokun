@@ -47,7 +47,7 @@ classes:
       buttonDebounceSamples: 3
   MotorControl:
     model: "AR-KD2"
-    device: "/dev/ttyr03"
+    device: "/dev/ttyr01"
     baud: 115200
     parity: "E"
     dataBits: 8
@@ -55,30 +55,36 @@ classes:
     responseTimeoutMS: 1000
     motorAddresses:
       XLeft: 1
-      XRight: 2
-      YLeft: 3
-      YRight: 4
-      ZLeft: 5
-      ZRight: 6
+#      XRight: 2
+#      YLeft: 3
+#      YRight: 4
+#      ZLeft: 5
+#      ZRight: 6
   Machine:
-    loopIntervalMS: 10
-    updateIntervalMS: 50
+    loopIntervalMS: 60
+    updateIntervalMS: 200
     motion:
-      neutralAxisActivationThreshold: 0.10
+      neutralAxisActivationThreshold: 0.05
+      speedUpdateAxisDeltaThreshold: 0.02
       axes:
         leftArmX:
+          speedUpdateAxisDeltaThreshold: 0.02
           maxLinearSpeedMmPerSec: 80.0
           stepsPerMm: 100.0
         leftArmY:
+          speedUpdateAxisDeltaThreshold: 0.02
           maxLinearSpeedMmPerSec: 80.0
           stepsPerMm: 100.0
         rightArmX:
+          speedUpdateAxisDeltaThreshold: 0.02
           maxLinearSpeedMmPerSec: 80.0
           stepsPerMm: 100.0
         rightArmY:
+          speedUpdateAxisDeltaThreshold: 0.02
           maxLinearSpeedMmPerSec: 80.0
           stepsPerMm: 100.0
         gantryZ:
+          speedUpdateAxisDeltaThreshold: 0.02
           maxLinearSpeedMmPerSec: 80.0
           stepsPerMm: 100.0
     inputMapping:

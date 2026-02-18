@@ -1,6 +1,7 @@
 #include "MachineController.hpp"
 
 #include <Logger.hpp>
+#include <TimingMetrics.hpp>
 #include <magic_enum/magic_enum.hpp>
 #include <stdexcept>
 
@@ -34,6 +35,7 @@ MachineController::MachineController(ReadSignalsFn readInputs,
 }
 
 void MachineController::runControlLoopTasks() const {
+  RIMO_TIMED_SCOPE("MachineController::runControlLoopTasks");
   const auto decision =
       _controlPolicy->decide(_readInputs(), _readOutputs(), _contecState(),
                              _robotStatus);
@@ -68,6 +70,7 @@ void MachineController::runControlLoopTasks() const {
 
 void MachineController::handleToolChangerCommand(
     const cmd::ToolChangerCommand& command) const {
+  RIMO_TIMED_SCOPE("MachineController::handleToolChangerCommand");
   SPDLOG_INFO("Changing status of '{}' tool changer to '{}'",
               magic_enum::enum_name(command.arm),
               magic_enum::enum_name(command.action));

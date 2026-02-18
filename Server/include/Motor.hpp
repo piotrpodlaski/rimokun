@@ -171,4 +171,6 @@ class Motor {
   utl::EMotor _id;
   int _slaveAddress;
   MotorRegisterMap _map;
+  mutable std::optional<std::uint16_t> _driverInputCommandRawCache;
+  mutable std::optional<std::uint8_t> _selectedOperationIdCache;
 };

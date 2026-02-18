@@ -10,6 +10,8 @@
 #include <string_view>
 #include <vector>
 
+#include <TimingMetrics.hpp>
+
 struct ModbusError {
   int errno_value{};
   std::string message{};
@@ -77,6 +79,7 @@ class ModbusClient {
 
   // Connect / close
   ModbusResult<void> connect() {
+    RIMO_TIMED_SCOPE("ModbusClient::connect");
     if (!ctx_) {
       return std::unexpected(ModbusError{0, "Null context"});
     }
@@ -94,6 +97,7 @@ class ModbusClient {
 
   // C++ chrono timeout
   ModbusResult<void> set_response_timeout(std::chrono::milliseconds timeout) {
+    RIMO_TIMED_SCOPE("ModbusClient::set_response_timeout");
     const auto sec = static_cast<uint32_t>(timeout.count() / 1000);
     const auto usec = static_cast<uint32_t>((timeout.count() % 1000) * 1000);
 
@@ -104,6 +108,7 @@ class ModbusClient {
   }
 
   ModbusResult<void> set_slave(int slave_id) {
+    RIMO_TIMED_SCOPE("ModbusClient::set_slave");
     if (!ctx_) {
       return std::unexpected(ModbusError{0, "Null context"});
     }
@@ -117,6 +122,7 @@ class ModbusClient {
 
   ModbusResult<std::vector<std::uint16_t>> read_holding_registers(int addr,
                                                                   int count) {
+    RIMO_TIMED_SCOPE("ModbusClient::read_holding_registers");
     std::vector<std::uint16_t> buffer(static_cast<std::size_t>(count));
     int rc = modbus_read_registers(ctx_, addr, count, buffer.data());
     if (rc == -1) {
@@ -128,6 +134,7 @@ class ModbusClient {
 
   ModbusResult<std::vector<std::uint16_t>> read_input_registers(int addr,
                                                                 int count) {
+    RIMO_TIMED_SCOPE("ModbusClient::read_input_registers");
     std::vector<std::uint16_t> buffer(static_cast<std::size_t>(count));
     int rc = modbus_read_input_registers(ctx_, addr, count, buffer.data());
     if (rc == -1) {
@@ -138,6 +145,7 @@ class ModbusClient {
   }
 
   ModbusResult<void> write_single_register(int addr, std::uint16_t value) {
+    RIMO_TIMED_SCOPE("ModbusClient::write_single_register");
     int rc = modbus_write_register(ctx_, addr, value);
     if (rc == -1) {
       return std::unexpected(last_error());
@@ -147,6 +155,7 @@ class ModbusClient {
 
   ModbusResult<void> write_multiple_registers(
       int addr, std::span<const std::uint16_t> values) {
+    RIMO_TIMED_SCOPE("ModbusClient::write_multiple_registers");
     // libmodbus needs non-const pointer
     auto* data = const_cast<std::uint16_t*>(values.data());
     int rc = modbus_write_registers(ctx_, addr, static_cast<int>(values.size()),
@@ -158,6 +167,7 @@ class ModbusClient {
   }
 
   ModbusResult<std::vector<bool>> read_bits(int addr, int count) {
+    RIMO_TIMED_SCOPE("ModbusClient::read_bits");
     std::vector<uint8_t> raw(static_cast<std::size_t>(count));
 
     int rc = modbus_read_bits(ctx_, addr, count, raw.data());
@@ -175,6 +185,7 @@ class ModbusClient {
   }
 
   ModbusResult<std::vector<bool>> read_input_bits(int addr, int count) {
+    RIMO_TIMED_SCOPE("ModbusClient::read_input_bits");
     std::vector<uint8_t> raw(static_cast<std::size_t>(count));
 
     int rc = modbus_read_input_bits(ctx_, addr, count, raw.data());
@@ -193,6 +204,7 @@ class ModbusClient {
   }
 
   ModbusResult<void> write_bit(int addr, bool value) {
+    RIMO_TIMED_SCOPE("ModbusClient::write_bit");
     int rc = modbus_write_bit(ctx_, addr, value ? 1 : 0);
     if (rc == -1) {
       return std::unexpected(last_error());
@@ -201,6 +213,7 @@ class ModbusClient {
   }
 
   ModbusResult<void> write_bits(int addr, const std::vector<bool>& values) {
+    RIMO_TIMED_SCOPE("ModbusClient::write_bits");
     // Copy bools into a buffer of uint8_t (0 or 1)
     std::vector<uint8_t> raw;
     raw.reserve(values.size());

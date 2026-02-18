@@ -1,8 +1,11 @@
 #include "MainWindow.hpp"
 
+#include <Logger.hpp>
+
 #include "LedIndicator.hpp"
 #include "QtLogSink.hpp"
 #include "TitleBar.hpp"
+#include "spdlog/spdlog.h"
 #include "ui_MainWindow.h"
 
 MainWindow::MainWindow(QWidget* parent)

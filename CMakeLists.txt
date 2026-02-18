@@ -6,6 +6,12 @@ set(CMAKE_CXX_STANDARD 23)
 include(CTest)
 
 option(ENABLE_COVERAGE "Enable code coverage instrumentation" OFF)
+option(ENABLE_TIMING_METRICS
+       "Enable runtime timing metrics instrumentation and periodic reports" OFF)
+option(ENABLE_PROFILING
+       "Enable profiler-friendly instrumentation (debug symbols + frame pointers)" OFF)
+option(ENABLE_PROFILING_IN_RELEASE
+       "Automatically enable profiler-friendly flags for Release builds" ON)
 
 include(FetchContent)
 FetchContent_Declare(
@@ -69,6 +75,30 @@ if (ENABLE_COVERAGE)
     message(STATUS "Code coverage instrumentation enabled")
     add_compile_options(-O0 -g --coverage)
     add_link_options(--coverage)
+endif ()
+
+if (ENABLE_TIMING_METRICS)
+    add_compile_definitions(RIMOKUN_TIMING_ENABLED=1)
+else ()
+    add_compile_definitions(RIMOKUN_TIMING_ENABLED=0)
+endif ()
+
+set(_profiling_enabled OFF)
+if (ENABLE_PROFILING)
+    set(_profiling_enabled ON)
+elseif (ENABLE_PROFILING_IN_RELEASE AND CMAKE_BUILD_TYPE STREQUAL "Release")
+    set(_profiling_enabled ON)
+endif ()
+
+if (_profiling_enabled)
+    message(STATUS "Profiler-friendly build flags enabled")
+    if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        add_compile_options(-g -fno-omit-frame-pointer)
+    elseif (MSVC)
+        add_compile_options(/Zi /Oy-)
+    else ()
+        message(WARNING "ENABLE_PROFILING is set, but no compiler-specific flags are configured for ${CMAKE_CXX_COMPILER_ID}.")
+    endif ()
 endif ()
 
 

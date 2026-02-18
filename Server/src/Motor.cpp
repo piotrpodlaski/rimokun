@@ -3,6 +3,7 @@
 #include <ArKd2Diagnostics.hpp>
 #include <ArKd2FullRegisterMap.hpp>
 #include <Logger.hpp>
+#include <TimingMetrics.hpp>
 #include <magic_enum/magic_enum.hpp>
 
 #include <array>
@@ -121,6 +122,8 @@ Motor::Motor(utl::EMotor id, int slaveAddress, MotorRegisterMap map)
     : _id(id), _slaveAddress(slaveAddress), _map(std::move(map)) {}
 
 void Motor::initialize(ModbusClient& bus) const {
+  _driverInputCommandRawCache.reset();
+  _selectedOperationIdCache.reset();
   selectSlave(bus);
 
   // AR-KD2 sanity check: read present alarm register pair.
@@ -181,6 +184,7 @@ void Motor::initialize(ModbusClient& bus) const {
 }
 
 std::uint32_t Motor::readU32(ModbusClient& bus, int upperAddr) const {
+  RIMO_TIMED_SCOPE("Motor::readU32");
   selectSlave(bus);
   auto regs = bus.read_holding_registers(upperAddr, 2);
   if (!regs || regs->size() != 2) {
@@ -195,6 +199,7 @@ std::uint32_t Motor::readU32(ModbusClient& bus, int upperAddr) const {
 }
 
 std::uint16_t Motor::readU16(ModbusClient& bus, const int addr) const {
+  RIMO_TIMED_SCOPE("Motor::readU16");
   selectSlave(bus);
   auto regs = bus.read_holding_registers(addr, 1);
   if (!regs || regs->size() != 1) {
@@ -209,6 +214,7 @@ std::uint16_t Motor::readU16(ModbusClient& bus, const int addr) const {
 
 void Motor::writeU16(ModbusClient& bus, const int addr,
                      const std::uint16_t value) const {
+  RIMO_TIMED_SCOPE("Motor::writeU16");
   selectSlave(bus);
   auto wr = bus.write_single_register(addr, value);
   if (!wr) {
@@ -221,6 +227,7 @@ void Motor::writeU16(ModbusClient& bus, const int addr,
 }
 
 void Motor::writeInt32(ModbusClient& bus, int upperAddr, std::int32_t value) const {
+  RIMO_TIMED_SCOPE("Motor::writeInt32");
   selectSlave(bus);
   std::uint32_t raw = static_cast<std::uint32_t>(value);
   std::vector<std::uint16_t> words = {
@@ -267,7 +274,10 @@ MotorCodeDiagnostic Motor::diagnoseCommunicationError(
 }
 
 std::uint16_t Motor::readDriverInputCommandRaw(ModbusClient& bus) const {
-  return readU16(bus, _map.driverInputCommandLower);
+  const auto raw = readU16(bus, _map.driverInputCommandLower);
+  _driverInputCommandRawCache = raw;
+  _selectedOperationIdCache = decodeOperationIdFromInputRaw(raw);
+  return raw;
 }
 
 std::uint16_t Motor::readDriverOutputStatusRaw(ModbusClient& bus) const {
@@ -277,11 +287,15 @@ std::uint16_t Motor::readDriverOutputStatusRaw(ModbusClient& bus) const {
 void Motor::writeDriverInputCommandRaw(ModbusClient& bus,
                                        const std::uint16_t raw) const {
   writeU16(bus, _map.driverInputCommandLower, raw);
+  _driverInputCommandRawCache = raw;
+  _selectedOperationIdCache = decodeOperationIdFromInputRaw(raw);
 }
 
 void Motor::setDriverInputFlag(ModbusClient& bus, const MotorInputFlag flag,
                                const bool enabled) const {
-  auto raw = readDriverInputCommandRaw(bus);
+  auto raw = _driverInputCommandRawCache.has_value()
+                 ? *_driverInputCommandRawCache
+                 : readDriverInputCommandRaw(bus);
   const auto bit = static_cast<std::uint16_t>(flag);
   raw = enabled ? static_cast<std::uint16_t>(raw | bit)
                 : static_cast<std::uint16_t>(raw & ~bit);
@@ -342,6 +356,9 @@ std::uint8_t Motor::decodeOperationIdFromInputRaw(const std::uint16_t raw) {
 }
 
 std::uint8_t Motor::readSelectedOperationId(ModbusClient& bus) const {
+  if (_selectedOperationIdCache.has_value()) {
+    return *_selectedOperationIdCache;
+  }
   return decodeOperationIdFromInputRaw(readDriverInputCommandRaw(bus));
 }
 
@@ -350,7 +367,9 @@ void Motor::setSelectedOperationId(ModbusClient& bus, const std::uint8_t opId) c
     throw std::runtime_error(std::format("Invalid operation id {} (allowed 0..63)",
                                          static_cast<int>(opId)));
   }
-  auto raw = readDriverInputCommandRaw(bus);
+  auto raw = _driverInputCommandRawCache.has_value()
+                 ? *_driverInputCommandRawCache
+                 : readDriverInputCommandRaw(bus);
   raw = static_cast<std::uint16_t>(raw & ~kOperationIdMask);
   if ((opId & 1u) != 0) raw |= static_cast<std::uint16_t>(MotorInputFlag::M0);
   if ((opId & 2u) != 0) raw |= static_cast<std::uint16_t>(MotorInputFlag::M1);
@@ -399,6 +418,7 @@ void Motor::configureConstantSpeedPair(ModbusClient& bus,
                                        const std::int32_t speedOp1,
                                        const std::int32_t acceleration,
                                        const std::int32_t deceleration) const {
+  RIMO_TIMED_SCOPE("Motor::configureConstantSpeedPair");
   setOperationMode(bus, 0, MotorOperationMode::Incremental);
   setOperationMode(bus, 1, MotorOperationMode::Incremental);
   setOperationFunction(bus, 0, MotorOperationFunction::SingleMotion);
@@ -414,6 +434,7 @@ void Motor::configureConstantSpeedPair(ModbusClient& bus,
 
 void Motor::updateConstantSpeedBuffered(ModbusClient& bus,
                                         const std::int32_t speed) const {
+  RIMO_TIMED_SCOPE("Motor::updateConstantSpeedBuffered");
   const auto active = readSelectedOperationId(bus);
   const std::uint8_t next = (active == 0u) ? 1u : 0u;
   setOperationSpeed(bus, next, speed);
@@ -483,6 +504,7 @@ void Motor::resetAlarm(ModbusClient& bus) const {
 }
 
 void Motor::selectSlave(ModbusClient& bus) const {
+  RIMO_TIMED_SCOPE("Motor::selectSlave");
   if (auto s = bus.set_slave(_slaveAddress); !s) {
     auto msg = std::format("Failed to select slave {} for motor {}: {}",
                            _slaveAddress, magic_enum::enum_name(_id),

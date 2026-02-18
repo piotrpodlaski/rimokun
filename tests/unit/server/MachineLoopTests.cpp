@@ -214,6 +214,21 @@ class SlowTestMachine final : public Machine {
   std::shared_ptr<FakeClock> _clock;
   std::chrono::milliseconds _simulatedWork;
 };
+
+class ThrowingControlMachine final : public Machine {
+ public:
+  explicit ThrowingControlMachine(const std::shared_ptr<IClock>& clock)
+      : Machine(clock) {}
+
+  int throwsCount{0};
+
+ protected:
+  void controlLoopTasks() override {
+    ++throwsCount;
+    throw std::runtime_error("simulated control-step failure");
+  }
+  void updateStatus() override {}
+};
 }  // namespace
 
 TEST(MachineLoopTests, RunOneCycleAtConfiguredCadence) {
@@ -345,6 +360,21 @@ TEST(MachineLoopTests, NonPositiveIntervalsAreClampedToOneMillisecond) {
   EXPECT_EQ(machine.controlCycles, 5);
   EXPECT_EQ(machine.publishedUpdates, 5);
   EXPECT_EQ(fakeClock->now(), IClock::time_point{std::chrono::milliseconds{4}});
+
+  std::filesystem::remove(configPath);
+}
+
+TEST(MachineLoopTests, ControlStepExceptionDoesNotEscapeRunOneCycle) {
+  const auto configPath = writeTempConfig();
+  utl::Config::instance().setConfigPath(configPath.string());
+
+  auto fakeClock = std::make_shared<FakeClock>();
+  ThrowingControlMachine machine(fakeClock);
+  MachineRuntime::wireMachine(machine);
+  auto state = machine.makeInitialLoopState();
+
+  EXPECT_NO_THROW((void)machine.runOneCycle(state));
+  EXPECT_EQ(machine.throwsCount, 1);
 
   std::filesystem::remove(configPath);
 }

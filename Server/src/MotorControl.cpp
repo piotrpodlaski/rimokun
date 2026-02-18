@@ -3,6 +3,7 @@
 #include <ArKd2RegisterMap.hpp>
 #include <Config.hpp>
 #include <Logger.hpp>
+#include <TimingMetrics.hpp>
 #include <magic_enum/magic_enum.hpp>
 #include <cstdlib>
 #include <chrono>
@@ -118,6 +119,7 @@ void MotorControl::reset() {
 }
 
 void MotorControl::setMode(const utl::EMotor motorId, const MotorControlMode mode) {
+  RIMO_TIMED_SCOPE("MotorControl::setMode");
   const auto& motor = requireMotor(_motors, motorId);
   auto rtIt = _runtime.find(motorId);
   if (rtIt == _runtime.end()) {
@@ -150,6 +152,7 @@ void MotorControl::setMode(const utl::EMotor motorId, const MotorControlMode mod
 }
 
 void MotorControl::setSpeed(const utl::EMotor motorId, const std::int32_t speed) {
+  RIMO_TIMED_SCOPE("MotorControl::setSpeed");
   const auto& motor = requireMotor(_motors, motorId);
   auto rtIt = _runtime.find(motorId);
   if (rtIt == _runtime.end()) {
@@ -176,6 +179,7 @@ void MotorControl::setSpeed(const utl::EMotor motorId, const std::int32_t speed)
 
 void MotorControl::setPosition(const utl::EMotor motorId,
                                const std::int32_t position) {
+  RIMO_TIMED_SCOPE("MotorControl::setPosition");
   const auto& motor = requireMotor(_motors, motorId);
   auto rtIt = _runtime.find(motorId);
   if (rtIt == _runtime.end()) {
@@ -203,6 +207,7 @@ void MotorControl::setPosition(const utl::EMotor motorId,
 
 void MotorControl::setDirection(const utl::EMotor motorId,
                                 const MotorControlDirection direction) {
+  RIMO_TIMED_SCOPE("MotorControl::setDirection");
   const auto& motor = requireMotor(_motors, motorId);
   auto rtIt = _runtime.find(motorId);
   if (rtIt == _runtime.end()) {
@@ -225,6 +230,7 @@ void MotorControl::setDirection(const utl::EMotor motorId,
 }
 
 void MotorControl::startMovement(const utl::EMotor motorId) {
+  RIMO_TIMED_SCOPE("MotorControl::startMovement");
   const auto& motor = requireMotor(_motors, motorId);
   auto rtIt = _runtime.find(motorId);
   if (rtIt == _runtime.end()) {
@@ -250,6 +256,7 @@ void MotorControl::startMovement(const utl::EMotor motorId) {
       motor.setForward(*_bus, false);
       motor.setReverse(*_bus, true);
     }
+    return;
   } else {
     if (!runtime.positionPrepared) {
       motor.setOperationMode(*_bus, 2, MotorOperationMode::Incremental);
@@ -266,9 +273,23 @@ void MotorControl::startMovement(const utl::EMotor motorId) {
 }
 
 void MotorControl::stopMovement(const utl::EMotor motorId) {
+  RIMO_TIMED_SCOPE("MotorControl::stopMovement");
   const auto& motor = requireMotor(_motors, motorId);
+  auto rtIt = _runtime.find(motorId);
+  if (rtIt == _runtime.end()) {
+    throw std::runtime_error(std::format(
+        "Runtime state for motor {} is not available",
+        magic_enum::enum_name(motorId)));
+  }
+  const auto& runtime = rtIt->second;
   std::lock_guard<std::mutex> lock(_busMutex);
   if (!_bus) throw std::runtime_error("MotorControl bus is not initialized");
+  if (runtime.mode == MotorControlMode::Speed) {
+    // AR-KD2 speed mode: motion is level-controlled through FWD/RVS bits.
+    // Stop by clearing the whole driver input command register (0x007D).
+    motor.writeDriverInputCommandRaw(*_bus, 0);
+    return;
+  }
   motor.pulseStop(*_bus);
 }
 

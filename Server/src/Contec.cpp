@@ -1,6 +1,7 @@
 #include <Config.hpp>
 #include <Contec.hpp>
 #include <Logger.hpp>
+#include <TimingMetrics.hpp>
 
 using namespace utl;
 
@@ -88,6 +89,7 @@ Contec::~Contec() {
 }
 
 Contec::bitVector Contec::readInputs() {
+  RIMO_TIMED_SCOPE("Contec::readInputs");
   auto& client = ensureModbusClient();
   auto regs = client.read_input_bits(0, _nDI);
   if (!regs) {
@@ -102,6 +104,7 @@ Contec::bitVector Contec::readInputs() {
 }
 
 Contec::bitVector Contec::readOutputs() {
+  RIMO_TIMED_SCOPE("Contec::readOutputs");
   auto& client = ensureModbusClient();
   auto regs = client.read_bits(0, _nDO);
   if (!regs) {
@@ -116,6 +119,7 @@ Contec::bitVector Contec::readOutputs() {
 }
 
 void Contec::setOutputs(const bitVector& outputs) {
+  RIMO_TIMED_SCOPE("Contec::setOutputs");
   if (outputs.size() != _nDO) {
     auto msg =
         std::format("Invalid number of outputs provided! {} instead of {}",

@@ -94,6 +94,20 @@ TEST(MotorTests, UpdateConstantSpeedBufferedWritesInactiveOperationAndSwitchesId
   EXPECT_EQ(motor.readSelectedOperationId(bus), 1);
 }
 
+TEST(MotorTests, UpdateConstantSpeedBufferedUsesCachedSelectedOperationId) {
+  fake_modbus::reset();
+  auto map = makeArKd2RegisterMap();
+  auto bus = makeBus();
+  Motor motor(utl::EMotor::XLeft, 7, map);
+
+  motor.configureConstantSpeedPair(bus, 1000, 1000, 2000, 2000);
+  fake_modbus::failNext(fake_modbus::FailurePoint::ReadRegisters,
+                        "read should not be needed for buffered update");
+
+  EXPECT_NO_THROW(motor.updateConstantSpeedBuffered(bus, 654321));
+  EXPECT_EQ(motor.readSelectedOperationId(bus), 1);
+}
+
 TEST(MotorTests, DecodeDirectIoAndBrakeStatusDecodesExpectedFlagNames) {
   Motor motor(utl::EMotor::XLeft, 7, makeArKd2RegisterMap());
   const std::uint32_t raw =

@@ -119,6 +119,55 @@ TEST(MotorControlTests, PositionModeStartMovementSelectsOp2AndPulsesStart) {
   std::filesystem::remove(configPath);
 }
 
+TEST(MotorControlTests, SpeedModeStartMovementUsesDirectionBitsWithoutStartPulse) {
+  fake_modbus::reset();
+  const auto configPath = writeMotorControlConfig("5");
+  utl::Config::instance().setConfigPath(configPath.string());
+
+  MotorControl control;
+  control.initialize();
+  control.setMode(utl::EMotor::XLeft, MotorControlMode::Speed);
+  control.setSpeed(utl::EMotor::XLeft, 1200);
+  control.setDirection(utl::EMotor::XLeft, MotorControlDirection::Reverse);
+  control.startMovement(utl::EMotor::XLeft);
+
+  const auto map = makeArKd2RegisterMap();
+  const auto inputRaw =
+      fake_modbus::getHoldingRegister(5, map.driverInputCommandLower);
+
+  const auto startBit = static_cast<std::uint16_t>(MotorInputFlag::Start);
+  const auto stopBit = static_cast<std::uint16_t>(MotorInputFlag::Stop);
+  const auto fwdBit = static_cast<std::uint16_t>(MotorInputFlag::Fwd);
+  const auto revBit = static_cast<std::uint16_t>(MotorInputFlag::Rvs);
+  EXPECT_EQ(inputRaw & startBit, 0u);
+  EXPECT_EQ(inputRaw & stopBit, 0u);
+  EXPECT_EQ(inputRaw & fwdBit, 0u);
+  EXPECT_NE(inputRaw & revBit, 0u);
+
+  std::filesystem::remove(configPath);
+}
+
+TEST(MotorControlTests, SpeedModeStopMovementClearsDriverInputCommandRegister) {
+  fake_modbus::reset();
+  const auto configPath = writeMotorControlConfig("5");
+  utl::Config::instance().setConfigPath(configPath.string());
+
+  MotorControl control;
+  control.initialize();
+  control.setMode(utl::EMotor::XLeft, MotorControlMode::Speed);
+  control.setSpeed(utl::EMotor::XLeft, 900);
+  control.setDirection(utl::EMotor::XLeft, MotorControlDirection::Forward);
+  control.startMovement(utl::EMotor::XLeft);
+  control.stopMovement(utl::EMotor::XLeft);
+
+  const auto map = makeArKd2RegisterMap();
+  const auto inputRaw =
+      fake_modbus::getHoldingRegister(5, map.driverInputCommandLower);
+  EXPECT_EQ(inputRaw, 0u);
+
+  std::filesystem::remove(configPath);
+}
+
 TEST(MotorControlTests, UnknownMotorIdIsRejectedByCommandMethods) {
   fake_modbus::reset();
   const auto configPath = writeMotorControlConfig("5");
@@ -132,4 +181,3 @@ TEST(MotorControlTests, UnknownMotorIdIsRejectedByCommandMethods) {
 
   std::filesystem::remove(configPath);
 }
-

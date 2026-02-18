@@ -2,6 +2,7 @@
 
 #include <map>
 #include <cstdint>
+#include <mutex>
 #include <optional>
 #include <string>
 #include <vector>
@@ -58,11 +59,12 @@ class RimoKunControlPolicy final : public IRobotControlPolicy {
  private:
   struct AxisConfig {
     double neutralAxisActivationThreshold{0.10};
+    double speedUpdateAxisDeltaThreshold{0.02};
     double maxLinearSpeedMmPerSec{80.0};
     double stepsPerMm{100.0};
   };
 
-  struct MotionConfig {
+ struct MotionConfig {
     AxisConfig leftArmX;
     AxisConfig leftArmY;
     AxisConfig rightArmX;
@@ -70,5 +72,29 @@ class RimoKunControlPolicy final : public IRobotControlPolicy {
     AxisConfig gantryZ;
   };
 
+  struct WarningState {
+    bool missingContecStatus{false};
+    bool missingMotorControlStatus{false};
+    bool missingControlPanelStatus{false};
+    bool contecUnavailable{false};
+    bool motorControlUnavailable{false};
+    bool controlPanelUnavailable{false};
+    bool missingInputSignals{false};
+  };
+
+  struct MotorRuntimeState {
+    bool wasActive{false};
+    bool hasLastAxis{false};
+    double lastAxis{0.0};
+    std::optional<MotorControlDirection> lastDirection;
+  };
+
+  void warnOnce(bool& flag, const std::string& message) const;
+  void setWarningFlag(bool& flag, bool value) const;
+
   MotionConfig _motion;
+  mutable WarningState _warningState;
+  mutable std::mutex _warningMutex;
+  mutable std::map<utl::EMotor, MotorRuntimeState> _motorRuntime;
+  mutable std::mutex _runtimeMutex;
 };

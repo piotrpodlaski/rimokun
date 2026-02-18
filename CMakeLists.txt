@@ -17,6 +17,7 @@ option(ENABLE_PROFILING
        "Enable profiler-friendly instrumentation (debug symbols + frame pointers)" OFF)
 
 include(FetchContent)
+set(FETCHCONTENT_UPDATES_DISCONNECTED ON)
 FetchContent_Declare(
         yaml-cpp
         GIT_REPOSITORY https://github.com/jbeder/yaml-cpp.git
@@ -45,6 +46,14 @@ FetchContent_Declare(
         GIT_REPOSITORY https://github.com/p-ranav/argparse.git
         GIT_TAG v3.2
 )
+find_package(nlohmann_json CONFIG QUIET)
+if (NOT nlohmann_json_FOUND)
+    FetchContent_Declare(
+            nlohmann_json
+            GIT_REPOSITORY https://github.com/nlohmann/json.git
+            GIT_TAG v3.11.3
+    )
+endif ()
 option(CPPZMQ_BUILD_TESTS OFF)
 if (BUILD_TESTING)
     FetchContent_Declare(
@@ -55,6 +64,9 @@ if (BUILD_TESTING)
     set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
 endif()
 FetchContent_MakeAvailable(yaml-cpp magic_enum cppzmq spdlog argparse)
+if (NOT nlohmann_json_FOUND)
+    FetchContent_MakeAvailable(nlohmann_json)
+endif ()
 if (BUILD_TESTING)
     FetchContent_MakeAvailable(googletest)
 endif()

@@ -1,15 +1,16 @@
 #pragma once
 
 #include <thread>
+#include <vector>
 #include <zmq.hpp>
 
 #include "Config.hpp"
+#include "JsonExtensions.hpp"
 #include "Logger.hpp"
-#include "YamlExtensions.hpp"
 
 namespace utl {
 
-template <YAML::YamlConvertible T>
+template <typename T>
 class RimoServer {
  public:
   RimoServer() {
@@ -33,11 +34,9 @@ class RimoServer {
   }
   ~RimoServer() = default;
   void publish(const T &robot) {
-    const auto node = YAML::convert<T>::encode(robot);
-    const auto yaml_str = YAML::Dump(node);
-    zmq::message_t msg(yaml_str);
-    _statusSocket.send(msg, zmq::send_flags::none);
-    SPDLOG_TRACE("RobotStatus: \n {}", yaml_str);
+    const auto json = nlohmann::json(robot);
+    const auto payload = nlohmann::json::to_msgpack(json);
+    _statusSocket.send(zmq::buffer(payload), zmq::send_flags::none);
   }
 
   std::optional<YAML::Node> receiveCommand() {
@@ -46,11 +45,27 @@ class RimoServer {
       SPDLOG_TRACE("Timeout waiting for message from RimoClient...");
       return std::nullopt;
     }
-    return YAML::Load(msg.to_string());
+    try {
+      const auto json = nlohmann::json::from_msgpack(
+          static_cast<const std::uint8_t*>(msg.data()),
+          static_cast<const std::uint8_t*>(msg.data()) + msg.size());
+      return jsonToYamlNode(json);
+    } catch (const std::exception& e) {
+      SPDLOG_WARN("Invalid command payload format: {}", e.what());
+      return std::nullopt;
+    }
   }
 
   void sendResponse(const YAML::Node &response) {
-    _commandSocket.send(zmq::buffer(YAML::Dump(response)));
+    try {
+      const auto json = yamlNodeToJson(response);
+      const auto payload = nlohmann::json::to_msgpack(json);
+      _commandSocket.send(zmq::buffer(payload), zmq::send_flags::none);
+    } catch (const std::exception& e) {
+      SPDLOG_ERROR("Failed to serialize command response: {}", e.what());
+      _commandSocket.send(zmq::buffer(std::vector<std::uint8_t>{}),
+                          zmq::send_flags::none);
+    }
   }
 
  private:

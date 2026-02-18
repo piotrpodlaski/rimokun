@@ -34,7 +34,7 @@ void validateCurrentRange(const std::int32_t current, const std::string_view fie
                           const std::string_view motorName) {
   if (current < kMinCurrent || current > kMaxCurrent) {
     throw std::runtime_error(std::format(
-        "MotorControl.motorCurrents.{}.{} must be in range {}..{} (got {})",
+        "MotorControl.motors.{}.{} must be in range {}..{} (got {})",
         motorName, field, kMinCurrent, kMaxCurrent, current));
   }
 }
@@ -50,13 +50,11 @@ MotorControl::MotorControl() {
     throw std::runtime_error(
         std::format("Unsupported MotorControl model '{}'", model));
   }
-  _rtuConfig.device = cfg.getOptional<std::string>("MotorControl", "device", "");
-  _rtuConfig.baud = cfg.getOptional<int>("MotorControl", "baud", 9600);
-  const auto parity =
-      cfg.getOptional<std::string>("MotorControl", "parity", "N");
-  _rtuConfig.parity = parity.empty() ? 'N' : parity.front();
-  _rtuConfig.dataBits = cfg.getOptional<int>("MotorControl", "dataBits", 8);
-  _rtuConfig.stopBits = cfg.getOptional<int>("MotorControl", "stopBits", 1);
+  _rtuConfig.device.clear();
+  _rtuConfig.baud = 9600;
+  _rtuConfig.parity = 'N';
+  _rtuConfig.dataBits = 8;
+  _rtuConfig.stopBits = 1;
   _rtuConfig.responseTimeoutMS =
       cfg.getOptional<unsigned>("MotorControl", "responseTimeoutMS", 1000u);
   _rtuConfig.connectTimeoutMS =
@@ -64,70 +62,67 @@ MotorControl::MotorControl() {
 
   const auto motorCfg = cfg.getClassConfig("MotorControl");
   const auto transportCfg = motorCfg["transport"];
-  if (transportCfg && transportCfg.IsMap()) {
-    const auto type = transportCfg["type"].as<std::string>("rawTcpRtu");
-    if (type == "rawTcpRtu" || type == "rtuTcpRaw" || type == "tcpRawRtu") {
-      _transportType = TransportType::RawTcpRtu;
-      const auto tcpCfg = transportCfg["tcp"];
-      if (!tcpCfg || !tcpCfg.IsMap()) {
-        throw std::runtime_error(
-            "MotorControl.transport.tcp is required for rawTcpRtu transport.");
-      }
-      _rawTcpConfig.host = tcpCfg["host"].as<std::string>();
-      _rawTcpConfig.port = tcpCfg["port"].as<int>();
-    } else if (type == "serialRtu" || type == "serial" || type == "rtuSerial") {
-      _transportType = TransportType::SerialRtu;
-      const auto serialCfg = transportCfg["serial"];
-      if (!serialCfg || !serialCfg.IsMap()) {
-        throw std::runtime_error(
-            "MotorControl.transport.serial is required for serialRtu transport.");
-      }
-      _rtuConfig.device = serialCfg["device"].as<std::string>();
-      _rtuConfig.baud = serialCfg["baud"].as<int>(9600);
-      const auto parity = serialCfg["parity"].as<std::string>("N");
-      _rtuConfig.parity = parity.empty() ? 'N' : parity.front();
-      _rtuConfig.dataBits = serialCfg["dataBits"].as<int>(8);
-      _rtuConfig.stopBits = serialCfg["stopBits"].as<int>(1);
-    } else {
+  if (!transportCfg || !transportCfg.IsMap()) {
+    throw std::runtime_error(
+        "MotorControl.transport map is required (type + tcp/serial settings).");
+  }
+  const auto type = transportCfg["type"].as<std::string>("rawTcpRtu");
+  if (type == "rawTcpRtu") {
+    _transportType = TransportType::RawTcpRtu;
+    const auto tcpCfg = transportCfg["tcp"];
+    if (!tcpCfg || !tcpCfg.IsMap()) {
       throw std::runtime_error(
-          std::format("Unsupported MotorControl transport type '{}'", type));
+          "MotorControl.transport.tcp is required for rawTcpRtu transport.");
     }
-  } else {
-    // Legacy config path: keep existing serial keys behavior.
+    _rawTcpConfig.host = tcpCfg["host"].as<std::string>();
+    _rawTcpConfig.port = tcpCfg["port"].as<int>();
+  } else if (type == "serialRtu") {
     _transportType = TransportType::SerialRtu;
-    if (_rtuConfig.device.empty()) {
+    const auto serialCfg = transportCfg["serial"];
+    if (!serialCfg || !serialCfg.IsMap()) {
       throw std::runtime_error(
-          "MotorControl.device is required when using legacy serial config.");
+          "MotorControl.transport.serial is required for serialRtu transport.");
     }
+    _rtuConfig.device = serialCfg["device"].as<std::string>();
+    _rtuConfig.baud = serialCfg["baud"].as<int>(9600);
+    const auto parity = serialCfg["parity"].as<std::string>("N");
+    _rtuConfig.parity = parity.empty() ? 'N' : parity.front();
+    _rtuConfig.dataBits = serialCfg["dataBits"].as<int>(8);
+    _rtuConfig.stopBits = serialCfg["stopBits"].as<int>(1);
+  } else {
+    throw std::runtime_error(
+        std::format("Unsupported MotorControl transport type '{}'", type));
   }
 
-  _motorAddresses = cfg.getRequired<std::map<utl::EMotor, int>>(
-      "MotorControl", "motorAddresses");
-
-  for (const auto& [motorId, _] : _motorAddresses) {
-    _motorCurrents[motorId] = MotorCurrentConfig{
-        .runCurrent = kDefaultRunCurrent, .stopCurrent = kDefaultStopCurrent};
+  _motorConfigs.clear();
+  const auto motorsNode = motorCfg["motors"];
+  if (!motorsNode || !motorsNode.IsMap()) {
+    throw std::runtime_error(
+        "MotorControl.motors map is required (per motor: address, runCurrent, stopCurrent).");
   }
-
-  const auto motorCurrentsNode = motorCfg["motorCurrents"];
-  if (motorCurrentsNode && motorCurrentsNode.IsMap()) {
-    for (const auto& kv : motorCurrentsNode) {
-      auto motorId = kv.first.as<utl::EMotor>();
-      const auto entry = kv.second;
-      if (!entry || !entry.IsMap()) {
-        throw std::runtime_error(std::format(
-            "MotorControl.motorCurrents.{} must be a map with runCurrent/stopCurrent",
-            magic_enum::enum_name(motorId)));
-      }
-      auto runCurrent = entry["runCurrent"].as<std::int32_t>(kDefaultRunCurrent);
-      auto stopCurrent =
-          entry["stopCurrent"].as<std::int32_t>(kDefaultStopCurrent);
-      validateCurrentRange(runCurrent, "runCurrent", magic_enum::enum_name(motorId));
-      validateCurrentRange(stopCurrent, "stopCurrent",
-                           magic_enum::enum_name(motorId));
-      _motorCurrents[motorId] = MotorCurrentConfig{
-          .runCurrent = runCurrent, .stopCurrent = stopCurrent};
+  for (const auto& kv : motorsNode) {
+    const auto motorId = kv.first.as<utl::EMotor>();
+    const auto entry = kv.second;
+    if (!entry || !entry.IsMap()) {
+      throw std::runtime_error(std::format(
+          "MotorControl.motors.{} must be a map with at least 'address'.",
+          magic_enum::enum_name(motorId)));
     }
+    const auto address = entry["address"].as<int>();
+    if (address < 0 || address > 247) {
+      throw std::runtime_error(std::format(
+          "MotorControl.motors.{}.address must be in range 0..247 (got {})",
+          magic_enum::enum_name(motorId), address));
+    }
+    const auto runCurrent =
+        entry["runCurrent"].as<std::int32_t>(kDefaultRunCurrent);
+    const auto stopCurrent =
+        entry["stopCurrent"].as<std::int32_t>(kDefaultStopCurrent);
+    validateCurrentRange(runCurrent, "runCurrent", magic_enum::enum_name(motorId));
+    validateCurrentRange(stopCurrent, "stopCurrent",
+                         magic_enum::enum_name(motorId));
+    _motorConfigs[motorId] = MotorConfig{
+        .address = address, .runCurrent = runCurrent, .stopCurrent = stopCurrent};
   }
 }
 
@@ -179,25 +174,16 @@ void MotorControl::initialize() {
       throw std::runtime_error(msg);
     }
 
-    for (const auto& [motorId, address] : _motorAddresses) {
-      if (address < 0 || address > 247) {
-        auto msg = std::format("Invalid Modbus slave address {} for motor {}",
-                               address, magic_enum::enum_name(motorId));
-        SPDLOG_ERROR(msg);
-        throw std::runtime_error(msg);
-      }
+    for (const auto& [motorId, motorCfg] : _motorConfigs) {
       auto [it, inserted] =
-          _motors.emplace(motorId, Motor(motorId, address, _registerMap));
+          _motors.emplace(motorId, Motor(motorId, motorCfg.address, _registerMap));
       (void)inserted;
       _runtime.emplace(motorId, MotorRuntimeState{});
       {
         std::lock_guard<std::mutex> lock(_busMutex);
         it->second.initialize(*_bus);
-        const auto currentIt = _motorCurrents.find(motorId);
-        if (currentIt != _motorCurrents.end()) {
-          it->second.setRunCurrent(*_bus, currentIt->second.runCurrent);
-          it->second.setStopCurrent(*_bus, currentIt->second.stopCurrent);
-        }
+        it->second.setRunCurrent(*_bus, motorCfg.runCurrent);
+        it->second.setStopCurrent(*_bus, motorCfg.stopCurrent);
       }
     }
     setState(State::Normal);

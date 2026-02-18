@@ -23,8 +23,6 @@ void MachineStatusBuilder::updateAndPublish(
   status.joystics[utl::EArm::Gantry] = {
       .x = joystick.x[2], .y = joystick.y[2], .btn = joystick.b[2]};
 
-  auto inputs = readInputSignals();
-  auto outputs = readOutputSignals();
   const auto setAllToolChangerFlags = [&status](const utl::ELEDState ledState) {
     constexpr std::array flags = {
         utl::EToolChangerStatusFlags::ProxSen,
@@ -61,6 +59,9 @@ void MachineStatusBuilder::updateAndPublish(
     publish(status);
     return;
   }
+
+  auto inputs = readInputSignals();
+  auto outputs = readOutputSignals();
 
   if (inputs && inputs->contains("button1") && inputs->contains("button2")) {
     status.toolChangers[utl::EArm::Left].flags[utl::EToolChangerStatusFlags::ProxSen] =

@@ -3,6 +3,7 @@
 #include <Config.hpp>
 #include <Machine.hpp>
 #include <MachineRuntime.hpp>
+#include <JsonExtensions.hpp>
 
 #include <chrono>
 #include <filesystem>
@@ -76,19 +77,22 @@ ScopedConfig writeIntegrationConfig(
   out << "      buttonDebounceSamples: 2\n";
   out << "  MotorControl:\n";
   out << "    model: \"AR-KD2\"\n";
-  out << "    device: \"" << overrides.motorDevice << "\"\n";
-  out << "    baud: 115200\n";
-  out << "    parity: \"E\"\n";
-  out << "    dataBits: 8\n";
-  out << "    stopBits: 1\n";
+  out << "    transport:\n";
+  out << "      type: \"serialRtu\"\n";
+  out << "      serial:\n";
+  out << "        device: \"" << overrides.motorDevice << "\"\n";
+  out << "        baud: 115200\n";
+  out << "        parity: \"E\"\n";
+  out << "        dataBits: 8\n";
+  out << "        stopBits: 1\n";
   out << "    responseTimeoutMS: 1000\n";
-  out << "    motorAddresses:\n";
-  out << "      XLeft: 1\n";
-  out << "      XRight: 2\n";
-  out << "      YLeft: 3\n";
-  out << "      YRight: 4\n";
-  out << "      ZLeft: 5\n";
-  out << "      ZRight: 6\n";
+  out << "    motors:\n";
+  out << "      XLeft: { address: 1 }\n";
+  out << "      XRight: { address: 2 }\n";
+  out << "      YLeft: { address: 3 }\n";
+  out << "      YRight: { address: 4 }\n";
+  out << "      ZLeft: { address: 5 }\n";
+  out << "      ZRight: { address: 6 }\n";
   out << "  Machine:\n";
   out << "    loopIntervalMS: 10\n";
   out << "    updateIntervalMS: 50\n";
@@ -117,13 +121,17 @@ std::optional<YAML::Node> sendCommand(const std::string& address,
   req.set(zmq::sockopt::sndtimeo, static_cast<int>(timeout.count()));
   req.set(zmq::sockopt::rcvtimeo, static_cast<int>(timeout.count()));
   req.connect(address);
-  req.send(zmq::buffer(YAML::Dump(command)));
+  const auto payload = nlohmann::json::to_msgpack(utl::yamlNodeToJson(command));
+  req.send(zmq::buffer(payload));
 
   zmq::message_t reply;
   if (!req.recv(reply)) {
     return std::nullopt;
   }
-  return YAML::Load(reply.to_string());
+  const auto json = nlohmann::json::from_msgpack(
+      static_cast<const std::uint8_t*>(reply.data()),
+      static_cast<const std::uint8_t*>(reply.data()) + reply.size());
+  return utl::jsonToYamlNode(json);
 }
 
 class StatusSubscriber {
@@ -141,7 +149,10 @@ class StatusSubscriber {
     if (!_socket.recv(msg)) {
       return std::nullopt;
     }
-    return YAML::Load(msg.to_string()).as<utl::RobotStatus>();
+    const auto json = nlohmann::json::from_msgpack(
+        static_cast<const std::uint8_t*>(msg.data()),
+        static_cast<const std::uint8_t*>(msg.data()) + msg.size());
+    return json.get<utl::RobotStatus>();
   }
 
  private:

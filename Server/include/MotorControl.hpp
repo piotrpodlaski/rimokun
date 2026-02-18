@@ -84,11 +84,17 @@ class MotorControl final : public MachineComponent {
     int port{0};
   };
 
+  struct MotorConfig {
+    int address{1};
+    std::int32_t runCurrent{1000};
+    std::int32_t stopCurrent{500};
+  };
+
   TransportType _transportType{TransportType::RawTcpRtu};
   MotorRtuConfig _rtuConfig;
   MotorRawTcpConfig _rawTcpConfig;
   MotorRegisterMap _registerMap;
-  std::map<utl::EMotor, int> _motorAddresses;
+  std::map<utl::EMotor, MotorConfig> _motorConfigs;
   std::map<utl::EMotor, Motor> _motors;
 
   struct MotorRuntimeState {
@@ -101,12 +107,7 @@ class MotorControl final : public MachineComponent {
     bool speedPairPrepared{false};
     bool positionPrepared{false};
   };
-  struct MotorCurrentConfig {
-    std::int32_t runCurrent{0};
-    std::int32_t stopCurrent{0};
-  };
   std::map<utl::EMotor, MotorRuntimeState> _runtime;
-  std::map<utl::EMotor, MotorCurrentConfig> _motorCurrents;
 
   std::optional<ModbusClient> _bus;
   std::mutex _busMutex;

@@ -24,14 +24,18 @@ std::filesystem::path writeMotorControlConfig(const std::string& motorAddressVal
   out << "classes:\n";
   out << "  MotorControl:\n";
   out << "    model: \"AR-KD2\"\n";
-  out << "    device: \"/dev/fake\"\n";
-  out << "    baud: 115200\n";
-  out << "    parity: \"N\"\n";
-  out << "    dataBits: 8\n";
-  out << "    stopBits: 1\n";
+  out << "    transport:\n";
+  out << "      type: \"serialRtu\"\n";
+  out << "      serial:\n";
+  out << "        device: \"/dev/fake\"\n";
+  out << "        baud: 115200\n";
+  out << "        parity: \"N\"\n";
+  out << "        dataBits: 8\n";
+  out << "        stopBits: 1\n";
   out << "    responseTimeoutMS: 1000\n";
-  out << "    motorAddresses:\n";
-  out << "      XLeft: " << motorAddressValue << "\n";
+  out << "    motors:\n";
+  out << "      XLeft:\n";
+  out << "        address: " << motorAddressValue << "\n";
   out.close();
 
   return path;
@@ -50,16 +54,18 @@ std::filesystem::path writeMotorControlConfigWithCurrents(
   out << "classes:\n";
   out << "  MotorControl:\n";
   out << "    model: \"AR-KD2\"\n";
-  out << "    device: \"/dev/fake\"\n";
-  out << "    baud: 115200\n";
-  out << "    parity: \"N\"\n";
-  out << "    dataBits: 8\n";
-  out << "    stopBits: 1\n";
+  out << "    transport:\n";
+  out << "      type: \"serialRtu\"\n";
+  out << "      serial:\n";
+  out << "        device: \"/dev/fake\"\n";
+  out << "        baud: 115200\n";
+  out << "        parity: \"N\"\n";
+  out << "        dataBits: 8\n";
+  out << "        stopBits: 1\n";
   out << "    responseTimeoutMS: 1000\n";
-  out << "    motorAddresses:\n";
-  out << "      XLeft: " << motorAddressValue << "\n";
-  out << "    motorCurrents:\n";
+  out << "    motors:\n";
   out << "      XLeft:\n";
+  out << "        address: " << motorAddressValue << "\n";
   out << "        runCurrent: " << runCurrent << "\n";
   out << "        stopCurrent: " << stopCurrent << "\n";
   out.close();
@@ -96,10 +102,7 @@ TEST(MotorControlTests, InitializeFailsAndSetsErrorWhenAddressOutOfRange) {
   const auto configPath = writeMotorControlConfig("248");
   utl::Config::instance().setConfigPath(configPath.string());
 
-  MotorControl control;
-  EXPECT_THROW(control.initialize(), std::runtime_error);
-  EXPECT_EQ(control.state(), MachineComponent::State::Error);
-  EXPECT_TRUE(control.motors().empty());
+  EXPECT_THROW((void)MotorControl(), std::runtime_error);
 
   std::filesystem::remove(configPath);
 }

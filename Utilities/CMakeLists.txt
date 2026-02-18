@@ -8,4 +8,5 @@ target_include_directories(utilities
         ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-target_link_libraries(utilities PUBLIC magic_enum cppzmq spdlog argparse yaml-cpp)
+target_link_libraries(utilities PUBLIC magic_enum cppzmq spdlog argparse yaml-cpp
+        nlohmann_json::nlohmann_json)

@@ -4,12 +4,12 @@
 #include <optional>
 
 #include "Config.hpp"
-#include "YamlExtensions.hpp"
+#include "JsonExtensions.hpp"
 #include "zmq.hpp"
 
 namespace utl {
 
-template <YAML::YamlConvertible T>
+template <typename T>
 class RimoClient {
  public:
   RimoClient() = default;
@@ -46,17 +46,23 @@ class RimoClient {
           "running!");
       return std::nullopt;
     }
-    const auto msg_str = message.to_string();
-    SPDLOG_TRACE("message:\n{}", msg_str);
-    return YAML::Load(msg_str).as<T>();
+    try {
+      const auto json = nlohmann::json::from_msgpack(
+          static_cast<const std::uint8_t*>(message.data()),
+          static_cast<const std::uint8_t*>(message.data()) + message.size());
+      return json.get<T>();
+    } catch (const std::exception& e) {
+      SPDLOG_WARN("Failed to decode status message: {}", e.what());
+      return std::nullopt;
+    }
   }
 
   [[nodiscard]] std::optional<YAML::Node> sendCommand(
       const YAML::Node& command) {
-    auto commandStr = YAML::Dump(command);
-    SPDLOG_INFO("Sending command:\n{}", commandStr);
+    const auto commandJson = yamlNodeToJson(command);
+    const auto commandPayload = nlohmann::json::to_msgpack(commandJson);
 
-    if (const auto status = _commandSocket.send(zmq::buffer(commandStr));
+    if (const auto status = _commandSocket.send(zmq::buffer(commandPayload));
         !status) {
       SPDLOG_ERROR("Communication with command server impossible!");
       return std::nullopt;
@@ -74,8 +80,15 @@ class RimoClient {
       _commandSocket.connect(_commandAddress);
       return std::nullopt;
     }
-    SPDLOG_INFO("Got response:\n{}", response.to_string());
-    return YAML::Load(response.to_string());
+    try {
+      const auto json = nlohmann::json::from_msgpack(
+          static_cast<const std::uint8_t*>(response.data()),
+          static_cast<const std::uint8_t*>(response.data()) + response.size());
+      return jsonToYamlNode(json);
+    } catch (const std::exception& e) {
+      SPDLOG_ERROR("Failed to decode command response: {}", e.what());
+      return std::nullopt;
+    }
   }
 
  private:

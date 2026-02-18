@@ -40,6 +40,7 @@ class MainWindow : public QMainWindow {
   std::unique_ptr<ToolChangerPresenter> _leftToolChangerPresenter;
   std::unique_ptr<ToolChangerPresenter> _rightToolChangerPresenter;
   std::unique_ptr<ResetControlsPresenter> _resetControlsPresenter;
+  std::shared_ptr<spdlog::logger> _previousDefaultLogger;
   std::shared_ptr<spdlog::logger> _logger;
   std::shared_ptr<spdlog::sinks::stdout_color_sink_mt> _consoleSink;
   std::shared_ptr<QtLogSink> _qtSink;

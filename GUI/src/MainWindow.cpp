@@ -68,6 +68,8 @@ MainWindow::MainWindow(QWidget* parent)
   _logger = std::make_shared<spdlog::logger>(
       "gui", spdlog::sinks_init_list{_consoleSink, _qtSink});
   spdlog::register_logger(_logger);
+  _previousDefaultLogger = spdlog::default_logger();
+  spdlog::set_default_logger(_logger);
   utl::configureLogger();
   LedIndicator::initBlinkTimer();
 
@@ -83,7 +85,11 @@ MainWindow::MainWindow(QWidget* parent)
 
 MainWindow::~MainWindow() {
   _updater.stopUpdaterThread();
+  if (_previousDefaultLogger) {
+    spdlog::set_default_logger(_previousDefaultLogger);
+  }
   spdlog::drop("gui");
+  _previousDefaultLogger.reset();
   _logger.reset();
   _qtSink.reset();
   _consoleSink.reset();

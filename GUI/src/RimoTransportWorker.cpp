@@ -1,6 +1,6 @@
 #include "RimoTransportWorker.hpp"
 
-#include "GuiCommandYamlAdapter.hpp"
+#include "GuiCommandJsonAdapter.hpp"
 #include "Logger.hpp"
 
 namespace {
@@ -10,7 +10,8 @@ class ZmqRimoGuiClient final : public IRimoGuiClient {
   std::optional<utl::RobotStatus> receiveRobotStatus() override {
     return _client.receiveRobotStatus();
   }
-  std::optional<YAML::Node> sendCommand(const YAML::Node& command) override {
+  std::optional<nlohmann::json> sendCommand(
+      const nlohmann::json& command) override {
     return _client.sendCommand(command);
   }
 
@@ -88,12 +89,12 @@ void RimoTransportWorker::processPendingCommands() {
       _pendingRequests.pop();
     }
 
-    const auto yamlCommand = GuiCommandYamlAdapter::toYaml(request.command);
-    const auto rawResult = _client->sendCommand(yamlCommand);
+    const auto jsonCommand = GuiCommandJsonAdapter::toJson(request.command);
+    const auto rawResult = _client->sendCommand(jsonCommand);
     ResponseEvent responseEvent;
     responseEvent.id = request.id;
     if (rawResult) {
-      responseEvent.response = GuiCommandYamlAdapter::fromYaml(*rawResult);
+      responseEvent.response = GuiCommandJsonAdapter::fromJson(*rawResult);
     } else {
       responseEvent.response = std::nullopt;
     }

@@ -37,7 +37,6 @@ target_link_libraries(rimokunControl PRIVATE
         magic_enum
         utilities
         cppzmq
-        yaml-cpp::yaml-cpp
         spdlog
         argparse
 )

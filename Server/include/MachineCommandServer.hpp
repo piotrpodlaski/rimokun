@@ -10,16 +10,16 @@
 class ICommandChannel {
  public:
   virtual ~ICommandChannel() = default;
-  virtual std::optional<YAML::Node> receiveCommand() = 0;
-  virtual void sendResponse(const YAML::Node& response) = 0;
+  virtual std::optional<nlohmann::json> receiveCommand() = 0;
+  virtual void sendResponse(const nlohmann::json& response) = 0;
 };
 
 class RimoServerCommandChannel final : public ICommandChannel {
  public:
   explicit RimoServerCommandChannel(utl::RimoServer<utl::RobotStatus>& server);
 
-  std::optional<YAML::Node> receiveCommand() override;
-  void sendResponse(const YAML::Node& response) override;
+  std::optional<nlohmann::json> receiveCommand() override;
+  void sendResponse(const nlohmann::json& response) override;
 
  private:
   utl::RimoServer<utl::RobotStatus>& _server;

@@ -9,6 +9,7 @@
 #include <thread>
 
 #include "Config.hpp"
+#include "JsonExtensions.hpp"
 #include "Logger.hpp"
 #include "RimoServer.hpp"
 #include "argparse/argparse.hpp"
@@ -123,48 +124,41 @@ void applyToolChangerAction(EArm position, std::string_view action) {
   }
 }
 
-std::string validateAction(const YAML::Node& command) {
-  const auto actionNode = command["action"];
-  if (!actionNode || !actionNode.IsScalar()) {
+std::string validateAction(const nlohmann::json& command) {
+  if (!command.contains("action") || !command.at("action").is_string()) {
     throw std::runtime_error("Missing or invalid 'action' entry");
   }
-  const auto action = actionNode.as<std::string>();
+  const auto action = command.at("action").get<std::string>();
   if (action != "open" && action != "close") {
     throw std::runtime_error("Unsupported tool changer action: " + action);
   }
   return action;
 }
 
-EArm validatePosition(const YAML::Node& command) {
-  const auto positionNode = command["position"];
-  if (!positionNode || !positionNode.IsScalar()) {
+EArm validatePosition(const nlohmann::json& command) {
+  if (!command.contains("position") || !command.at("position").is_string()) {
     throw std::runtime_error("Missing or invalid 'position' entry");
   }
-  try {
-    return positionNode.as<EArm>();
-  } catch (const YAML::Exception& ex) {
-    throw std::runtime_error(
-        std::string("Failed to parse 'position' entry: ") + ex.what());
-  }
+  return utl::stringToEnum<EArm>(command.at("position").get<std::string>());
 }
 }  // namespace
 
 [[noreturn]] void handleCommands(RimoServer<RobotStatus>& srv) {
   while (true) {
     if (auto command = srv.receiveCommand()) {
-      SPDLOG_INFO("Received command:\n{}", YAML::Dump(*command));
-      YAML::Node response;
-      response["status"] = "OK";
-      response["message"] = "";
+      SPDLOG_INFO("Received command: {}", command->dump());
+      nlohmann::json response{
+          {"status", "OK"},
+          {"message", ""},
+      };
       try {
-        if (!command->IsMap()) {
+        if (!command->is_object()) {
           throw std::runtime_error("Command must be a map");
         }
-        const auto typeNode = (*command)["type"];
-        if (!typeNode || !typeNode.IsScalar()) {
+        if (!command->contains("type") || !command->at("type").is_string()) {
           throw std::runtime_error("Command lacks a valid 'type' entry");
         }
-        const auto type = typeNode.as<std::string>();
+        const auto type = command->at("type").get<std::string>();
         if (type == "toolChanger") {
           const auto position = validatePosition(*command);
           const auto action = validateAction(*command);

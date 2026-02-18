@@ -11,14 +11,15 @@
 #include "ITransportWorker.hpp"
 #include "GuiCommand.hpp"
 #include "RimoClient.hpp"
-#include "yaml-cpp/yaml.h"
+#include "nlohmann/json.hpp"
 
 class IRimoGuiClient {
  public:
   virtual ~IRimoGuiClient() = default;
   virtual void init() = 0;
   virtual std::optional<utl::RobotStatus> receiveRobotStatus() = 0;
-  virtual std::optional<YAML::Node> sendCommand(const YAML::Node& command) = 0;
+  virtual std::optional<nlohmann::json> sendCommand(
+      const nlohmann::json& command) = 0;
 };
 
 class RimoTransportWorker final : public ITransportWorker {

@@ -33,8 +33,9 @@ void AuxControls::handleButtons() {
     command.payload = GuiReconnectCommand{.component = utl::ERobotComponent::Contec};
   }
   else if (sender == _ui->disableButton) {
-    YAML::Node raw;
-    raw["type"] = "disableMotors";
+    nlohmann::json raw{
+        {"type", "disableMotors"},
+    };
     command.payload = GuiRawCommand{.node = raw};
   }
   else

@@ -1,29 +1,31 @@
 #include "MachineCommandProcessor.hpp"
 
+#include <JsonExtensions.hpp>
+
 #include <format>
 
 using namespace std::chrono_literals;
 
-YAML::Node MachineCommandProcessor::processCommand(const YAML::Node& command,
-                                                   const DispatchFn& dispatch) const {
-  YAML::Node response;
-  response["status"] = "OK";
-  response["message"] = "";
-  if (!command.IsMap()) {
+nlohmann::json MachineCommandProcessor::processCommand(
+    const nlohmann::json& command, const DispatchFn& dispatch) const {
+  nlohmann::json response{
+      {"status", "OK"},
+      {"message", ""},
+  };
+  if (!command.is_object()) {
     response["status"] = "Error";
     response["message"] = "Command must be a map! Ignoring!";
     return response;
   }
-  const auto typeNode = command["type"];
-  if (!typeNode || !typeNode.IsScalar()) {
+  if (!command.contains("type") || !command.at("type").is_string()) {
     response["status"] = "Error";
     response["message"] = "Command lacks a valid 'type' entry! Ignoring!";
     return response;
   }
 
-  const auto type = typeNode.as<std::string>();
+  const auto type = command.at("type").get<std::string>();
   if (type == "toolChanger") {
-    if (!command["position"] || !command["action"]) {
+    if (!command.contains("position") || !command.contains("action")) {
       response["status"] = "Error";
       response["message"] =
           "toolChanger command requires both 'position' and 'action'.";
@@ -32,8 +34,8 @@ YAML::Node MachineCommandProcessor::processCommand(const YAML::Node& command,
     try {
       cmd::Command c;
       c.payload = cmd::ToolChangerCommand(
-          command["position"].as<utl::EArm>(),
-          command["action"].as<utl::EToolChangerAction>());
+          utl::enumFromJsonStringField<utl::EArm>(command, "position"),
+          utl::enumFromJsonStringField<utl::EToolChangerAction>(command, "action"));
       const auto reply = dispatch(std::move(c), 2s);
       if (!reply.empty()) {
         response["status"] = "Error";
@@ -47,14 +49,15 @@ YAML::Node MachineCommandProcessor::processCommand(const YAML::Node& command,
   }
 
   if (type == "reset") {
-    if (!command["system"]) {
+    if (!command.contains("system")) {
       response["status"] = "Error";
       response["message"] = "reset command requires a 'system' field.";
       return response;
     }
     try {
       cmd::Command c;
-      c.payload = cmd::ReconnectCommand(command["system"].as<utl::ERobotComponent>());
+      c.payload = cmd::ReconnectCommand(
+          utl::enumFromJsonStringField<utl::ERobotComponent>(command, "system"));
       const auto reply = dispatch(std::move(c), 2s);
       if (!reply.empty()) {
         response["status"] = "Error";

@@ -76,11 +76,11 @@ gtest_discover_tests(motor_unit_tests PROPERTIES LABELS "unit")
 find_package(Qt6 COMPONENTS Core Gui Widgets Test REQUIRED)
 
 add_executable(gui_glue_unit_tests
-        gui/GuiCommandYamlAdapterTests.cpp
+        gui/GuiCommandJsonAdapterTests.cpp
         gui/RobotStatusViewModelTests.cpp
         gui/UpdaterCoordinationTests.cpp
         gui/RimoTransportWorkerTests.cpp
-        ${CMAKE_SOURCE_DIR}/GUI/src/GuiCommandYamlAdapter.cpp
+        ${CMAKE_SOURCE_DIR}/GUI/src/GuiCommandJsonAdapter.cpp
         ${CMAKE_SOURCE_DIR}/GUI/src/RobotStatusViewModel.cpp
         ${CMAKE_SOURCE_DIR}/GUI/src/Updater.cpp
         ${CMAKE_SOURCE_DIR}/GUI/src/RimoTransportWorker.cpp
@@ -98,7 +98,6 @@ target_include_directories(gui_glue_unit_tests
 target_link_libraries(gui_glue_unit_tests
         PRIVATE
         utilities
-        yaml-cpp::yaml-cpp
         cppzmq
         Qt6::Core
         Qt6::Gui

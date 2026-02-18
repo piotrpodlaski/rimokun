@@ -7,6 +7,7 @@
 #include "Config.hpp"
 #include "JsonExtensions.hpp"
 #include "Logger.hpp"
+#include "nlohmann/json.hpp"
 
 namespace utl {
 
@@ -39,7 +40,7 @@ class RimoServer {
     _statusSocket.send(zmq::buffer(payload), zmq::send_flags::none);
   }
 
-  std::optional<YAML::Node> receiveCommand() {
+  std::optional<nlohmann::json> receiveCommand() {
     zmq::message_t msg;
     if (const auto status = _commandSocket.recv(msg); !status) {
       SPDLOG_TRACE("Timeout waiting for message from RimoClient...");
@@ -49,17 +50,16 @@ class RimoServer {
       const auto json = nlohmann::json::from_msgpack(
           static_cast<const std::uint8_t*>(msg.data()),
           static_cast<const std::uint8_t*>(msg.data()) + msg.size());
-      return jsonToYamlNode(json);
+      return json;
     } catch (const std::exception& e) {
       SPDLOG_WARN("Invalid command payload format: {}", e.what());
       return std::nullopt;
     }
   }
 
-  void sendResponse(const YAML::Node &response) {
+  void sendResponse(const nlohmann::json& response) {
     try {
-      const auto json = yamlNodeToJson(response);
-      const auto payload = nlohmann::json::to_msgpack(json);
+      const auto payload = nlohmann::json::to_msgpack(response);
       _commandSocket.send(zmq::buffer(payload), zmq::send_flags::none);
     } catch (const std::exception& e) {
       SPDLOG_ERROR("Failed to serialize command response: {}", e.what());

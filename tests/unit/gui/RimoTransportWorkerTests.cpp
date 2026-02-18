@@ -5,6 +5,7 @@
 #include <atomic>
 #include <condition_variable>
 #include <mutex>
+#include <nlohmann/json.hpp>
 #include <thread>
 
 namespace {
@@ -22,7 +23,8 @@ class FakeRimoGuiClient final : public IRimoGuiClient {
     return status;
   }
 
-  std::optional<YAML::Node> sendCommand(const YAML::Node& command) override {
+  std::optional<nlohmann::json> sendCommand(
+      const nlohmann::json& command) override {
     std::lock_guard<std::mutex> lock(mutex);
     sentCommands.push_back(command);
     if (commandResponses.empty()) {
@@ -36,8 +38,8 @@ class FakeRimoGuiClient final : public IRimoGuiClient {
   std::atomic<int> initCalls{0};
   std::mutex mutex;
   std::queue<utl::RobotStatus> statuses;
-  std::queue<YAML::Node> commandResponses;
-  std::vector<YAML::Node> sentCommands;
+  std::queue<nlohmann::json> commandResponses;
+  std::vector<nlohmann::json> sentCommands;
 };
 
 bool waitFor(const std::function<bool()>& predicate, const int timeoutMs = 500) {
@@ -81,9 +83,10 @@ TEST(RimoTransportWorkerTests, ProcessesQueuedCommandAndEmitsResponse) {
   auto fakeClient = std::make_unique<FakeRimoGuiClient>();
   auto* clientRaw = fakeClient.get();
 
-  YAML::Node responseNode;
-  responseNode["status"] = "OK";
-  responseNode["message"] = "ok";
+  nlohmann::json responseNode{
+      {"status", "OK"},
+      {"message", "ok"},
+  };
   {
     std::lock_guard<std::mutex> lock(clientRaw->mutex);
     clientRaw->commandResponses.push(responseNode);

@@ -7,6 +7,7 @@
 #include <chrono>
 #include <condition_variable>
 #include <mutex>
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <queue>
 #include <string>
@@ -20,7 +21,7 @@ class FakeCommandChannel final : public ICommandChannel {
   explicit FakeCommandChannel(const std::chrono::milliseconds receiveWait)
       : _receiveWait(receiveWait) {}
 
-  std::optional<YAML::Node> receiveCommand() override {
+  std::optional<nlohmann::json> receiveCommand() override {
     std::unique_lock<std::mutex> lock(_mutex);
     _cv.wait_for(lock, _receiveWait, [this]() { return !_commands.empty(); });
     if (_commands.empty()) {
@@ -31,7 +32,7 @@ class FakeCommandChannel final : public ICommandChannel {
     return cmd;
   }
 
-  void sendResponse(const YAML::Node& response) override {
+  void sendResponse(const nlohmann::json& response) override {
     {
       std::lock_guard<std::mutex> lock(_mutex);
       _responses.push(response);
@@ -39,7 +40,7 @@ class FakeCommandChannel final : public ICommandChannel {
     _cv.notify_all();
   }
 
-  void enqueueCommand(const YAML::Node& command) {
+  void enqueueCommand(const nlohmann::json& command) {
     {
       std::lock_guard<std::mutex> lock(_mutex);
       _commands.push(command);
@@ -47,7 +48,7 @@ class FakeCommandChannel final : public ICommandChannel {
     _cv.notify_all();
   }
 
-  std::optional<YAML::Node> popResponseWaitFor(
+  std::optional<nlohmann::json> popResponseWaitFor(
       const std::chrono::milliseconds timeout) {
     std::unique_lock<std::mutex> lock(_mutex);
     _cv.wait_for(lock, timeout, [this]() { return !_responses.empty(); });
@@ -63,8 +64,8 @@ class FakeCommandChannel final : public ICommandChannel {
   std::chrono::milliseconds _receiveWait;
   std::mutex _mutex;
   std::condition_variable _cv;
-  std::queue<YAML::Node> _commands;
-  std::queue<YAML::Node> _responses;
+  std::queue<nlohmann::json> _commands;
+  std::queue<nlohmann::json> _responses;
 };
 }  // namespace
 
@@ -86,9 +87,10 @@ TEST(MachineCommandServerTests, RespondsToCommandWithinDeadline) {
         });
   });
 
-  YAML::Node command;
-  command["type"] = "reset";
-  command["system"] = "ControlPanel";
+  nlohmann::json command{
+      {"type", "reset"},
+      {"system", "ControlPanel"},
+  };
 
   const auto start = std::chrono::steady_clock::now();
   channel.enqueueCommand(command);
@@ -96,7 +98,7 @@ TEST(MachineCommandServerTests, RespondsToCommandWithinDeadline) {
   const auto elapsed = std::chrono::steady_clock::now() - start;
 
   ASSERT_TRUE(response.has_value());
-  EXPECT_EQ((*response)["status"].as<std::string>(), "OK");
+  EXPECT_EQ((*response)["status"].get<std::string>(), "OK");
   EXPECT_TRUE(dispatched);
   EXPECT_EQ(seenTimeout, 2s);
   EXPECT_LT(elapsed, 500ms);
@@ -122,9 +124,10 @@ TEST(MachineCommandServerTests, ShutdownWhileBlockedOnReceiveExitsPromptlyWhenWo
 
   std::thread wakeThread([&]() {
     std::this_thread::sleep_for(100ms);
-    YAML::Node command;
-    command["type"] = "reset";
-    command["system"] = "ControlPanel";
+    nlohmann::json command{
+        {"type", "reset"},
+        {"system", "ControlPanel"},
+    };
     channel.enqueueCommand(command);
   });
 
@@ -151,35 +154,39 @@ TEST(MachineCommandServerTests, MalformedCommandsReturnErrorsAndLoopKeepsServing
         });
   });
 
-  YAML::Node malformedNoType;
-  malformedNoType["system"] = "ControlPanel";
+  nlohmann::json malformedNoType{
+      {"system", "ControlPanel"},
+  };
   channel.enqueueCommand(malformedNoType);
   auto r1 = channel.popResponseWaitFor(500ms);
   ASSERT_TRUE(r1.has_value());
-  EXPECT_EQ((*r1)["status"].as<std::string>(), "Error");
+  EXPECT_EQ((*r1)["status"].get<std::string>(), "Error");
 
-  YAML::Node unknownType;
-  unknownType["type"] = "nonsense";
+  nlohmann::json unknownType{
+      {"type", "nonsense"},
+  };
   channel.enqueueCommand(unknownType);
   auto r2 = channel.popResponseWaitFor(500ms);
   ASSERT_TRUE(r2.has_value());
-  EXPECT_EQ((*r2)["status"].as<std::string>(), "Error");
+  EXPECT_EQ((*r2)["status"].get<std::string>(), "Error");
 
-  YAML::Node malformedToolChanger;
-  malformedToolChanger["type"] = "toolChanger";
-  malformedToolChanger["position"] = "Left";
+  nlohmann::json malformedToolChanger{
+      {"type", "toolChanger"},
+      {"position", "Left"},
+  };
   channel.enqueueCommand(malformedToolChanger);
   auto r3 = channel.popResponseWaitFor(500ms);
   ASSERT_TRUE(r3.has_value());
-  EXPECT_EQ((*r3)["status"].as<std::string>(), "Error");
+  EXPECT_EQ((*r3)["status"].get<std::string>(), "Error");
 
-  YAML::Node valid;
-  valid["type"] = "reset";
-  valid["system"] = "ControlPanel";
+  nlohmann::json valid{
+      {"type", "reset"},
+      {"system", "ControlPanel"},
+  };
   channel.enqueueCommand(valid);
   auto r4 = channel.popResponseWaitFor(500ms);
   ASSERT_TRUE(r4.has_value());
-  EXPECT_EQ((*r4)["status"].as<std::string>(), "OK");
+  EXPECT_EQ((*r4)["status"].get<std::string>(), "OK");
   EXPECT_EQ(dispatchCalls, 1);
 
   running.store(false, std::memory_order_release);

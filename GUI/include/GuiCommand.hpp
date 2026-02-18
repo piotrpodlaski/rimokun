@@ -6,7 +6,7 @@
 #include <QMetaType>
 
 #include "CommonDefinitions.hpp"
-#include "yaml-cpp/yaml.h"
+#include "nlohmann/json.hpp"
 
 struct GuiToolChangerCommand {
   utl::EArm arm;
@@ -18,7 +18,7 @@ struct GuiReconnectCommand {
 };
 
 struct GuiRawCommand {
-  YAML::Node node;
+  nlohmann::json node;
 };
 
 struct GuiCommand {
@@ -28,7 +28,7 @@ struct GuiCommand {
 struct GuiResponse {
   bool ok{false};
   std::string message;
-  std::optional<YAML::Node> payload;
+  std::optional<nlohmann::json> payload;
 };
 
 Q_DECLARE_METATYPE(GuiCommand)

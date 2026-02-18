@@ -14,7 +14,7 @@
 #include <thread>
 #include <vector>
 
-#include <yaml-cpp/yaml.h>
+#include <nlohmann/json.hpp>
 #include <zmq.hpp>
 
 using namespace std::chrono_literals;
@@ -112,8 +112,8 @@ ScopedConfig writeIntegrationConfig(
                         .commandAddress = commandAddress}};
 }
 
-std::optional<YAML::Node> sendCommand(const std::string& address,
-                                      const YAML::Node& command,
+std::optional<nlohmann::json> sendCommand(const std::string& address,
+                                      const nlohmann::json& command,
                                       const std::chrono::milliseconds timeout =
                                           1200ms) {
   zmq::context_t context{1};
@@ -121,7 +121,7 @@ std::optional<YAML::Node> sendCommand(const std::string& address,
   req.set(zmq::sockopt::sndtimeo, static_cast<int>(timeout.count()));
   req.set(zmq::sockopt::rcvtimeo, static_cast<int>(timeout.count()));
   req.connect(address);
-  const auto payload = nlohmann::json::to_msgpack(utl::yamlNodeToJson(command));
+  const auto payload = nlohmann::json::to_msgpack(command);
   req.send(zmq::buffer(payload));
 
   zmq::message_t reply;
@@ -131,7 +131,7 @@ std::optional<YAML::Node> sendCommand(const std::string& address,
   const auto json = nlohmann::json::from_msgpack(
       static_cast<const std::uint8_t*>(reply.data()),
       static_cast<const std::uint8_t*>(reply.data()) + reply.size());
-  return utl::jsonToYamlNode(json);
+  return json;
 }
 
 class StatusSubscriber {
@@ -211,13 +211,14 @@ TEST(MachineRuntimeIntegrationTests,
     machine.initialize();
     std::this_thread::sleep_for(50ms);
 
-    YAML::Node command;
-    command["type"] = "reset";
-    command["system"] = "ControlPanel";
+    nlohmann::json command{
+        {"type", "reset"},
+        {"system", "ControlPanel"},
+    };
     const auto response = sendCommand(scoped.endpoints.commandAddress, command);
     ASSERT_TRUE(response.has_value());
-    EXPECT_TRUE((*response)["status"]);
-    EXPECT_TRUE((*response)["message"]);
+    EXPECT_TRUE(response->contains("status"));
+    EXPECT_TRUE(response->contains("message"));
 
     machine.shutdown();
 
@@ -267,12 +268,13 @@ TEST(MachineRuntimeIntegrationTests,
       machine.initialize();
       std::this_thread::sleep_for(40ms);
 
-      YAML::Node command;
-      command["type"] = "reset";
-      command["system"] = "Contec";
+      nlohmann::json command{
+          {"type", "reset"},
+          {"system", "Contec"},
+      };
       const auto response = sendCommand(scoped.endpoints.commandAddress, command);
       ASSERT_TRUE(response.has_value());
-      EXPECT_TRUE((*response)["status"]);
+      EXPECT_TRUE(response->contains("status"));
 
       machine.shutdown();
     }
@@ -294,11 +296,12 @@ TEST(MachineRuntimeIntegrationTests,
     machine.initialize();
     std::this_thread::sleep_for(50ms);
 
-    YAML::Node command;
-    command["type"] = "reset";
-    command["system"] = "MotorControl";
+    nlohmann::json command{
+        {"type", "reset"},
+        {"system", "MotorControl"},
+    };
 
-    std::optional<YAML::Node> response;
+    std::optional<nlohmann::json> response;
     std::thread requester([&] {
       response = sendCommand(scoped.endpoints.commandAddress, command, 1500ms);
     });
@@ -307,7 +310,7 @@ TEST(MachineRuntimeIntegrationTests,
     requester.join();
 
     if (response.has_value()) {
-      EXPECT_TRUE((*response)["status"]);
+      EXPECT_TRUE(response->contains("status"));
     }
 
     std::filesystem::remove(scoped.path);
@@ -330,13 +333,14 @@ TEST(MachineRuntimeIntegrationTests,
     StatusSubscriber subscriber(scoped.endpoints.statusAddress);
     machine.initialize();
 
-    YAML::Node command;
-    command["type"] = "reset";
-    command["system"] = "ControlPanel";
+    nlohmann::json command{
+        {"type", "reset"},
+        {"system", "ControlPanel"},
+    };
     const auto response = sendCommand(scoped.endpoints.commandAddress, command);
     ASSERT_TRUE(response.has_value());
-    EXPECT_TRUE((*response)["status"]);
-    EXPECT_TRUE((*response)["message"]);
+    EXPECT_TRUE(response->contains("status"));
+    EXPECT_TRUE(response->contains("message"));
 
     bool sawErrorState = false;
     const auto deadline = std::chrono::steady_clock::now() + 1500ms;
@@ -376,15 +380,17 @@ TEST(MachineRuntimeIntegrationTests,
     StatusSubscriber subscriber(scoped.endpoints.statusAddress);
     machine.initialize();
 
-    YAML::Node openCmd;
-    openCmd["type"] = "toolChanger";
-    openCmd["position"] = "Left";
-    openCmd["action"] = "Open";
+    nlohmann::json openCmd{
+        {"type", "toolChanger"},
+        {"position", "Left"},
+        {"action", "Open"},
+    };
     const auto openResponse = sendCommand(scoped.endpoints.commandAddress, openCmd);
     ASSERT_TRUE(openResponse.has_value());
-    const auto openStatus = (*openResponse)["status"].as<std::string>();
+    const auto openStatus = openResponse->at("status").get<std::string>();
     if (openStatus == "Error") {
-      const auto openMessage = (*openResponse)["message"].as<std::string>("");
+      const auto openMessage =
+          openResponse->value("message", std::string{});
       if (isContecUnavailableMessage(openMessage)) {
         machine.shutdown();
         std::filesystem::remove(scoped.path);
@@ -419,14 +425,15 @@ TEST(MachineRuntimeIntegrationTests,
     }
     EXPECT_TRUE(sawOpenState);
 
-    YAML::Node closeCmd;
-    closeCmd["type"] = "toolChanger";
-    closeCmd["position"] = "Left";
-    closeCmd["action"] = "Close";
+    nlohmann::json closeCmd{
+        {"type", "toolChanger"},
+        {"position", "Left"},
+        {"action", "Close"},
+    };
     const auto closeResponse =
         sendCommand(scoped.endpoints.commandAddress, closeCmd);
     ASSERT_TRUE(closeResponse.has_value());
-    EXPECT_EQ((*closeResponse)["status"].as<std::string>(), "OK");
+    EXPECT_EQ(closeResponse->at("status").get<std::string>(), "OK");
 
     bool sawCloseState = false;
     const auto closeDeadline = std::chrono::steady_clock::now() + 1500ms;
@@ -478,9 +485,10 @@ TEST(MachineRuntimeIntegrationTests,
     for (int i = 0; i < 4; ++i) {
       requesters.emplace_back([&] {
         while (keepSending.load(std::memory_order_acquire)) {
-          YAML::Node command;
-          command["type"] = "reset";
-          command["system"] = "Contec";
+          nlohmann::json command{
+              {"type", "reset"},
+              {"system", "Contec"},
+          };
           auto response =
               sendCommand(scoped.endpoints.commandAddress, command, 250ms);
           if (response.has_value()) {

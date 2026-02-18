@@ -6,11 +6,11 @@ RimoServerCommandChannel::RimoServerCommandChannel(
     utl::RimoServer<utl::RobotStatus>& server)
     : _server(server) {}
 
-std::optional<YAML::Node> RimoServerCommandChannel::receiveCommand() {
+std::optional<nlohmann::json> RimoServerCommandChannel::receiveCommand() {
   return _server.receiveCommand();
 }
 
-void RimoServerCommandChannel::sendResponse(const YAML::Node& response) {
+void RimoServerCommandChannel::sendResponse(const nlohmann::json& response) {
   _server.sendResponse(response);
 }
 
@@ -33,7 +33,7 @@ void MachineCommandServer::runLoop(
     if (!command) {
       continue;
     }
-    SPDLOG_INFO("Received command:\n{}", YAML::Dump(*command));
+    SPDLOG_INFO("Received command: {}", command->dump());
     const auto response = _processor.processCommand(*command, dispatch);
     _channel->sendResponse(response);
   }

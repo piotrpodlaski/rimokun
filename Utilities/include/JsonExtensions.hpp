@@ -13,7 +13,6 @@
 
 #include <magic_enum/magic_enum.hpp>
 #include <nlohmann/json.hpp>
-#include <yaml-cpp/yaml.h>
 
 namespace utl {
 
@@ -31,90 +30,6 @@ TEnum stringToEnum(const std::string& text) {
     throw std::runtime_error("Invalid enum value: " + text);
   }
   return *parsed;
-}
-
-inline nlohmann::json yamlScalarToJson(const YAML::Node& node) {
-  const auto scalar = node.as<std::string>();
-  if (scalar == "true" || scalar == "True" || scalar == "TRUE") {
-    return true;
-  }
-  if (scalar == "false" || scalar == "False" || scalar == "FALSE") {
-    return false;
-  }
-  std::int64_t asInt = 0;
-  {
-    const auto* begin = scalar.data();
-    const auto* end = scalar.data() + scalar.size();
-    if (auto [ptr, ec] = std::from_chars(begin, end, asInt);
-        ec == std::errc{} && ptr == end) {
-      return asInt;
-    }
-  }
-  {
-    char* parsedEnd = nullptr;
-    const double asDouble = std::strtod(scalar.c_str(), &parsedEnd);
-    if (parsedEnd == scalar.c_str() + scalar.size() && std::isfinite(asDouble)) {
-      return asDouble;
-    }
-  }
-  return scalar;
-}
-
-inline nlohmann::json yamlNodeToJson(const YAML::Node& node) {
-  if (!node || !node.IsDefined()) {
-    return nullptr;
-  }
-  if (node.IsMap()) {
-    nlohmann::json out = nlohmann::json::object();
-    for (const auto& kv : node) {
-      out[kv.first.as<std::string>()] = yamlNodeToJson(kv.second);
-    }
-    return out;
-  }
-  if (node.IsSequence()) {
-    nlohmann::json out = nlohmann::json::array();
-    for (const auto& item : node) {
-      out.push_back(yamlNodeToJson(item));
-    }
-    return out;
-  }
-  if (node.IsScalar()) {
-    return yamlScalarToJson(node);
-  }
-  return nullptr;
-}
-
-inline YAML::Node jsonToYamlNode(const nlohmann::json& value) {
-  if (value.is_null()) {
-    return {};
-  }
-  if (value.is_boolean()) {
-    return YAML::Node(value.get<bool>());
-  }
-  if (value.is_number_integer()) {
-    return YAML::Node(value.get<std::int64_t>());
-  }
-  if (value.is_number_unsigned()) {
-    return YAML::Node(value.get<std::uint64_t>());
-  }
-  if (value.is_number_float()) {
-    return YAML::Node(value.get<double>());
-  }
-  if (value.is_string()) {
-    return YAML::Node(value.get<std::string>());
-  }
-  if (value.is_array()) {
-    YAML::Node out(YAML::NodeType::Sequence);
-    for (const auto& item : value) {
-      out.push_back(jsonToYamlNode(item));
-    }
-    return out;
-  }
-  YAML::Node out(YAML::NodeType::Map);
-  for (const auto& [key, item] : value.items()) {
-    out[key] = jsonToYamlNode(item);
-  }
-  return out;
 }
 
 template <typename TEnum, typename TValue>
@@ -136,6 +51,14 @@ std::map<TEnum, TValue> enumKeyedMapFromJson(const nlohmann::json& in) {
     out.emplace(stringToEnum<TEnum>(k), v.get<TValue>());
   }
   return out;
+}
+
+template <typename TEnum>
+TEnum enumFromJsonStringField(const nlohmann::json& in, const char* key) {
+  if (!in.contains(key) || !in.at(key).is_string()) {
+    throw std::runtime_error(std::string("Missing or invalid '") + key + "' entry");
+  }
+  return stringToEnum<TEnum>(in.at(key).get<std::string>());
 }
 
 }  // namespace utl

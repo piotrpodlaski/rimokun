@@ -5,6 +5,7 @@
 
 #include "Config.hpp"
 #include "JsonExtensions.hpp"
+#include "nlohmann/json.hpp"
 #include "zmq.hpp"
 
 namespace utl {
@@ -57,10 +58,9 @@ class RimoClient {
     }
   }
 
-  [[nodiscard]] std::optional<YAML::Node> sendCommand(
-      const YAML::Node& command) {
-    const auto commandJson = yamlNodeToJson(command);
-    const auto commandPayload = nlohmann::json::to_msgpack(commandJson);
+  [[nodiscard]] std::optional<nlohmann::json> sendCommand(
+      const nlohmann::json& command) {
+    const auto commandPayload = nlohmann::json::to_msgpack(command);
 
     if (const auto status = _commandSocket.send(zmq::buffer(commandPayload));
         !status) {
@@ -84,7 +84,7 @@ class RimoClient {
       const auto json = nlohmann::json::from_msgpack(
           static_cast<const std::uint8_t*>(response.data()),
           static_cast<const std::uint8_t*>(response.data()) + response.size());
-      return jsonToYamlNode(json);
+      return json;
     } catch (const std::exception& e) {
       SPDLOG_ERROR("Failed to decode command response: {}", e.what());
       return std::nullopt;

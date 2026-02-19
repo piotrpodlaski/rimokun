@@ -27,13 +27,23 @@ struct ReconnectCommand {
   utl::ERobotComponent robotComponent;
 };
 
+struct MotorDiagnosticsCommand {
+  utl::EMotor motor;
+};
+
+struct ResetMotorAlarmCommand {
+  utl::EMotor motor;
+};
+
 struct AuxCommand {
   utl::ERobotComponent robotComponent;
 };
 
 
 struct Command {
-  std::variant<ToolChangerCommand, ReconnectCommand> payload;
+  std::variant<ToolChangerCommand, ReconnectCommand, MotorDiagnosticsCommand,
+               ResetMotorAlarmCommand>
+      payload;
   std::promise<std::string> reply;
 };
 

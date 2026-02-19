@@ -22,6 +22,7 @@
 #include <CommonDefinitions.hpp>
 #include <CommandInterface.hpp>
 #include <RimoServer.hpp>
+#include <nlohmann/json.hpp>
 
 typedef std::map<std::string, bool> signalMap_t;
 
@@ -57,6 +58,9 @@ class Machine {
   virtual void updateStatus();
   virtual void handleToolChangerCommand(const cmd::ToolChangerCommand& c);
   virtual void handleReconnectCommand(const cmd::ReconnectCommand& c);
+  virtual nlohmann::json handleMotorDiagnosticsCommand(
+      const cmd::MotorDiagnosticsCommand& c);
+  virtual void handleResetMotorAlarmCommand(const cmd::ResetMotorAlarmCommand& c);
  private:
   struct IoSignalCache {
     std::uint64_t cycle{0};

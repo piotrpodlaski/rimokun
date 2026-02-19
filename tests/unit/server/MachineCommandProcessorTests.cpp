@@ -253,3 +253,68 @@ TEST(MachineCommandProcessorTests,
                 std::string::npos);
   }
 }
+
+TEST(MachineCommandProcessorTests,
+     MotorDiagnosticsCommandParsesAndReturnsStructuredResponse) {
+  MachineCommandProcessor processor;
+  nlohmann::json command{
+      {"type", "motorDiagnostics"},
+      {"motor", "XLeft"},
+  };
+
+  bool dispatched = false;
+  const auto response = processor.processCommand(
+      command, [&](cmd::Command c, const std::chrono::milliseconds timeout) {
+        dispatched = true;
+        EXPECT_EQ(timeout, 2s);
+        EXPECT_TRUE(std::holds_alternative<cmd::MotorDiagnosticsCommand>(c.payload));
+        return std::string(
+            R"({"motor":"XLeft","inputRaw":0,"outputRaw":0,"inputFlags":[],"outputFlags":[]})");
+      });
+
+  EXPECT_TRUE(dispatched);
+  EXPECT_EQ(response["status"].get<std::string>(), "OK");
+  ASSERT_TRUE(response.contains("response"));
+  EXPECT_EQ(response["response"]["motor"].get<std::string>(), "XLeft");
+}
+
+TEST(MachineCommandProcessorTests,
+     MotorDiagnosticsMissingMotorReturnsErrorWithoutDispatch) {
+  MachineCommandProcessor processor;
+  nlohmann::json command{
+      {"type", "motorDiagnostics"},
+  };
+
+  bool dispatched = false;
+  const auto response = processor.processCommand(
+      command, [&](cmd::Command, std::chrono::milliseconds) {
+        dispatched = true;
+        return std::string{};
+      });
+
+  EXPECT_FALSE(dispatched);
+  EXPECT_EQ(response["status"].get<std::string>(), "Error");
+  EXPECT_TRUE(response["message"].get<std::string>().find("'motor'") !=
+              std::string::npos);
+}
+
+TEST(MachineCommandProcessorTests,
+     ResetMotorAlarmCommandParsesAndDispatches) {
+  MachineCommandProcessor processor;
+  nlohmann::json command{
+      {"type", "resetMotorAlarm"},
+      {"motor", "YRight"},
+  };
+
+  bool dispatched = false;
+  const auto response = processor.processCommand(
+      command, [&](cmd::Command c, const std::chrono::milliseconds timeout) {
+        dispatched = true;
+        EXPECT_EQ(timeout, 2s);
+        EXPECT_TRUE(std::holds_alternative<cmd::ResetMotorAlarmCommand>(c.payload));
+        return std::string{};
+      });
+
+  EXPECT_TRUE(dispatched);
+  EXPECT_EQ(response["status"].get<std::string>(), "OK");
+}

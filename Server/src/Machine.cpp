@@ -1,4 +1,5 @@
 #include <Config.hpp>
+#include <JsonExtensions.hpp>
 #include <Machine.hpp>
 #include <TimingMetrics.hpp>
 
@@ -172,14 +173,23 @@ void Machine::runOneCycle(LoopState& state) {
         [this]() {
           if (auto command = _commandQueue.try_pop()) {
             try {
+              std::string responsePayload;
               std::visit(Overloaded{[this](const cmd::ToolChangerCommand& c) {
                                       handleToolChangerCommand(c);
                                     },
                                     [this](const cmd::ReconnectCommand& c) {
                                       handleReconnectCommand(c);
+                                    },
+                                    [this, &responsePayload](
+                                        const cmd::MotorDiagnosticsCommand& c) {
+                                      responsePayload =
+                                          handleMotorDiagnosticsCommand(c).dump();
+                                    },
+                                    [this](const cmd::ResetMotorAlarmCommand& c) {
+                                      handleResetMotorAlarmCommand(c);
                                     }},
                          command->payload);
-              command->reply.set_value("");
+              command->reply.set_value(std::move(responsePayload));
             } catch (const std::exception& e) {
               SPDLOG_WARN("Exception caught in 'std::visit'! {}", e.what());
               command->reply.set_value(e.what());
@@ -311,6 +321,47 @@ void Machine::handleReconnectCommand(const cmd::ReconnectCommand& c) {
     throw std::runtime_error(result);
   }
   makeDummyStatus();
+}
+
+nlohmann::json Machine::handleMotorDiagnosticsCommand(
+    const cmd::MotorDiagnosticsCommand& c) {
+  const auto inputStatus = _motorControl.readInputStatus(c.motor);
+  const auto outputStatus = _motorControl.readOutputStatus(c.motor);
+  const auto alarm = _motorControl.diagnoseCurrentAlarm(c.motor);
+  const auto warning = _motorControl.diagnoseCurrentWarning(c.motor);
+
+  nlohmann::json response{
+      {"motor", utl::enumToString(c.motor)},
+      {"inputRaw", inputStatus.raw},
+      {"outputRaw", outputStatus.raw},
+  };
+  response["inputFlags"] = nlohmann::json::array();
+  for (const auto flag : inputStatus.activeFlags) {
+    response["inputFlags"].push_back(std::string(flag));
+  }
+  response["outputFlags"] = nlohmann::json::array();
+  for (const auto flag : outputStatus.activeFlags) {
+    response["outputFlags"].push_back(std::string(flag));
+  }
+  response["alarm"] = nlohmann::json{
+      {"code", alarm.code},
+      {"known", alarm.known},
+      {"type", alarm.type},
+      {"cause", alarm.cause},
+      {"remedialAction", alarm.remedialAction},
+  };
+  response["warning"] = nlohmann::json{
+      {"code", warning.code},
+      {"known", warning.known},
+      {"type", warning.type},
+      {"cause", warning.cause},
+      {"remedialAction", warning.remedialAction},
+  };
+  return response;
+}
+
+void Machine::handleResetMotorAlarmCommand(const cmd::ResetMotorAlarmCommand& c) {
+  _motorControl.resetAlarm(c.motor);
 }
 
 void Machine::shutdown() {

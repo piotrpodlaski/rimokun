@@ -451,6 +451,13 @@ std::uint8_t MotorControl::readSelectedOperationId(const utl::EMotor motorId) {
   return motor.readSelectedOperationId(*_bus);
 }
 
+void MotorControl::resetAlarm(const utl::EMotor motorId) {
+  const auto& motor = requireMotor(_motors, motorId);
+  std::lock_guard<std::mutex> lock(_busMutex);
+  if (!_bus) throw std::runtime_error("MotorControl bus is not initialized");
+  motor.resetAlarm(*_bus);
+}
+
 void MotorControl::setSelectedOperationId(const utl::EMotor motorId,
                                           const std::uint8_t opId) {
   const auto& motor = requireMotor(_motors, motorId);

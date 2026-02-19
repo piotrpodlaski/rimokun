@@ -48,6 +48,7 @@ class MotorControl final : public MachineComponent {
   void setJogPlus(utl::EMotor motorId, bool enabled);
   void setJogMinus(utl::EMotor motorId, bool enabled);
   [[nodiscard]] std::uint8_t readSelectedOperationId(utl::EMotor motorId);
+  void resetAlarm(utl::EMotor motorId);
   void setSelectedOperationId(utl::EMotor motorId, std::uint8_t opId);
   void setOperationMode(utl::EMotor motorId, std::uint8_t opId,
                         MotorOperationMode mode);

@@ -7,6 +7,7 @@
 #include <mutex>
 #include <optional>
 #include <string>
+#include <vector>
 
 enum class MotorControlMode {
   Speed,
@@ -30,6 +31,7 @@ class MotorControl final : public MachineComponent {
   [[nodiscard]] const std::map<utl::EMotor, Motor>& motors() const {
     return _motors;
   }
+  [[nodiscard]] std::vector<utl::EMotor> configuredMotorIds() const;
 
   void setMode(utl::EMotor motorId, MotorControlMode mode);
   void setSpeed(utl::EMotor motorId, std::int32_t speed);
@@ -68,6 +70,8 @@ class MotorControl final : public MachineComponent {
   [[nodiscard]] MotorFlagStatus readInputStatus(utl::EMotor motorId);
   [[nodiscard]] MotorFlagStatus readOutputStatus(utl::EMotor motorId);
   [[nodiscard]] MotorDirectIoStatus readDirectIoStatus(utl::EMotor motorId);
+  [[nodiscard]] bool hasAnyWarningOrAlarm();
+  void setWarningState(bool warningActive);
   [[nodiscard]] MotorCodeDiagnostic diagnoseCurrentAlarm(utl::EMotor motorId);
   [[nodiscard]] MotorCodeDiagnostic diagnoseCurrentWarning(utl::EMotor motorId);
   [[nodiscard]] MotorCodeDiagnostic diagnoseCurrentCommunicationError(

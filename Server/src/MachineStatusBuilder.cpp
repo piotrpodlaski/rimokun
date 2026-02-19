@@ -1,11 +1,99 @@
 #include "MachineStatusBuilder.hpp"
 
 #include <array>
+#include <exception>
+#include <format>
+
+#include <Logger.hpp>
+#include <Motor.hpp>
+#include <MotorControl.hpp>
+#include <magic_enum/magic_enum.hpp>
 
 void MachineStatusBuilder::updateAndPublish(
     utl::RobotStatus& status, const ComponentsMap& components,
     const SnapshotFn& readJoystickSnapshot, const ReadSignalsFn& readInputSignals,
     const ReadSignalsFn& readOutputSignals, const PublishFn& publish) const {
+  const auto motorControlIt = components.find(utl::ERobotComponent::MotorControl);
+  if (motorControlIt != components.end() && motorControlIt->second != nullptr) {
+    if (auto* motorControl = dynamic_cast<MotorControl*>(motorControlIt->second);
+        motorControl != nullptr) {
+      const auto componentState = motorControlIt->second->state();
+      bool hasAnyMotorWarningOrAlarm = false;
+      const auto configuredMotorIds = motorControl->configuredMotorIds();
+      for (const auto motorId : configuredMotorIds) {
+        auto& motorStatus = status.motors[motorId];
+
+        if (componentState == MachineComponent::State::Error) {
+          motorStatus.state = utl::ELEDState::Error;
+          motorStatus.flags[utl::EMotorStatusFlags::Warning] = utl::ELEDState::Off;
+          motorStatus.flags[utl::EMotorStatusFlags::Alarm] = utl::ELEDState::Error;
+          motorStatus.warningDescription.clear();
+          motorStatus.alarmDescription =
+              "MotorControl component is in error state";
+          hasAnyMotorWarningOrAlarm = true;
+          continue;
+        }
+
+        if (!motorControl->motors().contains(motorId)) {
+          motorStatus.state = utl::ELEDState::Error;
+          motorStatus.flags[utl::EMotorStatusFlags::Warning] = utl::ELEDState::Off;
+          motorStatus.flags[utl::EMotorStatusFlags::Alarm] = utl::ELEDState::Error;
+          motorStatus.warningDescription.clear();
+          motorStatus.alarmDescription =
+              "Motor is configured but unavailable in runtime";
+          hasAnyMotorWarningOrAlarm = true;
+          continue;
+        }
+
+        try {
+          const auto outputStatus = motorControl->readOutputStatus(motorId);
+          const bool hasWarning = Motor::isDriverOutputFlagSet(
+              outputStatus.raw, MotorOutputFlag::Warning);
+          const bool hasAlarm = Motor::isDriverOutputFlagSet(outputStatus.raw,
+                                                             MotorOutputFlag::Alarm);
+          hasAnyMotorWarningOrAlarm = hasAnyMotorWarningOrAlarm || hasWarning || hasAlarm;
+
+          motorStatus.flags[utl::EMotorStatusFlags::Warning] =
+              hasWarning ? utl::ELEDState::Warning : utl::ELEDState::Off;
+          motorStatus.flags[utl::EMotorStatusFlags::Alarm] =
+              hasAlarm ? utl::ELEDState::Error : utl::ELEDState::Off;
+          motorStatus.state = hasAlarm
+                                  ? utl::ELEDState::Error
+                                  : (hasWarning ? utl::ELEDState::Warning
+                                                : utl::ELEDState::On);
+          motorStatus.warningDescription.clear();
+          motorStatus.alarmDescription.clear();
+
+          if (hasWarning) {
+            const auto warning = motorControl->diagnoseCurrentWarning(motorId);
+            motorStatus.warningDescription =
+                warning.cause.empty()
+                    ? warning.type
+                    : std::format("{}: {}", warning.type, warning.cause);
+          }
+          if (hasAlarm) {
+            const auto alarm = motorControl->diagnoseCurrentAlarm(motorId);
+            motorStatus.alarmDescription =
+                alarm.cause.empty()
+                    ? alarm.type
+                    : std::format("{}: {}", alarm.type, alarm.cause);
+          }
+        } catch (const std::exception& ex) {
+          SPDLOG_WARN("Failed to read status for motor {}: {}",
+                      magic_enum::enum_name(motorId), ex.what());
+          auto& motorStatus = status.motors[motorId];
+          motorStatus.state = utl::ELEDState::Error;
+          motorStatus.flags[utl::EMotorStatusFlags::Warning] = utl::ELEDState::Off;
+          motorStatus.flags[utl::EMotorStatusFlags::Alarm] = utl::ELEDState::Error;
+          motorStatus.warningDescription.clear();
+          motorStatus.alarmDescription = ex.what();
+          hasAnyMotorWarningOrAlarm = true;
+        }
+      }
+      motorControl->setWarningState(hasAnyMotorWarningOrAlarm);
+    }
+  }
+
   for (const auto& [componentType, component] : components) {
     status.robotComponents[componentType] = stateToLed(component->state());
   }
@@ -97,6 +185,13 @@ void MachineStatusBuilder::updateAndPublish(
 }
 
 utl::ELEDState MachineStatusBuilder::stateToLed(MachineComponent::State state) {
-  return state == MachineComponent::State::Normal ? utl::ELEDState::On
-                                                   : utl::ELEDState::Error;
+  switch (state) {
+    case MachineComponent::State::Normal:
+      return utl::ELEDState::On;
+    case MachineComponent::State::Warning:
+      return utl::ELEDState::Warning;
+    case MachineComponent::State::Error:
+      return utl::ELEDState::Error;
+  }
+  return utl::ELEDState::Error;
 }

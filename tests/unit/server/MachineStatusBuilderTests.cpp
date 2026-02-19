@@ -98,6 +98,38 @@ TEST(MachineStatusBuilderTests, MissingInputSnapshotSetsProximityFlagsToError) {
             utl::ELEDState::Error);
 }
 
+TEST(MachineStatusBuilderTests, WarningComponentMapsToWarningLed) {
+  MachineStatusBuilder builder;
+  utl::RobotStatus status;
+
+  FakeComponent contec(MachineComponent::State::Warning);
+  MachineStatusBuilder::ComponentsMap components{
+      {utl::ERobotComponent::Contec, &contec}};
+
+  bool published = false;
+  builder.updateAndPublish(
+      status, components,
+      []() {
+        ControlPanel::Snapshot s;
+        s.x = {0.0, 0.0, 0.0};
+        s.y = {0.0, 0.0, 0.0};
+        s.b = {false, false, false};
+        return s;
+      },
+      []() -> std::optional<signal_map_t> {
+        return signal_map_t{{"button1", false}, {"button2", false}};
+      },
+      []() -> std::optional<signal_map_t> {
+        return signal_map_t{{"toolChangerLeft", false},
+                            {"toolChangerRight", false}};
+      },
+      [&](const utl::RobotStatus&) { published = true; });
+
+  ASSERT_TRUE(published);
+  EXPECT_EQ(status.robotComponents.at(utl::ERobotComponent::Contec),
+            utl::ELEDState::Warning);
+}
+
 TEST(MachineStatusBuilderTests, ContecErrorSetsAllToolChangerFlagsToError) {
   MachineStatusBuilder builder;
   utl::RobotStatus status;

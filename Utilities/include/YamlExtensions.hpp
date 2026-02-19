@@ -92,6 +92,9 @@ struct convert<utl::SingleMotorStatus> {
     node["targetPosition"] = rhs.targetPosition;
     node["speed"] = rhs.speed;
     node["torque"] = rhs.torque;
+    node["state"] = rhs.state;
+    node["warningDescription"] = rhs.warningDescription;
+    node["alarmDescription"] = rhs.alarmDescription;
     node["flags"] = rhs.flags;
     return node;
   }
@@ -102,6 +105,14 @@ struct convert<utl::SingleMotorStatus> {
     rhs.targetPosition = node["targetPosition"].as<double>();
     rhs.speed = node["speed"].as<double>();
     rhs.torque = node["torque"].as<int>();
+    rhs.state = node["state"] ? node["state"].as<utl::ELEDState>()
+                              : utl::ELEDState::Off;
+    rhs.warningDescription =
+        node["warningDescription"] ? node["warningDescription"].as<std::string>()
+                                    : std::string{};
+    rhs.alarmDescription =
+        node["alarmDescription"] ? node["alarmDescription"].as<std::string>()
+                                  : std::string{};
     rhs.flags =
         node["flags"].as<std::map<utl::EMotorStatusFlags, utl::ELEDState>>();
     return true;

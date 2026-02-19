@@ -60,6 +60,25 @@ std::optional<utl::ELEDState> componentStateFromStatus(
   }
   return it->second;
 }
+
+bool isComponentOperational(const std::optional<utl::ELEDState>& state) {
+  return state.has_value() &&
+         (*state == utl::ELEDState::On || *state == utl::ELEDState::Warning);
+}
+
+bool isMotorInAlarm(const utl::SingleMotorStatus& motorStatus) {
+  if (motorStatus.state == utl::ELEDState::Error) {
+    return true;
+  }
+  const auto alarmIt = motorStatus.flags.find(utl::EMotorStatusFlags::Alarm);
+  return alarmIt != motorStatus.flags.end() &&
+         alarmIt->second == utl::ELEDState::Error;
+}
+
+bool anyMotorInAlarm(const utl::RobotStatus& status) {
+  return std::any_of(status.motors.begin(), status.motors.end(),
+                     [](const auto& kv) { return isMotorInAlarm(kv.second); });
+}
 }  // namespace
 
 RimoKunControlPolicy::RimoKunControlPolicy() {
@@ -164,8 +183,8 @@ IRobotControlPolicy::ControlDecision RimoKunControlPolicy::decide(
   }
 
   const bool contecAvailable =
-      contecState == MachineComponent::State::Normal &&
-      contecStatus.has_value() && *contecStatus == utl::ELEDState::On;
+      contecState != MachineComponent::State::Error &&
+      isComponentOperational(contecStatus);
   if (!contecAvailable) {
     warnOnce(_warningState.contecUnavailable,
              "Contec is unavailable. Tool changer and light outputs are disabled.");
@@ -185,10 +204,8 @@ IRobotControlPolicy::ControlDecision RimoKunControlPolicy::decide(
   ioOutputs["light1"] = inputs->at("button1");
   ioOutputs["light2"] = inputs->at("button2");
 
-  const bool motorControlAvailable =
-      motorControlStatus.has_value() && *motorControlStatus == utl::ELEDState::On;
-  const bool controlPanelAvailable =
-      controlPanelStatus.has_value() && *controlPanelStatus == utl::ELEDState::On;
+  const bool motorControlAvailable = isComponentOperational(motorControlStatus);
+  const bool controlPanelAvailable = isComponentOperational(controlPanelStatus);
 
   if (!motorControlAvailable) {
     warnOnce(_warningState.motorControlUnavailable,
@@ -208,6 +225,15 @@ IRobotControlPolicy::ControlDecision RimoKunControlPolicy::decide(
             .motorIntents = {},
             .setToolChangerErrorBlinking = false};
   }
+
+  if (anyMotorInAlarm(robotStatus)) {
+    warnOnce(_warningState.motorAlarmActive,
+             "At least one motor is in alarm state. Motor commands are disabled.");
+    return {.outputs = std::move(ioOutputs),
+            .motorIntents = {},
+            .setToolChangerErrorBlinking = false};
+  }
+  setWarningFlag(_warningState.motorAlarmActive, false);
 
   std::vector<MotorIntent> motorIntents;
   motorIntents.reserve(6);

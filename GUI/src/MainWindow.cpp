@@ -27,8 +27,8 @@ MainWindow::MainWindow(QWidget* parent)
     motStat->setSpeed(2137);
     motStat->setTargetPosition(420);
     motStat->setTorque(69);
+    motStat->setStatus(utl::ELEDState::Off);
     motStat->setBrake(utl::ELEDState::Off);
-    motStat->setEnabled(utl::ELEDState::Error);
     _motorPresenters.push_back(
         std::make_unique<MotorStatsPresenter>(
             dynamic_cast<MotorStats*>(motStat), eMot, &_stateStore, this));

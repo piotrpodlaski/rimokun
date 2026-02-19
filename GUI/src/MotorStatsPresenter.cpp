@@ -18,6 +18,6 @@ void MotorStatsPresenter::onConnectionChanged(const bool connected) {
   if (connected) {
     return;
   }
+  _view->setStatus(utl::ELEDState::Off);
   _view->setBrake(utl::ELEDState::Off);
-  _view->setEnabled(utl::ELEDState::Off);
 }

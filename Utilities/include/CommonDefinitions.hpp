@@ -5,8 +5,8 @@
 
 namespace utl {
 enum class EMotor { XLeft, XRight, YLeft, YRight, ZLeft, ZRight };
-enum class ELEDState { On, Off, Error, ErrorBlinking };
-enum class EMotorStatusFlags { BrakeApplied, Enabled, Error };
+enum class ELEDState { On, Off, Warning, Error, ErrorBlinking };
+enum class EMotorStatusFlags { BrakeApplied, Enabled, Error, Warning, Alarm };
 enum class EArm { Left, Right, Gantry };
 enum class EToolChangerStatusFlags {
   ProxSen,
@@ -28,6 +28,9 @@ struct SingleMotorStatus {
   double targetPosition{0};
   double speed{0};
   int torque{0};
+  ELEDState state{ELEDState::Off};
+  std::string warningDescription;
+  std::string alarmDescription;
   std::map<EMotorStatusFlags, ELEDState> flags;
 };
 

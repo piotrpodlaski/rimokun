@@ -42,6 +42,8 @@ QColor LedIndicator::currentColor() const {
   switch (_ledState) {
     case utl::ELEDState::On:
       return Qt::green;
+    case utl::ELEDState::Warning:
+      return QColor(255, 165, 0);
     case utl::ELEDState::Error:
       return Qt::red;
     case utl::ELEDState::Off:

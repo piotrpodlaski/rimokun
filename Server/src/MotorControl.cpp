@@ -126,6 +126,15 @@ MotorControl::MotorControl() {
   }
 }
 
+std::vector<utl::EMotor> MotorControl::configuredMotorIds() const {
+  std::vector<utl::EMotor> ids;
+  ids.reserve(_motorConfigs.size());
+  for (const auto& [motorId, _] : _motorConfigs) {
+    ids.push_back(motorId);
+  }
+  return ids;
+}
+
 void MotorControl::initialize() {
   _motors.clear();
   _runtime.clear();
@@ -562,6 +571,29 @@ MotorDirectIoStatus MotorControl::readDirectIoStatus(const utl::EMotor motorId) 
   if (!_bus) throw std::runtime_error("MotorControl bus is not initialized");
   return motor.decodeDirectIoAndBrakeStatus(
       motor.readDirectIoAndBrakeStatusRaw(*_bus));
+}
+
+bool MotorControl::hasAnyWarningOrAlarm() {
+  std::lock_guard<std::mutex> lock(_busMutex);
+  if (!_bus) {
+    throw std::runtime_error("MotorControl bus is not initialized");
+  }
+
+  for (const auto& [_, motor] : _motors) {
+    const auto raw = motor.readDriverOutputStatusRaw(*_bus);
+    if (Motor::isDriverOutputFlagSet(raw, MotorOutputFlag::Warning) ||
+        Motor::isDriverOutputFlagSet(raw, MotorOutputFlag::Alarm)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+void MotorControl::setWarningState(const bool warningActive) {
+  if (state() == State::Error) {
+    return;
+  }
+  setState(warningActive ? State::Warning : State::Normal);
 }
 
 MotorCodeDiagnostic MotorControl::diagnoseCurrentAlarm(

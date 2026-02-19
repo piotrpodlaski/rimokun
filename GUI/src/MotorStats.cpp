@@ -35,7 +35,10 @@ void MotorStats::setBrake(const utl::ELEDState value) const {
   _ui->brakeLED->setState(value);
 }
 void MotorStats::setEnabled(const utl::ELEDState value) const {
-  _ui->enaLED->setState(value);
+  (void)value;
+}
+void MotorStats::setStatus(const utl::ELEDState value) const {
+  _ui->statusLED->setState(value);
 }
 // void MotorStats::setMotorName(const std::string& name) const {
 //   ui->groupBox->setTitle(name.c_str());

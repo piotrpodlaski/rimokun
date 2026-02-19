@@ -26,7 +26,7 @@ std::string MachineComponentService::reconnect(
     return std::format("Resetting '{}' failed: {}",
                        magic_enum::enum_name(componentId), e.what());
   }
-  if (component->state() != MachineComponent::State::Normal) {
+  if (component->state() == MachineComponent::State::Error) {
     return std::format("Resetting '{}' was unsuccessful!",
                        magic_enum::enum_name(componentId));
   }

@@ -48,6 +48,7 @@ TEST(MachineControllerTests, ErrorDecisionDoesNotMutateToolChangerStatusInContro
       [](utl::EMotor, MotorControlDirection) {},
       [](utl::EMotor) {},
       [](utl::EMotor) {},
+      [](utl::EMotor) { return true; },
       status, std::move(policy));
 
   controller.runControlLoopTasks();
@@ -80,6 +81,7 @@ TEST(MachineControllerTests, ToolChangerCommandSetsExpectedOutputSignal) {
       [](utl::EMotor, MotorControlDirection) {},
       [](utl::EMotor) {},
       [](utl::EMotor) {},
+      [](utl::EMotor) { return true; },
       status, std::move(policy));
 
   controller.handleToolChangerCommand(
@@ -106,6 +108,7 @@ TEST(MachineControllerTests, PolicyOutputsAreForwardedToOutputsWriter) {
       [](utl::EMotor, MotorControlDirection) {},
       [](utl::EMotor) {},
       [](utl::EMotor) {},
+      [](utl::EMotor) { return true; },
       status, std::move(policy));
 
   controller.runControlLoopTasks();
@@ -132,6 +135,7 @@ TEST(MachineControllerTests, ToolChangerCommandThrowsWhenContecIsInErrorState) {
       [](utl::EMotor, MotorControlDirection) {},
       [](utl::EMotor) {},
       [](utl::EMotor) {},
+      [](utl::EMotor) { return true; },
       status, std::move(policy));
 
   EXPECT_THROW((void)controller.handleToolChangerCommand(
@@ -157,6 +161,7 @@ TEST(MachineControllerTests, ToolChangerCommandThrowsWhenOutputReadbackFails) {
       [](utl::EMotor, MotorControlDirection) {},
       [](utl::EMotor) {},
       [](utl::EMotor) {},
+      [](utl::EMotor) { return true; },
       status, std::move(policy));
 
   EXPECT_THROW((void)controller.handleToolChangerCommand(
@@ -188,6 +193,7 @@ TEST(MachineControllerTests, PolicyMotorIntentsAreAppliedInExpectedOrder) {
       [&](utl::EMotor, MotorControlDirection) { applied.emplace_back("direction"); },
       [&](utl::EMotor) { applied.emplace_back("start"); },
       [&](utl::EMotor) { applied.emplace_back("stop"); },
+      [](utl::EMotor) { return true; },
       status, std::move(policy));
 
   controller.runControlLoopTasks();
@@ -197,4 +203,34 @@ TEST(MachineControllerTests, PolicyMotorIntentsAreAppliedInExpectedOrder) {
   EXPECT_EQ(applied[1], "direction");
   EXPECT_EQ(applied[2], "speed");
   EXPECT_EQ(applied[3], "start");
+}
+
+TEST(MachineControllerTests, UnconfiguredMotorIntentsAreIgnored) {
+  utl::RobotStatus status;
+  auto policy = std::make_unique<FakeControlPolicy>();
+  policy->decisionToReturn.motorIntents.push_back(
+      {.motorId = utl::EMotor::XRight,
+       .mode = MotorControlMode::Speed,
+       .direction = MotorControlDirection::Forward,
+       .speed = 900,
+       .startMovement = true});
+
+  std::vector<std::string> applied;
+  MachineController controller(
+      []() -> std::optional<signal_map_t> { return signal_map_t{{"button1", true}}; },
+      [](const signal_map_t&) {},
+      []() -> std::optional<signal_map_t> { return signal_map_t{}; },
+      []() { return MachineComponent::State::Normal; },
+      [&](utl::EMotor, MotorControlMode) { applied.emplace_back("mode"); },
+      [&](utl::EMotor, std::int32_t) { applied.emplace_back("speed"); },
+      [&](utl::EMotor, std::int32_t) { applied.emplace_back("position"); },
+      [&](utl::EMotor, MotorControlDirection) { applied.emplace_back("direction"); },
+      [&](utl::EMotor) { applied.emplace_back("start"); },
+      [&](utl::EMotor) { applied.emplace_back("stop"); },
+      [](const utl::EMotor motorId) { return motorId == utl::EMotor::XLeft; },
+      status, std::move(policy));
+
+  controller.runControlLoopTasks();
+
+  EXPECT_TRUE(applied.empty());
 }

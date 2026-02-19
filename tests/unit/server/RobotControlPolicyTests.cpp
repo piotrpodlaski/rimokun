@@ -283,6 +283,51 @@ TEST(RobotControlPolicyTests, RimoKunPolicySkipsMotorCommandsWhenMotorControlDow
   EXPECT_TRUE(decision.motorIntents.empty());
 }
 
+TEST(RobotControlPolicyTests,
+     RimoKunPolicyTreatsWarningComponentStateAsOperational) {
+  RimoKunControlPolicy policy;
+  utl::RobotStatus status;
+  status.robotComponents[utl::ERobotComponent::Contec] = utl::ELEDState::Warning;
+  status.robotComponents[utl::ERobotComponent::MotorControl] =
+      utl::ELEDState::Warning;
+  status.robotComponents[utl::ERobotComponent::ControlPanel] =
+      utl::ELEDState::Warning;
+  status.joystics[utl::EArm::Left] = {.x = 0.8, .y = 0.0, .btn = false};
+  status.joystics[utl::EArm::Right] = {.x = 0.0, .y = 0.0, .btn = false};
+  status.joystics[utl::EArm::Gantry] = {.x = 0.0, .y = 0.0, .btn = false};
+
+  const auto decision = policy.decide(
+      IRobotControlPolicy::SignalMap{{"button1", true}, {"button2", false}},
+      std::nullopt, MachineComponent::State::Normal, status);
+
+  EXPECT_FALSE(decision.setToolChangerErrorBlinking);
+  ASSERT_TRUE(decision.outputs.has_value());
+  EXPECT_TRUE(decision.outputs->at("light1"));
+  EXPECT_FALSE(decision.outputs->at("light2"));
+  EXPECT_FALSE(decision.motorIntents.empty());
+}
+
+TEST(RobotControlPolicyTests, RimoKunPolicyDisablesMotionWhenAnyMotorIsInAlarm) {
+  RimoKunControlPolicy policy;
+  utl::RobotStatus status;
+  setAllComponentsOn(status);
+  status.motors[utl::EMotor::XLeft].state = utl::ELEDState::Error;
+  status.motors[utl::EMotor::XLeft].flags[utl::EMotorStatusFlags::Alarm] =
+      utl::ELEDState::Error;
+  status.joystics[utl::EArm::Left] = {.x = 0.8, .y = 0.0, .btn = false};
+  status.joystics[utl::EArm::Right] = {.x = 0.0, .y = 0.0, .btn = false};
+  status.joystics[utl::EArm::Gantry] = {.x = 0.0, .y = 0.0, .btn = false};
+
+  const auto decision = policy.decide(
+      IRobotControlPolicy::SignalMap{{"button1", true}, {"button2", false}},
+      std::nullopt, MachineComponent::State::Normal, status);
+
+  ASSERT_TRUE(decision.outputs.has_value());
+  EXPECT_TRUE(decision.outputs->at("light1"));
+  EXPECT_FALSE(decision.outputs->at("light2"));
+  EXPECT_TRUE(decision.motorIntents.empty());
+}
+
 TEST(RobotControlPolicyTests, RimoKunPolicyUpdatesSpeedOnlyAfterAxisDeltaThreshold) {
   RimoKunControlPolicy policy;
   utl::RobotStatus status;

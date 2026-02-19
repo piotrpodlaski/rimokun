@@ -121,6 +121,9 @@ struct adl_serializer<utl::SingleMotorStatus> {
         {"targetPosition", v.targetPosition},
         {"speed", v.speed},
         {"torque", v.torque},
+        {"state", v.state},
+        {"warningDescription", v.warningDescription},
+        {"alarmDescription", v.alarmDescription},
         {"flags", utl::enumKeyedMapToJson(v.flags)},
     };
   }
@@ -130,6 +133,10 @@ struct adl_serializer<utl::SingleMotorStatus> {
     v.targetPosition = j.at("targetPosition").get<double>();
     v.speed = j.at("speed").get<double>();
     v.torque = j.at("torque").get<int>();
+    v.state = j.contains("state") ? j.at("state").get<utl::ELEDState>()
+                                   : utl::ELEDState::Off;
+    v.warningDescription = j.value("warningDescription", std::string{});
+    v.alarmDescription = j.value("alarmDescription", std::string{});
     v.flags = utl::enumKeyedMapFromJson<utl::EMotorStatusFlags, utl::ELEDState>(
         j.at("flags"));
   }

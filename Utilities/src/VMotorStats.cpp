@@ -5,6 +5,7 @@ void VMotorStats::configure(const utl::SingleMotorStatus& s) const {
   setTargetPosition(s.targetPosition);
   setTorque(s.torque);
   setSpeed(s.speed);
+  setStatus(s.state);
   if (s.flags.contains(utl::EMotorStatusFlags::BrakeApplied))
     setBrake(s.flags.at(utl::EMotorStatusFlags::BrakeApplied));
   else

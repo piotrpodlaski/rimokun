@@ -13,6 +13,7 @@ class FakeMotorStats final : public VMotorStats {
   void setTargetPosition(double value) const override { targetPosition = value; }
   void setBrake(utl::ELEDState value) const override { brake = value; }
   void setEnabled(utl::ELEDState value) const override { enabled = value; }
+  void setStatus(utl::ELEDState value) const override { status = value; }
   void setMotorId(utl::EMotor value) override { motorId = value; }
 
   mutable int torque{0};
@@ -21,6 +22,7 @@ class FakeMotorStats final : public VMotorStats {
   mutable double targetPosition{0};
   mutable utl::ELEDState brake{utl::ELEDState::On};
   mutable utl::ELEDState enabled{utl::ELEDState::On};
+  mutable utl::ELEDState status{utl::ELEDState::On};
   utl::EMotor motorId{utl::EMotor::XLeft};
 };
 }  // namespace
@@ -32,6 +34,7 @@ TEST(VMotorStatsTests, ConfigureCopiesNumericFieldsAndFlags) {
       .targetPosition = -22.0,
       .speed = 5.5,
       .torque = 17,
+      .state = utl::ELEDState::Warning,
       .flags = {{utl::EMotorStatusFlags::BrakeApplied, utl::ELEDState::Error},
                 {utl::EMotorStatusFlags::Enabled, utl::ELEDState::Off}}};
 
@@ -41,6 +44,7 @@ TEST(VMotorStatsTests, ConfigureCopiesNumericFieldsAndFlags) {
   EXPECT_DOUBLE_EQ(stats.targetPosition, -22.0);
   EXPECT_DOUBLE_EQ(stats.speed, 5.5);
   EXPECT_EQ(stats.torque, 17);
+  EXPECT_EQ(stats.status, utl::ELEDState::Warning);
   EXPECT_EQ(stats.brake, utl::ELEDState::Error);
   EXPECT_EQ(stats.enabled, utl::ELEDState::Off);
 }
@@ -49,15 +53,18 @@ TEST(VMotorStatsTests, ConfigureDefaultsFlagsToOffWhenMissing) {
   FakeMotorStats stats;
   stats.brake = utl::ELEDState::On;
   stats.enabled = utl::ELEDState::Error;
+  stats.status = utl::ELEDState::Error;
   utl::SingleMotorStatus input{
       .currentPosition = 0,
       .targetPosition = 0,
       .speed = 0,
       .torque = 0,
+      .state = utl::ELEDState::Off,
       .flags = {}};
 
   stats.apply(input);
 
+  EXPECT_EQ(stats.status, utl::ELEDState::Off);
   EXPECT_EQ(stats.brake, utl::ELEDState::Off);
   EXPECT_EQ(stats.enabled, utl::ELEDState::Off);
 }

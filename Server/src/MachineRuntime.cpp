@@ -29,6 +29,9 @@ void MachineRuntime::wireMachine(Machine& machine) {
         [&machine](const utl::EMotor motorId) {
           machine._motorControl.stopMovement(motorId);
         },
+        [&machine](const utl::EMotor motorId) {
+          return machine._motorControl.motors().contains(motorId);
+        },
         machine._robotStatus, std::make_unique<RimoKunControlPolicy>());
   }
   if (!machine._componentService) {

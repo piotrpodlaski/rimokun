@@ -57,6 +57,21 @@ TEST(MachineComponentServiceTests, ReconnectReturnsEmptyOnSuccess) {
   EXPECT_EQ(component.state(), MachineComponent::State::Normal);
 }
 
+TEST(MachineComponentServiceTests, ReconnectReturnsEmptyOnWarningState) {
+  FakeComponent component(utl::ERobotComponent::ControlPanel, false,
+                          MachineComponent::State::Warning);
+  std::map<utl::ERobotComponent, MachineComponent*> components{
+      {utl::ERobotComponent::ControlPanel, &component}};
+  MachineComponentService service(components);
+
+  const auto result = service.reconnect(utl::ERobotComponent::ControlPanel);
+
+  EXPECT_TRUE(result.empty());
+  EXPECT_EQ(component.resetCalls, 1);
+  EXPECT_EQ(component.initializeCalls, 1);
+  EXPECT_EQ(component.state(), MachineComponent::State::Warning);
+}
+
 TEST(MachineComponentServiceTests, ReconnectUnknownComponentReturnsError) {
   std::map<utl::ERobotComponent, MachineComponent*> components;
   MachineComponentService service(components);

@@ -25,6 +25,7 @@ class MachineController {
   using SetMotorDirectionFn =
       std::function<void(utl::EMotor, MotorControlDirection)>;
   using MoveMotorFn = std::function<void(utl::EMotor)>;
+  using IsMotorConfiguredFn = std::function<bool(utl::EMotor)>;
 
   MachineController(ReadSignalsFn readInputs,
                     SetOutputsFn setOutputs,
@@ -36,6 +37,7 @@ class MachineController {
                     SetMotorDirectionFn setMotorDirection,
                     MoveMotorFn startMotor,
                     MoveMotorFn stopMotor,
+                    IsMotorConfiguredFn isMotorConfigured,
                     utl::RobotStatus& robotStatus,
                     std::unique_ptr<IRobotControlPolicy> controlPolicy);
 
@@ -53,6 +55,8 @@ class MachineController {
   SetMotorDirectionFn _setMotorDirection;
   MoveMotorFn _startMotor;
   MoveMotorFn _stopMotor;
+  IsMotorConfiguredFn _isMotorConfigured;
   utl::RobotStatus& _robotStatus;
   std::unique_ptr<IRobotControlPolicy> _controlPolicy;
+  mutable std::map<utl::EMotor, bool> _missingMotorWarned;
 };

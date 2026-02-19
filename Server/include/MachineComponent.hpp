@@ -5,7 +5,7 @@
 
 class MachineComponent {
  public:
-  enum class State { Normal, Error };
+  enum class State { Normal, Warning, Error };
 
   virtual ~MachineComponent() = default;
 

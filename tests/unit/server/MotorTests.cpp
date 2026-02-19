@@ -121,3 +121,33 @@ TEST(MotorTests, DecodeDirectIoAndBrakeStatusDecodesExpectedFlagNames) {
       "OUT0", "OUT5", "MB", "IN7", "IN5", "IN4", "IN0", "-LS"};
   EXPECT_EQ(status.activeFlags, expected);
 }
+
+TEST(MotorTests, ResetAlarmDoesNothingWhenNoAlarmIsActive) {
+  fake_modbus::reset();
+  auto map = makeArKd2RegisterMap();
+  auto bus = makeBus();
+  Motor motor(utl::EMotor::XLeft, 7, map);
+
+  fake_modbus::setHoldingRegister(7, map.presentAlarm, 0x0000u);
+  fake_modbus::setHoldingRegister(7, map.presentAlarm + 1, 0x0000u);
+  fake_modbus::setHoldingRegister(7, map.alarmResetCommand, 0xABCDu);
+
+  motor.resetAlarm(bus);
+
+  EXPECT_EQ(fake_modbus::getHoldingRegister(7, map.alarmResetCommand), 0xABCDu);
+}
+
+TEST(MotorTests, ResetAlarmPerformsZeroToOneTransitionWhenAlarmIsActive) {
+  fake_modbus::reset();
+  auto map = makeArKd2RegisterMap();
+  auto bus = makeBus();
+  Motor motor(utl::EMotor::XLeft, 7, map);
+
+  fake_modbus::setHoldingRegister(7, map.presentAlarm, 0x0000u);
+  fake_modbus::setHoldingRegister(7, map.presentAlarm + 1, 0x0005u);
+  fake_modbus::setHoldingRegister(7, map.alarmResetCommand, 0xABCDu);
+
+  motor.resetAlarm(bus);
+
+  EXPECT_EQ(fake_modbus::getHoldingRegister(7, map.alarmResetCommand), 0x0001u);
+}

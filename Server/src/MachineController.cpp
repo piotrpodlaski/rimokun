@@ -15,6 +15,7 @@ MachineController::MachineController(ReadSignalsFn readInputs,
                                      SetMotorDirectionFn setMotorDirection,
                                      MoveMotorFn startMotor,
                                      MoveMotorFn stopMotor,
+                                     IsMotorConfiguredFn isMotorConfigured,
                                      utl::RobotStatus& robotStatus,
                                      std::unique_ptr<IRobotControlPolicy> controlPolicy)
     : _readInputs(std::move(readInputs)),
@@ -27,10 +28,14 @@ MachineController::MachineController(ReadSignalsFn readInputs,
       _setMotorDirection(std::move(setMotorDirection)),
       _startMotor(std::move(startMotor)),
       _stopMotor(std::move(stopMotor)),
+      _isMotorConfigured(std::move(isMotorConfigured)),
       _robotStatus(robotStatus),
       _controlPolicy(std::move(controlPolicy)) {
   if (!_controlPolicy) {
     throw std::runtime_error("MachineController requires a non-null control policy.");
+  }
+  if (!_isMotorConfigured) {
+    throw std::runtime_error("MachineController requires motor availability callback.");
   }
 }
 
@@ -46,6 +51,17 @@ void MachineController::runControlLoopTasks() const {
     _setOutputs(*decision.outputs);
   }
   for (const auto& intent : decision.motorIntents) {
+    if (!_isMotorConfigured(intent.motorId)) {
+      if (!_missingMotorWarned[intent.motorId]) {
+        SPDLOG_WARN(
+            "Control policy emitted command for motor {} which is not configured. "
+            "Ignoring commands for this motor.",
+            magic_enum::enum_name(intent.motorId));
+        _missingMotorWarned[intent.motorId] = true;
+      }
+      continue;
+    }
+    _missingMotorWarned[intent.motorId] = false;
     if (intent.mode) {
       _setMotorMode(intent.motorId, *intent.mode);
     }

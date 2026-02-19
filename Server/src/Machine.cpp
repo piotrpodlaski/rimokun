@@ -331,7 +331,15 @@ void Machine::makeDummyStatus() {
                               EMotor::YRight, EMotor::ZLeft,  EMotor::ZRight};
   for (const auto& motor : motors) {
     _robotStatus.motors[motor] = {
-        .currentPosition = 0, .targetPosition = 0, .speed = 0, .torque = 0};
+        .currentPosition = 0,
+        .targetPosition = 0,
+        .speed = 0,
+        .torque = 0,
+        .state = ELEDState::Off,
+        .warningDescription = "",
+        .alarmDescription = "",
+        .flags = {{EMotorStatusFlags::Warning, ELEDState::Off},
+                  {EMotorStatusFlags::Alarm, ELEDState::Off}}};
   }
   _robotStatus.toolChangers[EArm::Left] = {
       .flags = {{EToolChangerStatusFlags::ProxSen, ELEDState::Off},

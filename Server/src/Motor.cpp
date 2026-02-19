@@ -507,8 +507,13 @@ MotorDirectIoStatus Motor::decodeDirectIoAndBrakeStatus(
 }
 
 void Motor::resetAlarm(ModbusClient& bus) const {
-  writeInt32(bus, _map.alarmResetCommand, 0);
-  writeInt32(bus, _map.alarmResetCommand, 1);
+  if (readAlarmCode(bus) == 0u) {
+    return;
+  }
+
+  // Alarm reset is a 0->1 edge on 0x0180.
+  writeU16(bus, _map.alarmResetCommand, 0u);
+  writeU16(bus, _map.alarmResetCommand, 1u);
 }
 
 void Motor::selectSlave(ModbusClient& bus) const {

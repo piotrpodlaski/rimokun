@@ -58,6 +58,19 @@
       </item>
       <item row="4" column="0" colspan="3">
        <layout class="QHBoxLayout" name="horizontalLayout">
+       <item>
+         <widget class="QLabel" name="label_11">
+          <property name="text">
+           <string>Status</string>
+          </property>
+          <property name="alignment">
+           <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="LedIndicator" name="statusLED" native="true"/>
+        </item>
         <item>
          <widget class="QLabel" name="label_4">
           <property name="text">
@@ -70,19 +83,6 @@
         </item>
         <item>
          <widget class="LedIndicator" name="brakeLED" native="true"/>
-        </item>
-        <item>
-         <widget class="QLabel" name="label_9">
-          <property name="text">
-           <string>Enabled</string>
-          </property>
-          <property name="alignment">
-           <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="LedIndicator" name="enaLED" native="true"/>
         </item>
        </layout>
       </item>

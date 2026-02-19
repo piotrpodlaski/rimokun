@@ -22,6 +22,7 @@ class MotorStats : public QWidget, public VMotorStats {
   void setTargetPosition(double value) const override;
   void setBrake(utl::ELEDState value) const override;
   void setEnabled(utl::ELEDState value) const override;
+  void setStatus(utl::ELEDState value) const override;
   void setMotorId(utl::EMotor id) override;
 
  public slots:

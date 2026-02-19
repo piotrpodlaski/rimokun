@@ -102,15 +102,21 @@ void Updater::handleResponse(const ITransportWorker::ResponseEvent& event) {
   }
 
   auto response = *event.response;
+  auto* senderObject = meta.sender.data();
+  ResponseConsumer* consumer = nullptr;
+  if (meta.expectsResponse && senderObject) {
+    consumer = dynamic_cast<ResponseConsumer*>(senderObject);
+  }
   if (!response.ok) {
     if (response.message.empty()) {
       response.message = "Server did not provide any message..."s;
     }
     SPDLOG_ERROR("Server returned error status with message: '{}'", response.message);
-    _errorNotifier("Error", QString::fromStdString(response.message));
+    if (!(consumer && consumer->suppressGlobalErrorPopup())) {
+      _errorNotifier("Error", QString::fromStdString(response.message));
+    }
   }
 
-  auto* senderObject = meta.sender.data();
   if (!meta.expectsResponse) {
     if (response.payload.has_value()) {
       SPDLOG_WARN("Class {} received unexpected response payload; ignoring.",
@@ -123,7 +129,6 @@ void Updater::handleResponse(const ITransportWorker::ResponseEvent& event) {
                 meta.senderClassName.toStdString());
     return;
   }
-  auto* consumer = dynamic_cast<ResponseConsumer*>(senderObject);
   if (!consumer) {
     return;
   }

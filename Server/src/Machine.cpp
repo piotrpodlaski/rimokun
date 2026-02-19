@@ -378,6 +378,7 @@ void Machine::shutdown() {
 
 void Machine::makeDummyStatus() {
   using namespace utl;
+  _robotStatus.motors.clear();
   const std::vector motors = {EMotor::XLeft,  EMotor::XRight, EMotor::YLeft,
                               EMotor::YRight, EMotor::ZLeft,  EMotor::ZRight};
   for (const auto& motor : motors) {

@@ -46,7 +46,7 @@ MotorPanelWindow::MotorPanelWindow(QWidget* parent) : QDialog(parent) {
   _refreshButton = new QPushButton("Refresh", this);
   _resetAlarmButton = new QPushButton("Reset alarm", this);
   _autoRefreshCheck = new QCheckBox("Auto-refresh", this);
-  _autoRefreshCheck->setChecked(true);
+  _autoRefreshCheck->setChecked(false);
   topRow->addWidget(motorLabel);
   topRow->addWidget(_motorSelector, 1);
   topRow->addWidget(new QLabel("State:", this));
@@ -119,6 +119,14 @@ void MotorPanelWindow::setRobotStatus(const utl::RobotStatus& status) {
 void MotorPanelWindow::processResponse(const GuiResponse& response) {
   const auto pending = _pendingRequest;
   _pendingRequest = PendingRequest::None;
+  if (!response.ok) {
+    const auto message =
+        response.message.empty() ? std::string("Unknown motor monitor error")
+                                 : response.message;
+    _alarmText->setPlainText(QString("Error: %1").arg(
+        QString::fromStdString(message)));
+    return;
+  }
   if (pending == PendingRequest::ResetAlarm) {
     requestDiagnostics();
     return;

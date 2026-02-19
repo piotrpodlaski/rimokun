@@ -24,6 +24,7 @@ class MotorPanelWindow final : public QDialog, public ResponseConsumer {
  public:
   explicit MotorPanelWindow(QWidget* parent = nullptr);
   void setRobotStatus(const utl::RobotStatus& status);
+  bool suppressGlobalErrorPopup() const override { return true; }
   void processResponse(const GuiResponse& response) override;
 
  signals:

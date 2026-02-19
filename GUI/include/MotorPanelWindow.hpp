@@ -2,7 +2,9 @@
 
 #include <QDialog>
 
+#include <map>
 #include <optional>
+#include <string>
 #include <vector>
 
 #include "CommonDefinitions.hpp"
@@ -12,6 +14,7 @@
 class QCheckBox;
 class QCloseEvent;
 class QComboBox;
+class QGridLayout;
 class QLabel;
 class QPushButton;
 class QTextEdit;
@@ -42,19 +45,25 @@ class MotorPanelWindow final : public QDialog, public ResponseConsumer {
   void requestResetAlarm();
   [[nodiscard]] std::optional<utl::EMotor> selectedMotor() const;
   void updateFromDiagnostics(const nlohmann::json& payload);
+  void createAssignmentRows(
+      QGridLayout* layout, const std::vector<std::string>& channels,
+      std::map<std::string, std::pair<QLabel*, LedIndicator*>>& targetRows);
+  void updateAssignmentRows(
+      const nlohmann::json& assignments,
+      std::map<std::string, std::pair<QLabel*, LedIndicator*>>& rows);
 
   QComboBox* _motorSelector{nullptr};
   LedIndicator* _stateLamp{nullptr};
   QLabel* _inputRawLabel{nullptr};
   QLabel* _outputRawLabel{nullptr};
-  QTextEdit* _inputFlagsText{nullptr};
-  QTextEdit* _outputFlagsText{nullptr};
   QTextEdit* _alarmText{nullptr};
   QTextEdit* _warningText{nullptr};
   QPushButton* _refreshButton{nullptr};
   QPushButton* _resetAlarmButton{nullptr};
   QCheckBox* _autoRefreshCheck{nullptr};
   QTimer* _refreshTimer{nullptr};
+  std::map<std::string, std::pair<QLabel*, LedIndicator*>> _inputAssignmentRows;
+  std::map<std::string, std::pair<QLabel*, LedIndicator*>> _outputAssignmentRows;
 
   std::vector<utl::EMotor> _visibleMotors;
   utl::RobotStatus _lastStatus;

@@ -1,29 +1,38 @@
 #include <Config.hpp>
 #include <Logger.hpp>
 #include <MotorControl.hpp>
+#include <JsonExtensions.hpp>
 #include <magic_enum/magic_enum.hpp>
 
-#include <chrono>
 #include <algorithm>
+#include <atomic>
+#include <chrono>
+#include <csignal>
 #include <filesystem>
-#include <format>
 #include <iostream>
+#include <optional>
 #include <string>
 #include <thread>
+#include <vector>
 
 namespace {
+std::atomic_bool gStopRequested{false};
+
+void signalHandler(int) { gStopRequested.store(true, std::memory_order_release); }
+
 struct Args {
   std::string configPath{"Config/rimokun.yaml"};
-  std::string motorName{"XLeft"};
+  std::string motorName{};
   std::int32_t speed1{200};
   std::int32_t speed2{400};
   int runSeconds{5};
+  bool listMotorsOnly{false};
 };
 
 void printUsage(const char* argv0) {
   std::cout
       << "Usage: " << argv0
-      << " [--config PATH] [--motor NAME] [--speed1 N] [--speed2 N] [--run-seconds N]\n"
+      << " [--config PATH] [--motor NAME] [--speed1 N] [--speed2 N] [--run-seconds N] [--list-motors]\n"
       << "Example: " << argv0
       << " --config Config/rimokun.yaml --motor XLeft --speed1 200 --speed2 600 --run-seconds 5\n";
 }
@@ -54,6 +63,10 @@ bool parseArgs(int argc, char** argv, Args& args) {
     if (a == "--help" || a == "-h") {
       printUsage(argv[0]);
       return false;
+    }
+    if (a == "--list-motors") {
+      args.listMotorsOnly = true;
+      continue;
     }
     if (a == "--config") {
       if (!needValue("--config")) return false;
@@ -108,10 +121,94 @@ void printFlags(const std::string& label, const T& status, const std::string& ra
   }
   std::cout << "]\n";
 }
+
+template <typename TAssignment>
+void printAssignments(const char* label, const std::vector<TAssignment>& assignments,
+                      const bool inputSide, const MotorRegisterMap& map) {
+  auto resolveRegisterInfo = [inputSide, &map](const std::string& channel)
+      -> std::pair<std::string, std::string> {
+    if (!inputSide) {
+      if (channel.rfind("OUT", 0) == 0) {
+        const auto index = std::stoi(channel.substr(3));
+        const auto upper = map.outputFunctionSelectBase + (2 * index);
+        const auto lower = upper + 1;
+        if (index > 5) {
+          return {std::format("assign=0x{:04X}/0x{:04X}", upper, lower),
+                  "state=n/a"};
+        }
+        return {
+            std::format("assign=0x{:04X}/0x{:04X}", upper, lower),
+            std::format("state=0x00D4.bit{}", index)};
+      }
+      if (channel == "MB") {
+        return {"assign=fixed", "state=0x00D4.bit8"};
+      }
+      return {"assign=n/a", "state=n/a"};
+    }
+
+    if (channel.rfind("IN", 0) == 0) {
+      const auto index = std::stoi(channel.substr(2));
+      const auto upper = map.inputFunctionSelectBase + (2 * index);
+      const auto lower = upper + 1;
+      constexpr std::array<int, 8> kInBitsByChannel = {6, 7, 8, 9, 10, 11, 12, 13};
+      if (index >= 0 && index < static_cast<int>(kInBitsByChannel.size())) {
+        return {
+            std::format("assign=0x{:04X}/0x{:04X}", upper, lower),
+            std::format("state=0x00D5.bit{}", kInBitsByChannel[index])};
+      }
+      return {std::format("assign=0x{:04X}/0x{:04X}", upper, lower), "state=n/a"};
+    }
+    if (channel == "+LS") return {"assign=fixed", "state=0x00D5.bit0"};
+    if (channel == "-LS") return {"assign=fixed", "state=0x00D5.bit1"};
+    if (channel == "HOMES") return {"assign=fixed", "state=0x00D5.bit2"};
+    if (channel == "SLIT") return {"assign=fixed", "state=0x00D5.bit3"};
+    return {"assign=n/a", "state=n/a"};
+  };
+
+  std::cout << label << ":\n";
+  for (const auto& assignment : assignments) {
+    const auto [assignReg, stateReg] = resolveRegisterInfo(assignment.channel);
+    std::cout << "  "
+              << "[" << (assignment.active ? "1" : "0") << "] "
+              << assignment.channel << " -> " << assignment.function
+              << " (code=" << assignment.functionCode << ", " << assignReg
+              << ", " << stateReg << ")\n";
+  }
+}
+
+void sleepOrStop(const std::chrono::steady_clock::time_point until) {
+  using namespace std::chrono_literals;
+  while (!gStopRequested.load(std::memory_order_acquire) &&
+         std::chrono::steady_clock::now() < until) {
+    std::this_thread::sleep_for(50ms);
+  }
+}
+
+std::optional<utl::EMotor> resolveMotor(const std::string& name,
+                                        const std::vector<utl::EMotor>& configured) {
+  if (configured.empty()) {
+    return std::nullopt;
+  }
+  if (name.empty()) {
+    return configured.front();
+  }
+  const auto parsed = magic_enum::enum_cast<utl::EMotor>(name);
+  if (!parsed) {
+    return std::nullopt;
+  }
+  const auto it = std::find(configured.begin(), configured.end(), *parsed);
+  if (it == configured.end()) {
+    return std::nullopt;
+  }
+  return *parsed;
+}
 }  // namespace
 
 int main(int argc, char** argv) {
+  using namespace std::chrono;
   utl::configureLogger();
+  std::signal(SIGINT, signalHandler);
+  std::signal(SIGTERM, signalHandler);
 
   Args args;
   if (!parseArgs(argc, argv, args)) {
@@ -124,69 +221,111 @@ int main(int argc, char** argv) {
   }
   utl::Config::instance().setConfigPath(args.configPath);
 
-  const auto motorOpt = magic_enum::enum_cast<utl::EMotor>(args.motorName);
-  if (!motorOpt) {
-    SPDLOG_CRITICAL("Invalid motor '{}'.", args.motorName);
-    return 1;
-  }
-  const auto motorId = *motorOpt;
-
   try {
     MotorControl mc;
-    mc.initialize();
+    auto cleanup = [&mc](const std::optional<utl::EMotor> motor) {
+      if (motor.has_value()) {
+        try {
+          mc.stopMovement(*motor);
+        } catch (const std::exception& e) {
+          SPDLOG_WARN("Failed to stop motor during cleanup: {}", e.what());
+        }
+      }
+      try {
+        mc.reset();
+      } catch (const std::exception& e) {
+        SPDLOG_WARN("Failed to reset MotorControl during cleanup: {}", e.what());
+      }
+    };
 
-    // Diagnostics snapshot similar to manual checks in the python script.
+    mc.initialize();
+    const auto configuredMotors = mc.configuredMotorIds();
+    if (configuredMotors.empty()) {
+      SPDLOG_CRITICAL("No motors configured in MotorControl.motors.");
+      cleanup(std::nullopt);
+      return 1;
+    }
+
+    SPDLOG_INFO("Configured motors ({}):", configuredMotors.size());
+    for (const auto motor : configuredMotors) {
+      SPDLOG_INFO("  {}", utl::enumToString(motor));
+    }
+    if (args.listMotorsOnly) {
+      cleanup(std::nullopt);
+      return 0;
+    }
+
+    const auto motorOpt = resolveMotor(args.motorName, configuredMotors);
+    if (!motorOpt) {
+      SPDLOG_CRITICAL(
+          "Invalid or unconfigured motor '{}'. Use --list-motors to inspect available motors.",
+          args.motorName);
+      cleanup(std::nullopt);
+      return 1;
+    }
+    const auto motorId = *motorOpt;
+    SPDLOG_INFO("Using motor {}", utl::enumToString(motorId));
+
     const auto alarm = mc.diagnoseCurrentAlarm(motorId);
     const auto warning = mc.diagnoseCurrentWarning(motorId);
     const auto comm = mc.diagnoseCurrentCommunicationError(motorId);
-    SPDLOG_INFO("Current alarm code=0x{:02X}, type='{}'", alarm.code, alarm.type);
-    SPDLOG_INFO("Current warning code=0x{:02X}, type='{}'", warning.code, warning.type);
+    SPDLOG_INFO("Current alarm: {}",
+                alarm.code == 0
+                    ? "none"
+                    : std::format("code=0x{:02X}, type='{}'", alarm.code,
+                                  alarm.type));
+    SPDLOG_INFO("Current warning: {}",
+                warning.code == 0
+                    ? "none"
+                    : std::format("code=0x{:02X}, type='{}'", warning.code,
+                                  warning.type));
     SPDLOG_INFO("Current comm error code=0x{:02X}, type='{}'", comm.code, comm.type);
 
-    // Speed-mode run: movement is level-controlled by FWD/RVS bits in 0x007D.
-    // No START/STOP pulses are used in speed mode.
-    // Stop is performed by clearing 0x007D (via MotorControl::stopMovement).
     mc.setMode(motorId, MotorControlMode::Speed);
     mc.setDirection(motorId, MotorControlDirection::Forward);
     mc.setSpeed(motorId, args.speed1);
     mc.startMovement(motorId);
-    SPDLOG_INFO(
-        "Started motor {} in speed mode (FWD), speed={}.",
-        args.motorName, args.speed1);
+    SPDLOG_INFO("Started speed mode: forward, speed={}", args.speed1);
 
-    std::this_thread::sleep_for(std::chrono::seconds{std::max(1, args.runSeconds / 3)});
+    const auto total = seconds{std::max(1, args.runSeconds)};
+    const auto t0 = steady_clock::now();
+    const auto t1 = t0 + total / 3;
+    const auto t2 = t0 + (2 * total) / 3;
+    const auto tEnd = t0 + total;
 
-    mc.setSpeed(motorId, args.speed2);
-    SPDLOG_INFO("Updated speed while moving to {} (buffered op switch).", args.speed2);
+    sleepOrStop(t1);
+    if (!gStopRequested.load(std::memory_order_acquire)) {
+      mc.setSpeed(motorId, args.speed2);
+      SPDLOG_INFO("Updated speed while moving: {}", args.speed2);
+    }
 
-    std::this_thread::sleep_for(std::chrono::seconds{std::max(1, args.runSeconds / 3)});
+    sleepOrStop(t2);
+    if (!gStopRequested.load(std::memory_order_acquire)) {
+      mc.setDirection(motorId, MotorControlDirection::Reverse);
+      SPDLOG_INFO("Direction changed to reverse");
+    }
 
-    mc.setDirection(motorId, MotorControlDirection::Reverse);  // FWD=0, RVS=1
-    SPDLOG_INFO("Changed direction on the fly: REVERSE (RVS high).");
-
-    std::this_thread::sleep_for(
-        std::chrono::seconds{std::max(1, args.runSeconds - 2 * std::max(1, args.runSeconds / 3))});
-
-    mc.setDirection(motorId, MotorControlDirection::Forward);  // RVS=0, FWD=1
-    SPDLOG_INFO("Changed direction on the fly: FORWARD (FWD high).");
+    sleepOrStop(tEnd);
+    if (!gStopRequested.load(std::memory_order_acquire)) {
+      mc.setDirection(motorId, MotorControlDirection::Forward);
+      SPDLOG_INFO("Direction changed to forward");
+    }
 
     const auto input = mc.readInputStatus(motorId);
     const auto output = mc.readOutputStatus(motorId);
     const auto dio = mc.readDirectIoStatus(motorId);
+    const auto& motorMap = mc.motors().at(motorId).map();
     printFlags("Input", input, "raw", input.raw);
     printFlags("Output", output, "raw", output.raw);
     std::cout << "DirectIO 00D4=0x" << std::hex << dio.reg00D4 << " 00D5=0x"
-              << dio.reg00D5 << std::dec << " [";
-    for (std::size_t i = 0; i < dio.activeFlags.size(); ++i) {
-      if (i) std::cout << ", ";
-      std::cout << dio.activeFlags[i];
+              << dio.reg00D5 << std::dec << "\n";
+    printAssignments("Input assignments", dio.inputAssignments, true, motorMap);
+    printAssignments("Output assignments", dio.outputAssignments, false, motorMap);
+
+    cleanup(motorId);
+    if (gStopRequested.load(std::memory_order_acquire)) {
+      SPDLOG_WARN("Interrupted by signal; exited gracefully.");
     }
-    std::cout << "]\n";
-
-    mc.stopMovement(motorId);
-    SPDLOG_INFO("Stopped motor {} by clearing 0x007D.", args.motorName);
-
-    mc.reset();
     return 0;
   } catch (const std::exception& e) {
     SPDLOG_CRITICAL("motorControlDemo failed: {}", e.what());

@@ -292,3 +292,65 @@ TEST(MotorControlTests, InitializeRejectsOutOfRangeConfiguredCurrents) {
 
   std::filesystem::remove(configPath);
 }
+
+TEST(MotorControlTests, SetAccelerationWritesBothSpeedOperationsAndCachesValue) {
+  fake_modbus::reset();
+  const auto configPath = writeMotorControlConfig("5");
+  utl::Config::instance().setConfigPath(configPath.string());
+
+  MotorControl control;
+  control.initialize();
+  control.setMode(utl::EMotor::XLeft, MotorControlMode::Speed);
+
+  const auto map = makeArKd2RegisterMap();
+  const auto writesBefore = fake_modbus::writes().size();
+  control.setAcceleration(utl::EMotor::XLeft, 1234);
+  const auto writesAfterFirst = fake_modbus::writes().size();
+  control.setAcceleration(utl::EMotor::XLeft, 1234);
+  const auto writesAfterSecond = fake_modbus::writes().size();
+
+  EXPECT_GT(writesAfterFirst, writesBefore);
+  EXPECT_EQ(writesAfterSecond, writesAfterFirst);
+
+  EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.accelerationNo0),
+            static_cast<std::uint16_t>(1234u >> 16));
+  EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.accelerationNo0 + 1),
+            static_cast<std::uint16_t>(1234u & 0xFFFFu));
+  EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.accelerationNo0 + 2),
+            static_cast<std::uint16_t>(1234u >> 16));
+  EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.accelerationNo0 + 3),
+            static_cast<std::uint16_t>(1234u & 0xFFFFu));
+
+  std::filesystem::remove(configPath);
+}
+
+TEST(MotorControlTests, SetDecelerationWritesBothSpeedOperationsAndCachesValue) {
+  fake_modbus::reset();
+  const auto configPath = writeMotorControlConfig("5");
+  utl::Config::instance().setConfigPath(configPath.string());
+
+  MotorControl control;
+  control.initialize();
+  control.setMode(utl::EMotor::XLeft, MotorControlMode::Speed);
+
+  const auto map = makeArKd2RegisterMap();
+  const auto writesBefore = fake_modbus::writes().size();
+  control.setDeceleration(utl::EMotor::XLeft, 2345);
+  const auto writesAfterFirst = fake_modbus::writes().size();
+  control.setDeceleration(utl::EMotor::XLeft, 2345);
+  const auto writesAfterSecond = fake_modbus::writes().size();
+
+  EXPECT_GT(writesAfterFirst, writesBefore);
+  EXPECT_EQ(writesAfterSecond, writesAfterFirst);
+
+  EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.decelerationNo0),
+            static_cast<std::uint16_t>(2345u >> 16));
+  EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.decelerationNo0 + 1),
+            static_cast<std::uint16_t>(2345u & 0xFFFFu));
+  EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.decelerationNo0 + 2),
+            static_cast<std::uint16_t>(2345u >> 16));
+  EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.decelerationNo0 + 3),
+            static_cast<std::uint16_t>(2345u & 0xFFFFu));
+
+  std::filesystem::remove(configPath);
+}

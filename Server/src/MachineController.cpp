@@ -11,6 +11,8 @@ MachineController::MachineController(ReadSignalsFn readInputs,
                                      ComponentStateFn contecState,
                                      SetMotorModeFn setMotorMode,
                                      SetMotorSpeedFn setMotorSpeed,
+                                     SetMotorAccelerationFn setMotorAcceleration,
+                                     SetMotorDecelerationFn setMotorDeceleration,
                                      SetMotorPositionFn setMotorPosition,
                                      SetMotorDirectionFn setMotorDirection,
                                      MoveMotorFn startMotor,
@@ -24,6 +26,8 @@ MachineController::MachineController(ReadSignalsFn readInputs,
       _contecState(std::move(contecState)),
       _setMotorMode(std::move(setMotorMode)),
       _setMotorSpeed(std::move(setMotorSpeed)),
+      _setMotorAcceleration(std::move(setMotorAcceleration)),
+      _setMotorDeceleration(std::move(setMotorDeceleration)),
       _setMotorPosition(std::move(setMotorPosition)),
       _setMotorDirection(std::move(setMotorDirection)),
       _startMotor(std::move(startMotor)),
@@ -70,6 +74,12 @@ void MachineController::runControlLoopTasks() const {
     }
     if (intent.speed) {
       _setMotorSpeed(intent.motorId, *intent.speed);
+    }
+    if (intent.acceleration) {
+      _setMotorAcceleration(intent.motorId, *intent.acceleration);
+    }
+    if (intent.deceleration) {
+      _setMotorDeceleration(intent.motorId, *intent.deceleration);
     }
     if (intent.position) {
       _setMotorPosition(intent.motorId, *intent.position);

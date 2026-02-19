@@ -7,6 +7,7 @@
 #include <magic_enum/magic_enum.hpp>
 
 #include <array>
+#include <algorithm>
 #include <format>
 #include <stdexcept>
 #include <thread>
@@ -101,6 +102,20 @@ std::string joinFlags(const std::vector<std::string_view>& flags) {
   return out;
 }
 
+std::string joinFlags(const std::vector<std::string>& flags) {
+  if (flags.empty()) {
+    return "none";
+  }
+  std::string out;
+  for (std::size_t i = 0; i < flags.size(); ++i) {
+    if (i != 0) {
+      out += ", ";
+    }
+    out += flags[i];
+  }
+  return out;
+}
+
 constexpr std::uint16_t kOperationIdMask =
     static_cast<std::uint16_t>(MotorInputFlag::M0) |
     static_cast<std::uint16_t>(MotorInputFlag::M1) |
@@ -116,6 +131,117 @@ int operationAddr(const int baseUpperAddr, const std::uint8_t opId) {
   }
   return baseUpperAddr + static_cast<int>(opId) * 2;
 }
+
+std::string outputFunctionName(const std::uint16_t code) {
+  switch (code) {
+    case 0: return "No function";
+    case 1: return "FWD_R";
+    case 2: return "RVS_R";
+    case 3: return "HOME_R";
+    case 4: return "START_R";
+    case 5: return "SSTART_R";
+    case 6: return "+JOG_R";
+    case 7: return "-JOG_R";
+    case 8: return "MS0_R";
+    case 9: return "MS1_R";
+    case 10: return "MS2_R";
+    case 11: return "MS3_R";
+    case 12: return "MS4_R";
+    case 13: return "MS5_R";
+    case 16: return "FREE_R";
+    case 17: return "C-ON_R";
+    case 18: return "STOP_R";
+    case 32: return "R0";
+    case 33: return "R1";
+    case 34: return "R2";
+    case 35: return "R3";
+    case 36: return "R4";
+    case 37: return "R5";
+    case 38: return "R6";
+    case 39: return "R7";
+    case 40: return "R8";
+    case 41: return "R9";
+    case 42: return "R10";
+    case 43: return "R11";
+    case 44: return "R12";
+    case 45: return "R13";
+    case 46: return "R14";
+    case 47: return "R15";
+    case 48: return "M0_R";
+    case 49: return "M1_R";
+    case 50: return "M2_R";
+    case 51: return "M3_R";
+    case 52: return "M4_R";
+    case 53: return "M5_R";
+    case 60: return "+LS_R";
+    case 61: return "-LS_R";
+    case 62: return "HOMES_R";
+    case 63: return "SLIT_R";
+    case 65: return "ALM";
+    case 66: return "WNG";
+    case 67: return "READY";
+    case 68: return "MOVE";
+    case 69: return "END";
+    case 70: return "HOME-P";
+    case 71: return "TLC";
+    case 72: return "TIM";
+    case 73: return "AREA1";
+    case 74: return "AREA2";
+    case 75: return "AREA3";
+    case 80: return "S-BSY";
+    case 82: return "MPS";
+    default: return std::format("Unknown({})", code);
+  }
+}
+
+std::string inputFunctionName(const std::uint16_t code) {
+  switch (code) {
+    case 0: return "No function";
+    case 1: return "FWD";
+    case 2: return "RVS";
+    case 3: return "HOME";
+    case 4: return "START";
+    case 5: return "SSTART";
+    case 6: return "+JOG";
+    case 7: return "-JOG";
+    case 8: return "MS0";
+    case 9: return "MS1";
+    case 10: return "MS2";
+    case 11: return "MS3";
+    case 12: return "MS4";
+    case 13: return "MS5";
+    case 16: return "FREE";
+    case 17: return "C-ON";
+    case 18: return "STOP";
+    case 24: return "ALM-RST";
+    case 25: return "P-PRESET";
+    case 26: return "P-CLR";
+    case 27: return "HMI";
+    case 32: return "R0";
+    case 33: return "R1";
+    case 34: return "R2";
+    case 35: return "R3";
+    case 36: return "R4";
+    case 37: return "R5";
+    case 38: return "R6";
+    case 39: return "R7";
+    case 40: return "R8";
+    case 41: return "R9";
+    case 42: return "R10";
+    case 43: return "R11";
+    case 44: return "R12";
+    case 45: return "R13";
+    case 46: return "R14";
+    case 47: return "R15";
+    case 48: return "M0";
+    case 49: return "M1";
+    case 50: return "M2";
+    case 51: return "M3";
+    case 52: return "M4";
+    case 53: return "M5";
+    default: return std::format("Unknown({})", code);
+  }
+}
 }  // namespace
 
 Motor::Motor(utl::EMotor id, int slaveAddress, MotorRegisterMap map)
@@ -124,6 +250,8 @@ Motor::Motor(utl::EMotor id, int slaveAddress, MotorRegisterMap map)
 void Motor::initialize(ModbusClient& bus) const {
   _driverInputCommandRawCache.reset();
   _selectedOperationIdCache.reset();
+  _outputFunctionAssignments.reset();
+  _inputFunctionAssignments.reset();
   selectSlave(bus);
 
   // AR-KD2 sanity check: read present alarm register pair.
@@ -170,6 +298,8 @@ void Motor::initialize(ModbusClient& bus) const {
 
   const auto inputRaw = readDriverInputCommandRaw(bus);
   const auto outputRaw = readDriverOutputStatusRaw(bus);
+  _outputFunctionAssignments = readOutputFunctionAssignments(bus);
+  _inputFunctionAssignments = readInputFunctionAssignments(bus);
   const auto ioRaw = readDirectIoAndBrakeStatusRaw(bus);
   const auto inputStatus = decodeDriverInputStatus(inputRaw);
   const auto outputStatus = decodeDriverOutputStatus(outputRaw);
@@ -479,31 +609,128 @@ MotorDirectIoStatus Motor::decodeDirectIoAndBrakeStatus(
   const auto reg00D5 = static_cast<std::uint16_t>(raw & 0xFFFFu);
   MotorDirectIoStatus status{.reg00D4 = reg00D4, .reg00D5 = reg00D5};
 
-  // 00D4h lower byte
-  if ((reg00D4 & (1u << 0)) != 0) status.activeFlags.emplace_back("OUT0");
-  if ((reg00D4 & (1u << 1)) != 0) status.activeFlags.emplace_back("OUT1");
-  if ((reg00D4 & (1u << 2)) != 0) status.activeFlags.emplace_back("OUT2");
-  if ((reg00D4 & (1u << 3)) != 0) status.activeFlags.emplace_back("OUT3");
-  if ((reg00D4 & (1u << 4)) != 0) status.activeFlags.emplace_back("OUT4");
-  if ((reg00D4 & (1u << 5)) != 0) status.activeFlags.emplace_back("OUT5");
-  // 00D4h upper byte bit0 (absolute bit8)
-  if ((reg00D4 & (1u << 8)) != 0) status.activeFlags.emplace_back("MB");
+  const auto outputAssignments = _outputFunctionAssignments.value_or(
+      std::array<std::uint16_t, 16>{});
+  const bool haveOutputAssignments = _outputFunctionAssignments.has_value();
+  // 00D4 mapping from original implementation:
+  // bit0..5 -> OUT0..OUT5, bit8 -> MB (fixed)
+  // Only 6 configurable output lines are exposed at interface level.
+  for (std::size_t i = 0; i <= 5; ++i) {
+    const auto code = outputAssignments[i];
+    const bool active = (reg00D4 & (1u << i)) != 0;
+    const auto functionName =
+        haveOutputAssignments ? describeOutputFunctionCode(code)
+                              : std::format("OUT{}", i);
+    status.outputAssignments.push_back(
+        {.channel = std::format("OUT{}", i),
+         .function = functionName,
+         .functionCode = code,
+         .active = active});
+    if (active) {
+      status.activeFlags.emplace_back(
+          std::format("OUT{}({})", i, functionName));
+    }
+  }
+  const bool mbActive = (reg00D4 & (1u << 8)) != 0;
+  status.outputAssignments.push_back(
+      {.channel = "MB", .function = "MB", .functionCode = 0, .active = mbActive});
+  if (mbActive) {
+    status.activeFlags.emplace_back("MB");
+  }
 
-  // 00D5h upper byte
-  if ((reg00D5 & (1u << 13)) != 0) status.activeFlags.emplace_back("IN7");
-  if ((reg00D5 & (1u << 12)) != 0) status.activeFlags.emplace_back("IN6");
-  if ((reg00D5 & (1u << 11)) != 0) status.activeFlags.emplace_back("IN5");
-  if ((reg00D5 & (1u << 10)) != 0) status.activeFlags.emplace_back("IN4");
-  if ((reg00D5 & (1u << 9)) != 0) status.activeFlags.emplace_back("IN3");
-  if ((reg00D5 & (1u << 8)) != 0) status.activeFlags.emplace_back("IN2");
-  // 00D5h lower byte
-  if ((reg00D5 & (1u << 7)) != 0) status.activeFlags.emplace_back("IN1");
-  if ((reg00D5 & (1u << 6)) != 0) status.activeFlags.emplace_back("IN0");
-  if ((reg00D5 & (1u << 3)) != 0) status.activeFlags.emplace_back("SLIT");
-  if ((reg00D5 & (1u << 2)) != 0) status.activeFlags.emplace_back("HOMES");
-  if ((reg00D5 & (1u << 1)) != 0) status.activeFlags.emplace_back("-LS");
-  if ((reg00D5 & (1u << 0)) != 0) status.activeFlags.emplace_back("+LS");
+  const auto inputAssignments =
+      _inputFunctionAssignments.value_or(std::array<std::uint16_t, 12>{});
+  const bool haveInputAssignments = _inputFunctionAssignments.has_value();
+  // 00D5 mapping from original implementation:
+  // IN0..IN1 -> bits6..7, IN2..IN7 -> bits8..13.
+  // Only 8 configurable input lines are exposed at interface level.
+  const std::array<int, 8> inBitsByChannel = {6, 7, 8, 9, 10, 11, 12, 13};
+  for (std::size_t i = 0; i < inBitsByChannel.size(); ++i) {
+    const auto code = inputAssignments[i];
+    const bool active = (reg00D5 & (1u << inBitsByChannel[i])) != 0;
+    const auto functionName =
+        haveInputAssignments ? describeInputFunctionCode(code)
+                             : std::format("IN{}", i);
+    status.inputAssignments.push_back(
+        {.channel = std::format("IN{}", i),
+         .function = functionName,
+         .functionCode = code,
+         .active = active});
+    if (active) {
+      status.activeFlags.emplace_back(
+          std::format("IN{}({})", i, functionName));
+    }
+  }
+
+  // Fixed input bits on 00D5 lower nibble.
+  const auto addFixedInput = [&](const std::string& name, const int bit) {
+    const bool active = (reg00D5 & (1u << bit)) != 0;
+    status.inputAssignments.push_back(
+        {.channel = name, .function = name, .functionCode = 0, .active = active});
+    if (active) {
+      status.activeFlags.push_back(name);
+    }
+  };
+  addFixedInput("+LS", 0);
+  addFixedInput("-LS", 1);
+  addFixedInput("HOMES", 2);
+  addFixedInput("SLIT", 3);
   return status;
+}
+
+std::array<std::uint16_t, 16> Motor::readOutputFunctionAssignments(
+    ModbusClient& bus) const {
+  selectSlave(bus);
+  // Function assignment registers are 32-bit values (upper/lower per channel).
+  // We keep only the lower 16-bit function code.
+  constexpr int kChannels = 6;
+  constexpr int kWordsPerChannel = 2;
+  auto regs =
+      bus.read_holding_registers(_map.outputFunctionSelectBase,
+                                 kChannels * kWordsPerChannel);
+  if (!regs || regs->size() != static_cast<std::size_t>(kChannels * kWordsPerChannel)) {
+    const auto reason = regs ? "Unexpected register count" : regs.error().message;
+    throw std::runtime_error(
+        std::format("Motor {} (slave {}) read output function assignment failed: {}",
+                    magic_enum::enum_name(_id), _slaveAddress, reason));
+  }
+  std::array<std::uint16_t, 16> out{};
+  for (int i = 0; i < kChannels; ++i) {
+    const auto lowerWordIndex = i * kWordsPerChannel + 1;
+    out[static_cast<std::size_t>(i)] = (*regs)[static_cast<std::size_t>(lowerWordIndex)];
+  }
+  return out;
+}
+
+std::array<std::uint16_t, 12> Motor::readInputFunctionAssignments(
+    ModbusClient& bus) const {
+  selectSlave(bus);
+  // Function assignment registers are 32-bit values (upper/lower per channel).
+  // We keep only the lower 16-bit function code.
+  constexpr int kChannels = 8;
+  constexpr int kWordsPerChannel = 2;
+  auto regs = bus.read_holding_registers(_map.inputFunctionSelectBase,
+                                         kChannels * kWordsPerChannel);
+  if (!regs || regs->size() != static_cast<std::size_t>(kChannels * kWordsPerChannel)) {
+    const auto reason = regs ? "Unexpected register count" : regs.error().message;
+    throw std::runtime_error(
+        std::format("Motor {} (slave {}) read input function assignment failed: {}",
+                    magic_enum::enum_name(_id), _slaveAddress, reason));
+  }
+  std::array<std::uint16_t, 12> out{};
+  for (int i = 0; i < kChannels; ++i) {
+    const auto lowerWordIndex = i * kWordsPerChannel + 1;
+    out[static_cast<std::size_t>(i)] = (*regs)[static_cast<std::size_t>(lowerWordIndex)];
+  }
+  return out;
+}
+
+std::string Motor::describeOutputFunctionCode(const std::uint16_t code) {
+  return outputFunctionName(code);
+}
+
+std::string Motor::describeInputFunctionCode(const std::uint16_t code) {
+  return inputFunctionName(code);
 }
 
 void Motor::resetAlarm(ModbusClient& bus) const {
@@ -512,8 +739,8 @@ void Motor::resetAlarm(ModbusClient& bus) const {
   }
 
   // Alarm reset is a 0->1 edge on 0x0180.
-  writeU16(bus, _map.alarmResetCommand, 0u);
-  writeU16(bus, _map.alarmResetCommand, 1u);
+  writeInt32(bus, _map.alarmResetCommand, 0u);
+  writeInt32(bus, _map.alarmResetCommand, 1u);
 }
 
 void Motor::selectSlave(ModbusClient& bus) const {

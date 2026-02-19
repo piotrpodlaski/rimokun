@@ -10,6 +10,9 @@ struct MotorRegisterMap {
   int presentWarning{0x0096};
   int communicationErrorCode{0x00AC};
   int directIoAndBrakeStatus{0x00D4};
+  // 32-bit entries (upper/lower words): OUTn at 0x1100 + 2*n, INn at 0x1140 + 2*n
+  int outputFunctionSelectBase{0x1100};  // OUT0..OUT15 assignment base
+  int inputFunctionSelectBase{0x1140};   // IN0..IN11 assignment base
 
   // From lab validation script (vendor docs should be preferred for production reset flow).
   int alarmResetCommand{0x0180};

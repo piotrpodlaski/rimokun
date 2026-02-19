@@ -131,6 +131,14 @@ RimoKunControlPolicy::RimoKunControlPolicy() {
       if (const auto stepsPerMm = axisNode["stepsPerMm"]; stepsPerMm) {
         axis.stepsPerMm = stepsPerMm.as<double>();
       }
+      if (const auto acceleration = axisNode["acceleration001MsPerKHz"];
+          acceleration) {
+        axis.acceleration001MsPerKHz = acceleration.as<std::int32_t>();
+      }
+      if (const auto deceleration = axisNode["deceleration001MsPerKHz"];
+          deceleration) {
+        axis.deceleration001MsPerKHz = deceleration.as<std::int32_t>();
+      }
     };
 
     readAxis(axesCfg, "leftArmX", _motion.leftArmX);
@@ -275,6 +283,8 @@ IRobotControlPolicy::ControlDecision RimoKunControlPolicy::decide(
     if (!runtime.wasActive) {
       intent.mode = MotorControlMode::Speed;  // default operating mode
       intent.direction = desiredDirection;
+      intent.acceleration = axisCfg.acceleration001MsPerKHz;
+      intent.deceleration = axisCfg.deceleration001MsPerKHz;
       intent.speed = std::max<std::int32_t>(
           1, speedStepsPerSecFromAxis(clampedAxis, axisCfg.maxLinearSpeedMmPerSec,
                                     axisCfg.stepsPerMm));

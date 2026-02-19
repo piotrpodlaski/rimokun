@@ -60,20 +60,28 @@ MotorPanelWindow::MotorPanelWindow(QWidget* parent) : QDialog(parent) {
   auto* rawForm = new QFormLayout(rawGroup);
   _inputRawLabel = new QLabel("-", rawGroup);
   _outputRawLabel = new QLabel("-", rawGroup);
-  rawForm->addRow("Input (0x007D):", _inputRawLabel);
-  rawForm->addRow("Output (0x007F):", _outputRawLabel);
+  rawForm->addRow("OUT state (0x00D4):", _outputRawLabel);
+  rawForm->addRow("IN state (0x00D5):", _inputRawLabel);
   root->addWidget(rawGroup);
 
-  auto* flagsGroup = new QGroupBox("Bit flags", this);
+  auto* flagsGroup = new QGroupBox("Mapped I/O", this);
   auto* flagsGrid = new QGridLayout(flagsGroup);
-  _inputFlagsText = new QTextEdit(flagsGroup);
-  _outputFlagsText = new QTextEdit(flagsGroup);
-  _inputFlagsText->setReadOnly(true);
-  _outputFlagsText->setReadOnly(true);
-  flagsGrid->addWidget(new QLabel("Input flags"), 0, 0);
-  flagsGrid->addWidget(new QLabel("Output flags"), 0, 1);
-  flagsGrid->addWidget(_inputFlagsText, 1, 0);
-  flagsGrid->addWidget(_outputFlagsText, 1, 1);
+  auto* inputGroup = new QGroupBox("Inputs", flagsGroup);
+  auto* outputGroup = new QGroupBox("Outputs", flagsGroup);
+  auto* inputLayout = new QGridLayout(inputGroup);
+  auto* outputLayout = new QGridLayout(outputGroup);
+
+  createAssignmentRows(
+      inputLayout,
+      {"IN0", "IN1", "IN2", "IN3", "IN4", "IN5", "IN6", "IN7", "+LS", "-LS",
+       "HOMES", "SLIT"},
+      _inputAssignmentRows);
+  createAssignmentRows(outputLayout,
+                       {"OUT0", "OUT1", "OUT2", "OUT3", "OUT4", "OUT5", "MB"},
+                       _outputAssignmentRows);
+
+  flagsGrid->addWidget(inputGroup, 0, 0);
+  flagsGrid->addWidget(outputGroup, 0, 1);
   root->addWidget(flagsGroup, 1);
 
   auto* diagGroup = new QGroupBox("Diagnostics", this);
@@ -120,6 +128,7 @@ void MotorPanelWindow::processResponse(const GuiResponse& response) {
   const auto pending = _pendingRequest;
   _pendingRequest = PendingRequest::None;
   if (!response.ok) {
+    updateFromDiagnostics(nlohmann::json::object());
     const auto message =
         response.message.empty() ? std::string("Unknown motor monitor error")
                                  : response.message;
@@ -132,9 +141,15 @@ void MotorPanelWindow::processResponse(const GuiResponse& response) {
     return;
   }
   if (!response.payload.has_value()) {
+    updateFromDiagnostics(nlohmann::json::object());
     return;
   }
   updateFromDiagnostics(*response.payload);
+  if (response.payload->contains("diagnosticsError") &&
+      (*response.payload)["diagnosticsError"].is_string()) {
+    _alarmText->setPlainText(QString("Error: %1").arg(QString::fromStdString(
+        (*response.payload)["diagnosticsError"].get<std::string>())));
+  }
 }
 
 void MotorPanelWindow::closeEvent(QCloseEvent* event) {
@@ -219,42 +234,38 @@ void MotorPanelWindow::updateFromDiagnostics(const nlohmann::json& payload) {
   if (!payload.is_object()) {
     return;
   }
-  if (payload.contains("inputRaw") && payload["inputRaw"].is_number_unsigned()) {
+  if (payload.contains("ioInputRaw") && payload["ioInputRaw"].is_number_unsigned()) {
     _inputRawLabel->setText(
-        QString("0x%1").arg(payload["inputRaw"].get<unsigned int>(), 4, 16,
+        QString("0x%1").arg(payload["ioInputRaw"].get<unsigned int>(), 4, 16,
                             QLatin1Char('0')));
   } else {
     _inputRawLabel->setText("-");
   }
-  if (payload.contains("outputRaw") && payload["outputRaw"].is_number_unsigned()) {
+  if (payload.contains("ioOutputRaw") &&
+      payload["ioOutputRaw"].is_number_unsigned()) {
     _outputRawLabel->setText(
-        QString("0x%1").arg(payload["outputRaw"].get<unsigned int>(), 4, 16,
+        QString("0x%1").arg(payload["ioOutputRaw"].get<unsigned int>(), 4, 16,
                             QLatin1Char('0')));
   } else {
     _outputRawLabel->setText("-");
   }
 
-  auto stringifyFlags = [](const nlohmann::json& node) -> QString {
-    if (!node.is_array() || node.empty()) {
-      return "-";
-    }
-    QStringList lines;
-    for (const auto& item : node) {
-      if (item.is_string()) {
-        lines.push_back(QString::fromStdString(item.get<std::string>()));
-      }
-    }
-    return lines.join('\n');
-  };
-  _inputFlagsText->setPlainText(
-      payload.contains("inputFlags") ? stringifyFlags(payload["inputFlags"]) : "-");
-  _outputFlagsText->setPlainText(
-      payload.contains("outputFlags") ? stringifyFlags(payload["outputFlags"])
-                                      : "-");
+  updateAssignmentRows(payload.contains("ioOutputAssignments")
+                           ? payload["ioOutputAssignments"]
+                           : nlohmann::json::array(),
+                       _outputAssignmentRows);
+  updateAssignmentRows(payload.contains("ioInputAssignments")
+                           ? payload["ioInputAssignments"]
+                           : nlohmann::json::array(),
+                       _inputAssignmentRows);
 
   auto formatDiag = [](const nlohmann::json& diag) -> QString {
     if (!diag.is_object()) {
       return "-";
+    }
+    if (diag.contains("code") && diag["code"].is_number_unsigned() &&
+        diag["code"].get<unsigned int>() == 0u) {
+      return "None";
     }
     QStringList lines;
     lines << QString("Code: %1").arg(formatCode(diag, "code"));
@@ -276,4 +287,47 @@ void MotorPanelWindow::updateFromDiagnostics(const nlohmann::json& payload) {
       payload.contains("alarm") ? formatDiag(payload["alarm"]) : "-");
   _warningText->setPlainText(
       payload.contains("warning") ? formatDiag(payload["warning"]) : "-");
+}
+
+void MotorPanelWindow::createAssignmentRows(
+    QGridLayout* layout, const std::vector<std::string>& channels,
+    std::map<std::string, std::pair<QLabel*, LedIndicator*>>& targetRows) {
+  int row = 0;
+  for (const auto& channel : channels) {
+    auto* mappingLabel = new QLabel("-", this);
+    auto* led = new LedIndicator(this);
+    led->setState(utl::ELEDState::Off);
+    layout->addWidget(mappingLabel, row, 0);
+    layout->addWidget(led, row, 1);
+    targetRows.emplace(channel, std::make_pair(mappingLabel, led));
+    ++row;
+  }
+  layout->setColumnStretch(0, 1);
+}
+
+void MotorPanelWindow::updateAssignmentRows(
+    const nlohmann::json& assignments,
+    std::map<std::string, std::pair<QLabel*, LedIndicator*>>& rows) {
+  for (auto& [_, widgets] : rows) {
+    widgets.first->setText("-");
+    widgets.second->setState(utl::ELEDState::Off);
+  }
+  if (!assignments.is_array()) {
+    return;
+  }
+  for (const auto& item : assignments) {
+    if (!item.is_object()) {
+      continue;
+    }
+    const auto channel = item.value("channel", std::string{});
+    const auto rowIt = rows.find(channel);
+    if (rowIt == rows.end()) {
+      continue;
+    }
+    const auto function = item.value("function", std::string{"-"});
+    const bool active = item.value("active", false);
+    rowIt->second.first->setText(QString::fromStdString(function));
+    rowIt->second.second->setState(active ? utl::ELEDState::On
+                                          : utl::ELEDState::Off);
+  }
 }

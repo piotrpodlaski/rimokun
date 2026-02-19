@@ -17,6 +17,12 @@ void MachineRuntime::wireMachine(Machine& machine) {
         [&machine](const utl::EMotor motorId, const std::int32_t speed) {
           machine._motorControl.setSpeed(motorId, speed);
         },
+        [&machine](const utl::EMotor motorId, const std::int32_t acceleration) {
+          machine._motorControl.setAcceleration(motorId, acceleration);
+        },
+        [&machine](const utl::EMotor motorId, const std::int32_t deceleration) {
+          machine._motorControl.setDeceleration(motorId, deceleration);
+        },
         [&machine](const utl::EMotor motorId, const std::int32_t position) {
           machine._motorControl.setPosition(motorId, position);
         },

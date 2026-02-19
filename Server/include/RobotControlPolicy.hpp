@@ -19,6 +19,8 @@ class IRobotControlPolicy {
     utl::EMotor motorId;
     std::optional<MotorControlMode> mode;
     std::optional<MotorControlDirection> direction;
+    std::optional<std::int32_t> acceleration;
+    std::optional<std::int32_t> deceleration;
     std::optional<std::int32_t> speed;
     std::optional<std::int32_t> position;
     bool startMovement{false};
@@ -62,6 +64,8 @@ class RimoKunControlPolicy final : public IRobotControlPolicy {
     double speedUpdateAxisDeltaThreshold{0.02};
     double maxLinearSpeedMmPerSec{80.0};
     double stepsPerMm{100.0};
+    std::int32_t acceleration001MsPerKHz{24575};
+    std::int32_t deceleration001MsPerKHz{24575};
   };
 
  struct MotionConfig {

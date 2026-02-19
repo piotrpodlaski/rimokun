@@ -26,6 +26,8 @@ std::filesystem::path writePolicyConfigWithPerMotorLimits() {
   out << "          neutralAxisActivationThreshold: 0.05\n";
   out << "          maxLinearSpeedMmPerSec: 40.0\n";
   out << "          stepsPerMm: 10.0\n";
+  out << "          acceleration001MsPerKHz: 1111\n";
+  out << "          deceleration001MsPerKHz: 2222\n";
   out << "        leftArmY:\n";
   out << "          maxLinearSpeedMmPerSec: 100.0\n";
   out << "          stepsPerMm: 10.0\n";
@@ -147,6 +149,10 @@ TEST(RobotControlPolicyTests, RimoKunPolicyGeneratesMotorIntentsFromJoystick) {
   for (const auto& intent : decision.motorIntents) {
     ASSERT_TRUE(intent.mode.has_value());
     EXPECT_EQ(*intent.mode, MotorControlMode::Speed);
+    ASSERT_TRUE(intent.acceleration.has_value());
+    ASSERT_TRUE(intent.deceleration.has_value());
+    EXPECT_EQ(*intent.acceleration, 24575);
+    EXPECT_EQ(*intent.deceleration, 24575);
   }
   std::filesystem::remove(configPath);
 }
@@ -201,6 +207,10 @@ TEST(RobotControlPolicyTests, RimoKunPolicyAppliesPerMotorSpeedLimits) {
   ASSERT_NE(xLeft, nullptr);
   ASSERT_TRUE(xLeft->speed.has_value());
   EXPECT_EQ(*xLeft->speed, 400);   // 40 mm/s * 10 steps/mm
+  ASSERT_TRUE(xLeft->acceleration.has_value());
+  ASSERT_TRUE(xLeft->deceleration.has_value());
+  EXPECT_EQ(*xLeft->acceleration, 1111);
+  EXPECT_EQ(*xLeft->deceleration, 2222);
 
   RimoKunControlPolicy policyRight;
   status.joystics[utl::EArm::Left] = {.x = 0.0, .y = 0.0, .btn = false};

@@ -45,6 +45,8 @@ TEST(MachineControllerTests, ErrorDecisionDoesNotMutateToolChangerStatusInContro
       [](utl::EMotor, MotorControlMode) {},
       [](utl::EMotor, std::int32_t) {},
       [](utl::EMotor, std::int32_t) {},
+      [](utl::EMotor, std::int32_t) {},
+      [](utl::EMotor, std::int32_t) {},
       [](utl::EMotor, MotorControlDirection) {},
       [](utl::EMotor) {},
       [](utl::EMotor) {},
@@ -78,6 +80,8 @@ TEST(MachineControllerTests, ToolChangerCommandSetsExpectedOutputSignal) {
       [](utl::EMotor, MotorControlMode) {},
       [](utl::EMotor, std::int32_t) {},
       [](utl::EMotor, std::int32_t) {},
+      [](utl::EMotor, std::int32_t) {},
+      [](utl::EMotor, std::int32_t) {},
       [](utl::EMotor, MotorControlDirection) {},
       [](utl::EMotor) {},
       [](utl::EMotor) {},
@@ -103,6 +107,8 @@ TEST(MachineControllerTests, PolicyOutputsAreForwardedToOutputsWriter) {
       []() -> std::optional<signal_map_t> { return std::nullopt; },
       []() { return MachineComponent::State::Normal; },
       [](utl::EMotor, MotorControlMode) {},
+      [](utl::EMotor, std::int32_t) {},
+      [](utl::EMotor, std::int32_t) {},
       [](utl::EMotor, std::int32_t) {},
       [](utl::EMotor, std::int32_t) {},
       [](utl::EMotor, MotorControlDirection) {},
@@ -132,6 +138,8 @@ TEST(MachineControllerTests, ToolChangerCommandThrowsWhenContecIsInErrorState) {
       [](utl::EMotor, MotorControlMode) {},
       [](utl::EMotor, std::int32_t) {},
       [](utl::EMotor, std::int32_t) {},
+      [](utl::EMotor, std::int32_t) {},
+      [](utl::EMotor, std::int32_t) {},
       [](utl::EMotor, MotorControlDirection) {},
       [](utl::EMotor) {},
       [](utl::EMotor) {},
@@ -156,6 +164,8 @@ TEST(MachineControllerTests, ToolChangerCommandThrowsWhenOutputReadbackFails) {
       []() -> std::optional<signal_map_t> { return std::nullopt; },
       []() { return MachineComponent::State::Normal; },
       [](utl::EMotor, MotorControlMode) {},
+      [](utl::EMotor, std::int32_t) {},
+      [](utl::EMotor, std::int32_t) {},
       [](utl::EMotor, std::int32_t) {},
       [](utl::EMotor, std::int32_t) {},
       [](utl::EMotor, MotorControlDirection) {},
@@ -189,6 +199,8 @@ TEST(MachineControllerTests, PolicyMotorIntentsAreAppliedInExpectedOrder) {
       []() { return MachineComponent::State::Normal; },
       [&](utl::EMotor, MotorControlMode) { applied.emplace_back("mode"); },
       [&](utl::EMotor, std::int32_t) { applied.emplace_back("speed"); },
+      [&](utl::EMotor, std::int32_t) { applied.emplace_back("acceleration"); },
+      [&](utl::EMotor, std::int32_t) { applied.emplace_back("deceleration"); },
       [&](utl::EMotor, std::int32_t) { applied.emplace_back("position"); },
       [&](utl::EMotor, MotorControlDirection) { applied.emplace_back("direction"); },
       [&](utl::EMotor) { applied.emplace_back("start"); },
@@ -223,6 +235,8 @@ TEST(MachineControllerTests, UnconfiguredMotorIntentsAreIgnored) {
       []() { return MachineComponent::State::Normal; },
       [&](utl::EMotor, MotorControlMode) { applied.emplace_back("mode"); },
       [&](utl::EMotor, std::int32_t) { applied.emplace_back("speed"); },
+      [&](utl::EMotor, std::int32_t) { applied.emplace_back("acceleration"); },
+      [&](utl::EMotor, std::int32_t) { applied.emplace_back("deceleration"); },
       [&](utl::EMotor, std::int32_t) { applied.emplace_back("position"); },
       [&](utl::EMotor, MotorControlDirection) { applied.emplace_back("direction"); },
       [&](utl::EMotor) { applied.emplace_back("start"); },
@@ -233,4 +247,38 @@ TEST(MachineControllerTests, UnconfiguredMotorIntentsAreIgnored) {
   controller.runControlLoopTasks();
 
   EXPECT_TRUE(applied.empty());
+}
+
+TEST(MachineControllerTests, AccelerationAndDecelerationIntentsAreApplied) {
+  utl::RobotStatus status;
+  auto policy = std::make_unique<FakeControlPolicy>();
+  policy->decisionToReturn.motorIntents.push_back(
+      {.motorId = utl::EMotor::XLeft,
+       .mode = MotorControlMode::Speed,
+       .acceleration = 1234,
+       .deceleration = 4321,
+       .speed = 900,
+       .startMovement = true});
+
+  std::vector<std::string> applied;
+  MachineController controller(
+      []() -> std::optional<signal_map_t> { return signal_map_t{{"button1", true}}; },
+      [](const signal_map_t&) {},
+      []() -> std::optional<signal_map_t> { return signal_map_t{}; },
+      []() { return MachineComponent::State::Normal; },
+      [&](utl::EMotor, MotorControlMode) { applied.emplace_back("mode"); },
+      [&](utl::EMotor, std::int32_t) { applied.emplace_back("speed"); },
+      [&](utl::EMotor, std::int32_t) { applied.emplace_back("acceleration"); },
+      [&](utl::EMotor, std::int32_t) { applied.emplace_back("deceleration"); },
+      [&](utl::EMotor, std::int32_t) { applied.emplace_back("position"); },
+      [&](utl::EMotor, MotorControlDirection) { applied.emplace_back("direction"); },
+      [&](utl::EMotor) { applied.emplace_back("start"); },
+      [&](utl::EMotor) { applied.emplace_back("stop"); },
+      [](utl::EMotor) { return true; },
+      status, std::move(policy));
+
+  controller.runControlLoopTasks();
+
+  EXPECT_NE(std::find(applied.begin(), applied.end(), "acceleration"), applied.end());
+  EXPECT_NE(std::find(applied.begin(), applied.end(), "deceleration"), applied.end());
 }

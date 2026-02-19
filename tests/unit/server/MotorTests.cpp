@@ -117,8 +117,9 @@ TEST(MotorTests, DecodeDirectIoAndBrakeStatusDecodesExpectedFlagNames) {
 
   EXPECT_EQ(status.reg00D4, 0x0121u);
   EXPECT_EQ(status.reg00D5, 0x2C42u);
-  const std::vector<std::string_view> expected{
-      "OUT0", "OUT5", "MB", "IN7", "IN5", "IN4", "IN0", "-LS"};
+  const std::vector<std::string> expected{
+      "OUT0(OUT0)", "OUT5(OUT5)", "MB", "IN0(IN0)", "IN4(IN4)",
+      "IN5(IN5)", "IN7(IN7)", "-LS"};
   EXPECT_EQ(status.activeFlags, expected);
 }
 
@@ -149,5 +150,6 @@ TEST(MotorTests, ResetAlarmPerformsZeroToOneTransitionWhenAlarmIsActive) {
 
   motor.resetAlarm(bus);
 
-  EXPECT_EQ(fake_modbus::getHoldingRegister(7, map.alarmResetCommand), 0x0001u);
+  EXPECT_EQ(fake_modbus::getHoldingRegister(7, map.alarmResetCommand), 0x0000u);
+  EXPECT_EQ(fake_modbus::getHoldingRegister(7, map.alarmResetCommand + 1), 0x0001u);
 }

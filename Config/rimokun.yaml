@@ -49,9 +49,10 @@ classes:
     model: "AR-KD2"
     transport:
       type: "rawTcpRtu" # default path for motors
+      #type: "serialRtu" # default path for motors
       tcp:
-        host: "10.1.1.50"
-        port: 4001
+        host: "10.1.1.102"
+        port: 4002
       serial:
         device: "/dev/ttyr01"
         baud: 115200
@@ -63,16 +64,16 @@ classes:
     motors:
       XLeft:
         address: 1
-        runCurrent: 1000
-        stopCurrent: 500
+        runCurrent: 500
+        stopCurrent: 100
 #      XRight:
 #        address: 2
 #        runCurrent: 1000
 #        stopCurrent: 500
-#      YLeft:
-#        address: 3
-#        runCurrent: 1000
-#        stopCurrent: 500
+      YLeft:
+        address: 2
+        runCurrent: 500
+        stopCurrent: 0
 #      YRight:
 #        address: 4
 #        runCurrent: 1000
@@ -94,24 +95,34 @@ classes:
       axes:
         leftArmX:
           speedUpdateAxisDeltaThreshold: 0.02
-          maxLinearSpeedMmPerSec: 80.0
+          maxLinearSpeedMmPerSec: 100.0
           stepsPerMm: 100.0
+          acceleration001MsPerKHz: 50000
+          deceleration001MsPerKHz: 50000
         leftArmY:
           speedUpdateAxisDeltaThreshold: 0.02
-          maxLinearSpeedMmPerSec: 80.0
+          maxLinearSpeedMmPerSec: 100.0
           stepsPerMm: 100.0
+          acceleration001MsPerKHz: 50000
+          deceleration001MsPerKHz: 50000
         rightArmX:
           speedUpdateAxisDeltaThreshold: 0.02
           maxLinearSpeedMmPerSec: 80.0
           stepsPerMm: 100.0
+          acceleration001MsPerKHz: 24575
+          deceleration001MsPerKHz: 24575
         rightArmY:
           speedUpdateAxisDeltaThreshold: 0.02
           maxLinearSpeedMmPerSec: 80.0
           stepsPerMm: 100.0
+          acceleration001MsPerKHz: 24575
+          deceleration001MsPerKHz: 24575
         gantryZ:
           speedUpdateAxisDeltaThreshold: 0.02
           maxLinearSpeedMmPerSec: 80.0
           stepsPerMm: 100.0
+          acceleration001MsPerKHz: 24575
+          deceleration001MsPerKHz: 24575
     inputMapping:
       safetyON : 8
       button1 : 9

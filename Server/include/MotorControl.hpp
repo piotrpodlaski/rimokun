@@ -35,6 +35,8 @@ class MotorControl final : public MachineComponent {
 
   void setMode(utl::EMotor motorId, MotorControlMode mode);
   void setSpeed(utl::EMotor motorId, std::int32_t speed);
+  void setAcceleration(utl::EMotor motorId, std::int32_t acceleration);
+  void setDeceleration(utl::EMotor motorId, std::int32_t deceleration);
   void setPosition(utl::EMotor motorId, std::int32_t position);
   void setDirection(utl::EMotor motorId, MotorControlDirection direction);
   void startMovement(utl::EMotor motorId);

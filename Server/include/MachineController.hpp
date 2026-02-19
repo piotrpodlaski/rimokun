@@ -21,6 +21,8 @@ class MachineController {
   using ComponentStateFn = std::function<MachineComponent::State()>;
   using SetMotorModeFn = std::function<void(utl::EMotor, MotorControlMode)>;
   using SetMotorSpeedFn = std::function<void(utl::EMotor, std::int32_t)>;
+  using SetMotorAccelerationFn = std::function<void(utl::EMotor, std::int32_t)>;
+  using SetMotorDecelerationFn = std::function<void(utl::EMotor, std::int32_t)>;
   using SetMotorPositionFn = std::function<void(utl::EMotor, std::int32_t)>;
   using SetMotorDirectionFn =
       std::function<void(utl::EMotor, MotorControlDirection)>;
@@ -33,6 +35,8 @@ class MachineController {
                     ComponentStateFn contecState,
                     SetMotorModeFn setMotorMode,
                     SetMotorSpeedFn setMotorSpeed,
+                    SetMotorAccelerationFn setMotorAcceleration,
+                    SetMotorDecelerationFn setMotorDeceleration,
                     SetMotorPositionFn setMotorPosition,
                     SetMotorDirectionFn setMotorDirection,
                     MoveMotorFn startMotor,
@@ -51,6 +55,8 @@ class MachineController {
   ComponentStateFn _contecState;
   SetMotorModeFn _setMotorMode;
   SetMotorSpeedFn _setMotorSpeed;
+  SetMotorAccelerationFn _setMotorAcceleration;
+  SetMotorDecelerationFn _setMotorDeceleration;
   SetMotorPositionFn _setMotorPosition;
   SetMotorDirectionFn _setMotorDirection;
   MoveMotorFn _startMotor;

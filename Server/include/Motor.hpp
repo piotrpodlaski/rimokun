@@ -5,6 +5,7 @@
 #include <MotorRegisterMap.hpp>
 
 #include <optional>
+#include <array>
 #include <chrono>
 #include <string>
 #include <string_view>
@@ -78,9 +79,18 @@ struct MotorFlagStatus {
 };
 
 struct MotorDirectIoStatus {
+  struct AssignedSignal {
+    std::string channel;
+    std::string function;
+    std::uint16_t functionCode{0};
+    bool active{false};
+  };
+
   std::uint16_t reg00D4{0};
   std::uint16_t reg00D5{0};
-  std::vector<std::string_view> activeFlags;
+  std::vector<std::string> activeFlags;
+  std::vector<AssignedSignal> outputAssignments;
+  std::vector<AssignedSignal> inputAssignments;
 };
 
 enum class MotorOperationMode : std::int32_t {
@@ -169,6 +179,13 @@ class Motor {
   [[nodiscard]] const MotorRegisterMap& map() const { return _map; }
 
  private:
+  [[nodiscard]] std::array<std::uint16_t, 16> readOutputFunctionAssignments(
+      ModbusClient& bus) const;
+  [[nodiscard]] std::array<std::uint16_t, 12> readInputFunctionAssignments(
+      ModbusClient& bus) const;
+  [[nodiscard]] static std::string describeOutputFunctionCode(std::uint16_t code);
+  [[nodiscard]] static std::string describeInputFunctionCode(std::uint16_t code);
+
   void selectSlave(ModbusClient& bus) const;
 
   utl::EMotor _id;
@@ -176,4 +193,6 @@ class Motor {
   MotorRegisterMap _map;
   mutable std::optional<std::uint16_t> _driverInputCommandRawCache;
   mutable std::optional<std::uint8_t> _selectedOperationIdCache;
+  mutable std::optional<std::array<std::uint16_t, 16>> _outputFunctionAssignments;
+  mutable std::optional<std::array<std::uint16_t, 12>> _inputFunctionAssignments;
 };

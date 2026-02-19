@@ -279,6 +279,60 @@ void MotorControl::setSpeed(const utl::EMotor motorId, const std::int32_t speed)
   }
 }
 
+void MotorControl::setAcceleration(const utl::EMotor motorId,
+                                   const std::int32_t acceleration) {
+  RIMO_TIMED_SCOPE("MotorControl::setAcceleration");
+  const auto& motor = requireMotor(_motors, motorId);
+  auto rtIt = _runtime.find(motorId);
+  if (rtIt == _runtime.end()) {
+    throw std::runtime_error(std::format(
+        "Runtime state for motor {} is not available",
+        magic_enum::enum_name(motorId)));
+  }
+  auto& runtime = rtIt->second;
+  if (runtime.acceleration == acceleration) {
+    return;
+  }
+  runtime.acceleration = acceleration;
+  std::lock_guard<std::mutex> lock(_busMutex);
+  if (!_bus) throw std::runtime_error("MotorControl bus is not initialized");
+
+  if (runtime.speedPairPrepared) {
+    motor.setOperationAcceleration(*_bus, 0, runtime.acceleration);
+    motor.setOperationAcceleration(*_bus, 1, runtime.acceleration);
+  }
+  if (runtime.positionPrepared) {
+    motor.setOperationAcceleration(*_bus, 2, runtime.acceleration);
+  }
+}
+
+void MotorControl::setDeceleration(const utl::EMotor motorId,
+                                   const std::int32_t deceleration) {
+  RIMO_TIMED_SCOPE("MotorControl::setDeceleration");
+  const auto& motor = requireMotor(_motors, motorId);
+  auto rtIt = _runtime.find(motorId);
+  if (rtIt == _runtime.end()) {
+    throw std::runtime_error(std::format(
+        "Runtime state for motor {} is not available",
+        magic_enum::enum_name(motorId)));
+  }
+  auto& runtime = rtIt->second;
+  if (runtime.deceleration == deceleration) {
+    return;
+  }
+  runtime.deceleration = deceleration;
+  std::lock_guard<std::mutex> lock(_busMutex);
+  if (!_bus) throw std::runtime_error("MotorControl bus is not initialized");
+
+  if (runtime.speedPairPrepared) {
+    motor.setOperationDeceleration(*_bus, 0, runtime.deceleration);
+    motor.setOperationDeceleration(*_bus, 1, runtime.deceleration);
+  }
+  if (runtime.positionPrepared) {
+    motor.setOperationDeceleration(*_bus, 2, runtime.deceleration);
+  }
+}
+
 void MotorControl::setPosition(const utl::EMotor motorId,
                                const std::int32_t position) {
   RIMO_TIMED_SCOPE("MotorControl::setPosition");

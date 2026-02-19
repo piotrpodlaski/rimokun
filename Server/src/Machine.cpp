@@ -20,6 +20,63 @@ unsigned int requireMappingIndex(
   return it->second;
 }
 
+nlohmann::json makeDefaultIoAssignmentResponse(const utl::EMotor motor) {
+  nlohmann::json response{
+      {"motor", utl::enumToString(motor)},
+      {"driverInputRaw", 0u},
+      {"driverOutputRaw", 0u},
+      {"ioOutputRaw", 0u},
+      {"ioInputRaw", 0u},
+      {"inputFlags", nlohmann::json::array()},
+      {"outputFlags", nlohmann::json::array()},
+      {"ioOutputAssignments", nlohmann::json::array()},
+      {"ioInputAssignments", nlohmann::json::array()},
+      {"alarm", nlohmann::json::object()},
+      {"warning", nlohmann::json::object()},
+  };
+
+  response["ioOutputAssignments"].push_back(
+      {{"channel", "OUT0"}, {"function", "HOME-P"}, {"functionCode", 70}, {"active", false}});
+  response["ioOutputAssignments"].push_back(
+      {{"channel", "OUT1"}, {"function", "END"}, {"functionCode", 69}, {"active", false}});
+  response["ioOutputAssignments"].push_back(
+      {{"channel", "OUT2"}, {"function", "AREA1"}, {"functionCode", 73}, {"active", false}});
+  response["ioOutputAssignments"].push_back(
+      {{"channel", "OUT3"}, {"function", "READY"}, {"functionCode", 67}, {"active", false}});
+  response["ioOutputAssignments"].push_back(
+      {{"channel", "OUT4"}, {"function", "WNG"}, {"functionCode", 66}, {"active", false}});
+  response["ioOutputAssignments"].push_back(
+      {{"channel", "OUT5"}, {"function", "ALM"}, {"functionCode", 65}, {"active", false}});
+  response["ioOutputAssignments"].push_back(
+      {{"channel", "MB"}, {"function", "MB"}, {"functionCode", 0}, {"active", false}});
+
+  response["ioInputAssignments"].push_back(
+      {{"channel", "IN0"}, {"function", "HOME"}, {"functionCode", 3}, {"active", false}});
+  response["ioInputAssignments"].push_back(
+      {{"channel", "IN1"}, {"function", "START"}, {"functionCode", 4}, {"active", false}});
+  response["ioInputAssignments"].push_back(
+      {{"channel", "IN2"}, {"function", "M0"}, {"functionCode", 48}, {"active", false}});
+  response["ioInputAssignments"].push_back(
+      {{"channel", "IN3"}, {"function", "M1"}, {"functionCode", 49}, {"active", false}});
+  response["ioInputAssignments"].push_back(
+      {{"channel", "IN4"}, {"function", "M2"}, {"functionCode", 50}, {"active", false}});
+  response["ioInputAssignments"].push_back(
+      {{"channel", "IN5"}, {"function", "FREE"}, {"functionCode", 16}, {"active", false}});
+  response["ioInputAssignments"].push_back(
+      {{"channel", "IN6"}, {"function", "STOP"}, {"functionCode", 18}, {"active", false}});
+  response["ioInputAssignments"].push_back(
+      {{"channel", "IN7"}, {"function", "ALM-RST"}, {"functionCode", 24}, {"active", false}});
+  response["ioInputAssignments"].push_back(
+      {{"channel", "+LS"}, {"function", "+LS"}, {"functionCode", 0}, {"active", false}});
+  response["ioInputAssignments"].push_back(
+      {{"channel", "-LS"}, {"function", "-LS"}, {"functionCode", 0}, {"active", false}});
+  response["ioInputAssignments"].push_back(
+      {{"channel", "HOMES"}, {"function", "HOMES"}, {"functionCode", 0}, {"active", false}});
+  response["ioInputAssignments"].push_back(
+      {{"channel", "SLIT"}, {"function", "SLIT"}, {"functionCode", 0}, {"active", false}});
+  return response;
+}
+
 }  // namespace
 
 Machine::Machine() : Machine(std::make_shared<SteadyClockAdapter>()) {}
@@ -325,38 +382,61 @@ void Machine::handleReconnectCommand(const cmd::ReconnectCommand& c) {
 
 nlohmann::json Machine::handleMotorDiagnosticsCommand(
     const cmd::MotorDiagnosticsCommand& c) {
-  const auto inputStatus = _motorControl.readInputStatus(c.motor);
-  const auto outputStatus = _motorControl.readOutputStatus(c.motor);
-  const auto alarm = _motorControl.diagnoseCurrentAlarm(c.motor);
-  const auto warning = _motorControl.diagnoseCurrentWarning(c.motor);
+  auto response = makeDefaultIoAssignmentResponse(c.motor);
+  try {
+    const auto inputStatus = _motorControl.readInputStatus(c.motor);
+    const auto outputStatus = _motorControl.readOutputStatus(c.motor);
+    const auto directIoStatus = _motorControl.readDirectIoStatus(c.motor);
+    const auto alarm = _motorControl.diagnoseCurrentAlarm(c.motor);
+    const auto warning = _motorControl.diagnoseCurrentWarning(c.motor);
 
-  nlohmann::json response{
-      {"motor", utl::enumToString(c.motor)},
-      {"inputRaw", inputStatus.raw},
-      {"outputRaw", outputStatus.raw},
-  };
-  response["inputFlags"] = nlohmann::json::array();
-  for (const auto flag : inputStatus.activeFlags) {
-    response["inputFlags"].push_back(std::string(flag));
+    response["driverInputRaw"] = inputStatus.raw;
+    response["driverOutputRaw"] = outputStatus.raw;
+    response["ioOutputRaw"] = directIoStatus.reg00D4;
+    response["ioInputRaw"] = directIoStatus.reg00D5;
+    response["inputFlags"] = nlohmann::json::array();
+    for (const auto flag : inputStatus.activeFlags) {
+      response["inputFlags"].push_back(std::string(flag));
+    }
+    response["outputFlags"] = nlohmann::json::array();
+    for (const auto flag : outputStatus.activeFlags) {
+      response["outputFlags"].push_back(std::string(flag));
+    }
+    response["ioOutputAssignments"] = nlohmann::json::array();
+    for (const auto& assignment : directIoStatus.outputAssignments) {
+      response["ioOutputAssignments"].push_back(nlohmann::json{
+          {"channel", assignment.channel},
+          {"function", assignment.function},
+          {"functionCode", assignment.functionCode},
+          {"active", assignment.active},
+      });
+    }
+    response["ioInputAssignments"] = nlohmann::json::array();
+    for (const auto& assignment : directIoStatus.inputAssignments) {
+      response["ioInputAssignments"].push_back(nlohmann::json{
+          {"channel", assignment.channel},
+          {"function", assignment.function},
+          {"functionCode", assignment.functionCode},
+          {"active", assignment.active},
+      });
+    }
+    response["alarm"] = nlohmann::json{
+        {"code", alarm.code},
+        {"known", alarm.known},
+        {"type", alarm.type},
+        {"cause", alarm.cause},
+        {"remedialAction", alarm.remedialAction},
+    };
+    response["warning"] = nlohmann::json{
+        {"code", warning.code},
+        {"known", warning.known},
+        {"type", warning.type},
+        {"cause", warning.cause},
+        {"remedialAction", warning.remedialAction},
+    };
+  } catch (const std::exception& ex) {
+    response["diagnosticsError"] = ex.what();
   }
-  response["outputFlags"] = nlohmann::json::array();
-  for (const auto flag : outputStatus.activeFlags) {
-    response["outputFlags"].push_back(std::string(flag));
-  }
-  response["alarm"] = nlohmann::json{
-      {"code", alarm.code},
-      {"known", alarm.known},
-      {"type", alarm.type},
-      {"cause", alarm.cause},
-      {"remedialAction", alarm.remedialAction},
-  };
-  response["warning"] = nlohmann::json{
-      {"code", warning.code},
-      {"known", warning.known},
-      {"type", warning.type},
-      {"cause", warning.cause},
-      {"remedialAction", warning.remedialAction},
-  };
   return response;
 }
 

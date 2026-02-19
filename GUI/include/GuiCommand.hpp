@@ -17,12 +17,23 @@ struct GuiReconnectCommand {
   utl::ERobotComponent component;
 };
 
+struct GuiMotorDiagnosticsCommand {
+  utl::EMotor motor;
+};
+
+struct GuiResetMotorAlarmCommand {
+  utl::EMotor motor;
+};
+
 struct GuiRawCommand {
   nlohmann::json node;
 };
 
 struct GuiCommand {
-  std::variant<GuiToolChangerCommand, GuiReconnectCommand, GuiRawCommand> payload;
+  std::variant<GuiToolChangerCommand, GuiReconnectCommand,
+               GuiMotorDiagnosticsCommand, GuiResetMotorAlarmCommand,
+               GuiRawCommand>
+      payload;
 };
 
 struct GuiResponse {

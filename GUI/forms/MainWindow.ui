@@ -360,16 +360,22 @@ li.checked::marker { content: &quot;\2612&quot;; }
     </rect>
    </property>
    <widget class="QMenu" name="menuTools">
-    <property name="title">
-     <string>Tools</string>
-    </property>
-    <addaction name="actionControl_panel_monitor"/>
-   </widget>
+   <property name="title">
+    <string>Tools</string>
+   </property>
+   <addaction name="actionControl_panel_monitor"/>
+   <addaction name="actionMotor_monitor"/>
+  </widget>
    <addaction name="menuTools"/>
   </widget>
   <action name="actionControl_panel_monitor">
    <property name="text">
     <string>Control panel monitor</string>
+   </property>
+  </action>
+  <action name="actionMotor_monitor">
+   <property name="text">
+    <string>Motor monitor</string>
    </property>
   </action>
   <widget class="QStatusBar" name="statusbar"/>

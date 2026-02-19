@@ -7,6 +7,7 @@
 #include "CommonDefinitions.hpp"
 #include "GuiStateStore.hpp"
 #include "JoystickPanelWindow.h"
+#include "MotorPanelWindow.hpp"
 #include "MotorStats.hpp"
 #include "MotorStatsPresenter.hpp"
 #include "ResetControlsPresenter.hpp"
@@ -28,6 +29,7 @@ class MainWindow : public QMainWindow {
   explicit MainWindow(QWidget *parent = nullptr);
   ~MainWindow() override;
   void openJoystickPanel();
+  void openMotorPanel();
   void onJoystickUpdate(int id, double x, double y, bool pressed);
 
  private:
@@ -45,5 +47,6 @@ class MainWindow : public QMainWindow {
   std::shared_ptr<spdlog::sinks::stdout_color_sink_mt> _consoleSink;
   std::shared_ptr<QtLogSink> _qtSink;
   JoystickPanelWindow* joystickPanel = nullptr;
+  MotorPanelWindow* motorPanel = nullptr;
 
 };

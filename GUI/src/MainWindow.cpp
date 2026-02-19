@@ -81,6 +81,8 @@ MainWindow::MainWindow(QWidget* parent)
 
   connect(_ui->actionControl_panel_monitor, &QAction::triggered, this,
           &MainWindow::openJoystickPanel);
+  connect(_ui->actionMotor_monitor, &QAction::triggered, this,
+          &MainWindow::openMotorPanel);
 }
 
 MainWindow::~MainWindow() {
@@ -111,7 +113,21 @@ void MainWindow::onJoystickUpdate(int id, double x, double y, bool pressed) {
   }
 }
 
+void MainWindow::openMotorPanel() {
+  if (motorPanel == nullptr) {
+    motorPanel = new MotorPanelWindow(this);
+    connect(motorPanel, &MotorPanelWindow::commandIssued, &_updater,
+            &Updater::sendCommand);
+  }
+  motorPanel->show();
+  motorPanel->raise();
+  motorPanel->activateWindow();
+}
+
 void MainWindow::onRobotStatusUpdate(const utl::RobotStatus& status) {
+  if (motorPanel) {
+    motorPanel->setRobotStatus(status);
+  }
   if (status.joystics.contains(utl::EArm::Left)) {
     const auto& js = status.joystics.at(utl::EArm::Left);
     onJoystickUpdate(0, js.x, js.y, js.btn);

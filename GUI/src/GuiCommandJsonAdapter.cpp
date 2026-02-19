@@ -17,6 +17,16 @@ nlohmann::json GuiCommandJsonAdapter::toJson(const GuiCommand& command) {
               {"type", "reset"},
               {"system", utl::enumToString(cmd.component)},
           };
+        } else if constexpr (std::is_same_v<CmdT, GuiMotorDiagnosticsCommand>) {
+          return nlohmann::json{
+              {"type", "motorDiagnostics"},
+              {"motor", utl::enumToString(cmd.motor)},
+          };
+        } else if constexpr (std::is_same_v<CmdT, GuiResetMotorAlarmCommand>) {
+          return nlohmann::json{
+              {"type", "resetMotorAlarm"},
+              {"motor", utl::enumToString(cmd.motor)},
+          };
         } else {
           return cmd.node;
         }

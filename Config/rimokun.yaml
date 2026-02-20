@@ -61,6 +61,7 @@ classes:
         stopBits: 1
     responseTimeoutMS: 100
     connectTimeoutMS: 100
+    interRequestDelayMS: 3
     motors:
       XLeft:
         address: 1

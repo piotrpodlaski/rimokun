@@ -19,6 +19,7 @@ struct MotorRtuConfig {
   int stopBits{1};
   unsigned connectTimeoutMS{1000};
   unsigned responseTimeoutMS{1000};
+  unsigned interRequestDelayMS{0};
 };
 
 enum class MotorDiagnosticDomain {

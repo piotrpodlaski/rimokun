@@ -59,6 +59,8 @@ MotorControl::MotorControl() {
       cfg.getOptional<unsigned>("MotorControl", "responseTimeoutMS", 1000u);
   _rtuConfig.connectTimeoutMS =
       cfg.getOptional<unsigned>("MotorControl", "connectTimeoutMS", 1000u);
+  _rtuConfig.interRequestDelayMS =
+      cfg.getOptional<unsigned>("MotorControl", "interRequestDelayMS", 0u);
 
   const auto motorCfg = cfg.getClassConfig("MotorControl");
   const auto transportCfg = motorCfg["transport"];
@@ -178,6 +180,15 @@ void MotorControl::initialize() {
         !t) {
       auto msg = std::format("Failed to set RTU bus timeout: {}",
                              t.error().message);
+      _bus->close();
+      _bus.reset();
+      throw std::runtime_error(msg);
+    }
+    if (auto d = _bus->set_inter_request_delay(
+            std::chrono::milliseconds{_rtuConfig.interRequestDelayMS});
+        !d) {
+      auto msg = std::format("Failed to set inter-request delay: {}",
+                             d.error().message);
       _bus->close();
       _bus.reset();
       throw std::runtime_error(msg);

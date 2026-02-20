@@ -21,6 +21,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <vector>
 
 #include <TimingMetrics.hpp>
@@ -68,7 +69,7 @@ class ModbusClient {
       return std::unexpected(err);
     }
 
-    return ModbusClient(ctx);
+    return ModbusClient(ctx, TransportKind::RtuSerial);
   }
 
   // Factory for RTU-over-raw-TCP (e.g. serial device servers like Moxa NPort)
@@ -95,9 +96,16 @@ class ModbusClient {
   ModbusClient(ModbusClient&& other) noexcept
       : ctx_(other.ctx_),
         backend_(other.backend_),
+        transport_kind_(other.transport_kind_),
         rtu_tcp_(std::move(other.rtu_tcp_)) {
     other.ctx_ = nullptr;
     other.backend_ = Backend::LibModbus;
+    other.transport_kind_ = TransportKind::Tcp;
+    inter_request_delay_ = other.inter_request_delay_;
+    last_transaction_completion_ = other.last_transaction_completion_;
+    has_last_transaction_completion_ = other.has_last_transaction_completion_;
+    other.inter_request_delay_ = std::chrono::milliseconds{0};
+    other.has_last_transaction_completion_ = false;
   }
 
   ModbusClient& operator=(ModbusClient&& other) noexcept {
@@ -105,9 +113,16 @@ class ModbusClient {
       cleanup();
       ctx_ = other.ctx_;
       backend_ = other.backend_;
+      transport_kind_ = other.transport_kind_;
       rtu_tcp_ = std::move(other.rtu_tcp_);
       other.ctx_ = nullptr;
       other.backend_ = Backend::LibModbus;
+      other.transport_kind_ = TransportKind::Tcp;
+      inter_request_delay_ = other.inter_request_delay_;
+      last_transaction_completion_ = other.last_transaction_completion_;
+      has_last_transaction_completion_ = other.has_last_transaction_completion_;
+      other.inter_request_delay_ = std::chrono::milliseconds{0};
+      other.has_last_transaction_completion_ = false;
     }
     return *this;
   }
@@ -164,6 +179,15 @@ class ModbusClient {
     return {};
   }
 
+  ModbusResult<void> set_inter_request_delay(std::chrono::milliseconds delay) {
+    if (delay < std::chrono::milliseconds{0}) {
+      return std::unexpected(ModbusError{EINVAL,
+                                         "Inter-request delay cannot be negative"});
+    }
+    inter_request_delay_ = delay;
+    return {};
+  }
+
   ModbusResult<void> set_slave(int slave_id) {
     RIMO_TIMED_SCOPE("ModbusClient::set_slave");
     if (backend_ == Backend::RtuOverTcp) {
@@ -191,11 +215,15 @@ class ModbusClient {
   ModbusResult<std::vector<std::uint16_t>> read_holding_registers(int addr,
                                                                   int count) {
     RIMO_TIMED_SCOPE("ModbusClient::read_holding_registers");
+    wait_inter_request_gap_if_needed();
     if (backend_ == Backend::RtuOverTcp) {
-      return read_registers_rtu_over_tcp(0x03, addr, count);
+      auto res = read_registers_rtu_over_tcp(0x03, addr, count);
+      mark_transaction_completed();
+      return res;
     }
     std::vector<std::uint16_t> buffer(static_cast<std::size_t>(count));
     int rc = modbus_read_registers(ctx_, addr, count, buffer.data());
+    mark_transaction_completed();
     if (rc == -1) {
       return std::unexpected(last_error());
     }
@@ -206,11 +234,15 @@ class ModbusClient {
   ModbusResult<std::vector<std::uint16_t>> read_input_registers(int addr,
                                                                 int count) {
     RIMO_TIMED_SCOPE("ModbusClient::read_input_registers");
+    wait_inter_request_gap_if_needed();
     if (backend_ == Backend::RtuOverTcp) {
-      return read_registers_rtu_over_tcp(0x04, addr, count);
+      auto res = read_registers_rtu_over_tcp(0x04, addr, count);
+      mark_transaction_completed();
+      return res;
     }
     std::vector<std::uint16_t> buffer(static_cast<std::size_t>(count));
     int rc = modbus_read_input_registers(ctx_, addr, count, buffer.data());
+    mark_transaction_completed();
     if (rc == -1) {
       return std::unexpected(last_error());
     }
@@ -220,10 +252,14 @@ class ModbusClient {
 
   ModbusResult<void> write_single_register(int addr, std::uint16_t value) {
     RIMO_TIMED_SCOPE("ModbusClient::write_single_register");
+    wait_inter_request_gap_if_needed();
     if (backend_ == Backend::RtuOverTcp) {
-      return write_single_register_rtu_over_tcp(addr, value);
+      auto res = write_single_register_rtu_over_tcp(addr, value);
+      mark_transaction_completed();
+      return res;
     }
     int rc = modbus_write_register(ctx_, addr, value);
+    mark_transaction_completed();
     if (rc == -1) {
       return std::unexpected(last_error());
     }
@@ -233,13 +269,17 @@ class ModbusClient {
   ModbusResult<void> write_multiple_registers(
       int addr, std::span<const std::uint16_t> values) {
     RIMO_TIMED_SCOPE("ModbusClient::write_multiple_registers");
+    wait_inter_request_gap_if_needed();
     if (backend_ == Backend::RtuOverTcp) {
-      return write_multiple_registers_rtu_over_tcp(addr, values);
+      auto res = write_multiple_registers_rtu_over_tcp(addr, values);
+      mark_transaction_completed();
+      return res;
     }
     // libmodbus needs non-const pointer
     auto* data = const_cast<std::uint16_t*>(values.data());
     int rc = modbus_write_registers(ctx_, addr, static_cast<int>(values.size()),
                                     data);
+    mark_transaction_completed();
     if (rc == -1) {
       return std::unexpected(last_error());
     }
@@ -248,12 +288,16 @@ class ModbusClient {
 
   ModbusResult<std::vector<bool>> read_bits(int addr, int count) {
     RIMO_TIMED_SCOPE("ModbusClient::read_bits");
+    wait_inter_request_gap_if_needed();
     if (backend_ == Backend::RtuOverTcp) {
-      return read_bits_rtu_over_tcp(0x01, addr, count);
+      auto res = read_bits_rtu_over_tcp(0x01, addr, count);
+      mark_transaction_completed();
+      return res;
     }
     std::vector<uint8_t> raw(static_cast<std::size_t>(count));
 
     int rc = modbus_read_bits(ctx_, addr, count, raw.data());
+    mark_transaction_completed();
     if (rc == -1) {
       return std::unexpected(last_error());
     }
@@ -269,12 +313,16 @@ class ModbusClient {
 
   ModbusResult<std::vector<bool>> read_input_bits(int addr, int count) {
     RIMO_TIMED_SCOPE("ModbusClient::read_input_bits");
+    wait_inter_request_gap_if_needed();
     if (backend_ == Backend::RtuOverTcp) {
-      return read_bits_rtu_over_tcp(0x02, addr, count);
+      auto res = read_bits_rtu_over_tcp(0x02, addr, count);
+      mark_transaction_completed();
+      return res;
     }
     std::vector<uint8_t> raw(static_cast<std::size_t>(count));
 
     int rc = modbus_read_input_bits(ctx_, addr, count, raw.data());
+    mark_transaction_completed();
     if (rc == -1) {
       return std::unexpected(last_error());
     }
@@ -291,10 +339,14 @@ class ModbusClient {
 
   ModbusResult<void> write_bit(int addr, bool value) {
     RIMO_TIMED_SCOPE("ModbusClient::write_bit");
+    wait_inter_request_gap_if_needed();
     if (backend_ == Backend::RtuOverTcp) {
-      return write_single_coil_rtu_over_tcp(addr, value);
+      auto res = write_single_coil_rtu_over_tcp(addr, value);
+      mark_transaction_completed();
+      return res;
     }
     int rc = modbus_write_bit(ctx_, addr, value ? 1 : 0);
+    mark_transaction_completed();
     if (rc == -1) {
       return std::unexpected(last_error());
     }
@@ -303,8 +355,11 @@ class ModbusClient {
 
   ModbusResult<void> write_bits(int addr, const std::vector<bool>& values) {
     RIMO_TIMED_SCOPE("ModbusClient::write_bits");
+    wait_inter_request_gap_if_needed();
     if (backend_ == Backend::RtuOverTcp) {
-      return write_multiple_bits_rtu_over_tcp(addr, values);
+      auto res = write_multiple_bits_rtu_over_tcp(addr, values);
+      mark_transaction_completed();
+      return res;
     }
     // Copy bools into a buffer of uint8_t (0 or 1)
     std::vector<uint8_t> raw;
@@ -316,6 +371,7 @@ class ModbusClient {
 
     int rc =
         modbus_write_bits(ctx_, addr, static_cast<int>(raw.size()), raw.data());
+    mark_transaction_completed();
 
     if (rc == -1) {
       return std::unexpected(last_error());
@@ -332,6 +388,12 @@ class ModbusClient {
     RtuOverTcp,
   };
 
+  enum class TransportKind {
+    Tcp,
+    RtuSerial,
+    RtuOverTcp,
+  };
+
   struct RtuOverTcpContext {
     std::string host;
     int port{};
@@ -341,10 +403,39 @@ class ModbusClient {
     std::chrono::milliseconds timeout{100};
   };
 
-  explicit ModbusClient(modbus_t* ctx) : ctx_(ctx) {}
+  explicit ModbusClient(modbus_t* ctx,
+                        TransportKind transport = TransportKind::Tcp)
+      : ctx_(ctx), transport_kind_(transport) {}
   explicit ModbusClient(RtuOverTcpContext ctx)
       : backend_(Backend::RtuOverTcp),
+        transport_kind_(TransportKind::RtuOverTcp),
         rtu_tcp_(std::make_unique<RtuOverTcpContext>(std::move(ctx))) {}
+
+  bool is_rtu_transport() const {
+    return transport_kind_ == TransportKind::RtuSerial ||
+           transport_kind_ == TransportKind::RtuOverTcp;
+  }
+
+  void wait_inter_request_gap_if_needed() {
+    if (!is_rtu_transport() || inter_request_delay_ <= std::chrono::milliseconds{0} ||
+        !has_last_transaction_completion_) {
+      return;
+    }
+    const auto elapsed =
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - last_transaction_completion_);
+    if (elapsed < inter_request_delay_) {
+      std::this_thread::sleep_for(inter_request_delay_ - elapsed);
+    }
+  }
+
+  void mark_transaction_completed() {
+    if (!is_rtu_transport()) {
+      return;
+    }
+    has_last_transaction_completion_ = true;
+    last_transaction_completion_ = std::chrono::steady_clock::now();
+  }
 
   void cleanup() noexcept {
     if (backend_ == Backend::RtuOverTcp) {
@@ -750,5 +841,9 @@ class ModbusClient {
 
   modbus_t* ctx_ = nullptr;
   Backend backend_{Backend::LibModbus};
+  TransportKind transport_kind_{TransportKind::Tcp};
   std::unique_ptr<RtuOverTcpContext> rtu_tcp_;
+  std::chrono::milliseconds inter_request_delay_{0};
+  std::chrono::steady_clock::time_point last_transaction_completion_{};
+  bool has_last_transaction_completion_{false};
 };

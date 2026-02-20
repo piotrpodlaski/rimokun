@@ -49,3 +49,12 @@ TEST(GuiCommandJsonAdapterTests, ResetMotorAlarmCommandMapsToJson) {
   EXPECT_EQ(json["type"].get<std::string>(), "resetMotorAlarm");
   EXPECT_EQ(json["motor"].get<std::string>(), "ZLeft");
 }
+
+TEST(GuiCommandJsonAdapterTests, ContecDiagnosticsCommandMapsToJson) {
+  GuiCommand command;
+  command.payload = GuiContecDiagnosticsCommand{};
+
+  const auto json = GuiCommandJsonAdapter::toJson(command);
+  ASSERT_TRUE(json.contains("type"));
+  EXPECT_EQ(json["type"].get<std::string>(), "contecDiagnostics");
+}

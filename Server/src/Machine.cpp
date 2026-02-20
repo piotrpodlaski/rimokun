@@ -4,6 +4,7 @@
 #include <TimingMetrics.hpp>
 
 #include <chrono>
+#include <array>
 #include <future>
 
 using namespace std::chrono_literals;
@@ -75,6 +76,17 @@ nlohmann::json makeDefaultIoAssignmentResponse(const utl::EMotor motor) {
   response["ioInputAssignments"].push_back(
       {{"channel", "SLIT"}, {"function", "SLIT"}, {"functionCode", 0}, {"active", false}});
   return response;
+}
+
+std::array<std::string, 8> buildContecChannelNames(
+    const std::map<std::string, unsigned int>& mapping) {
+  std::array<std::string, 8> names{};
+  for (const auto& [signal, index] : mapping) {
+    if (index < names.size() && names[index].empty()) {
+      names[index] = signal;
+    }
+  }
+  return names;
 }
 
 }  // namespace
@@ -244,6 +256,11 @@ void Machine::runOneCycle(LoopState& state) {
                                     },
                                     [this](const cmd::ResetMotorAlarmCommand& c) {
                                       handleResetMotorAlarmCommand(c);
+                                    },
+                                    [this, &responsePayload](
+                                        const cmd::ContecDiagnosticsCommand& c) {
+                                      responsePayload =
+                                          handleContecDiagnosticsCommand(c).dump();
                                     }},
                          command->payload);
               command->reply.set_value(std::move(responsePayload));
@@ -442,6 +459,51 @@ nlohmann::json Machine::handleMotorDiagnosticsCommand(
 
 void Machine::handleResetMotorAlarmCommand(const cmd::ResetMotorAlarmCommand& c) {
   _motorControl.resetAlarm(c.motor);
+}
+
+nlohmann::json Machine::handleContecDiagnosticsCommand(
+    const cmd::ContecDiagnosticsCommand&) {
+  nlohmann::json response{
+      {"inputsRaw", nlohmann::json::array()},
+      {"outputsRaw", nlohmann::json::array()},
+      {"inputs", nlohmann::json::array()},
+      {"outputs", nlohmann::json::array()},
+  };
+  const auto inputNames = buildContecChannelNames(_inputMapping);
+  const auto outputNames = buildContecChannelNames(_outputMapping);
+
+  for (std::size_t i = 0; i < inputNames.size(); ++i) {
+    response["inputsRaw"].push_back(false);
+    response["inputs"].push_back(
+        {{"channel", std::format("IN{}", i)},
+         {"active", false},
+         {"signal", inputNames[i]}});
+  }
+  for (std::size_t i = 0; i < outputNames.size(); ++i) {
+    response["outputsRaw"].push_back(false);
+    response["outputs"].push_back(
+        {{"channel", std::format("OUT{}", i)},
+         {"active", false},
+         {"signal", outputNames[i]}});
+  }
+
+  try {
+    const auto inputs = _contec.readInputs();
+    const auto outputs = _contec.readOutputs();
+    for (std::size_t i = 0; i < 8 && i < inputs.size(); ++i) {
+      const auto active = static_cast<bool>(inputs[i]);
+      response["inputsRaw"][i] = active;
+      response["inputs"][i]["active"] = active;
+    }
+    for (std::size_t i = 0; i < 8 && i < outputs.size(); ++i) {
+      const auto active = static_cast<bool>(outputs[i]);
+      response["outputsRaw"][i] = active;
+      response["outputs"][i]["active"] = active;
+    }
+  } catch (const std::exception& ex) {
+    response["diagnosticsError"] = ex.what();
+  }
+  return response;
 }
 
 void Machine::shutdown() {

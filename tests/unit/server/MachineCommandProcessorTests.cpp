@@ -318,3 +318,26 @@ TEST(MachineCommandProcessorTests,
   EXPECT_TRUE(dispatched);
   EXPECT_EQ(response["status"].get<std::string>(), "OK");
 }
+
+TEST(MachineCommandProcessorTests,
+     ContecDiagnosticsCommandParsesAndReturnsStructuredResponse) {
+  MachineCommandProcessor processor;
+  nlohmann::json command{
+      {"type", "contecDiagnostics"},
+  };
+
+  bool dispatched = false;
+  const auto response = processor.processCommand(
+      command, [&](cmd::Command c, const std::chrono::milliseconds timeout) {
+        dispatched = true;
+        EXPECT_EQ(timeout, 2s);
+        EXPECT_TRUE(std::holds_alternative<cmd::ContecDiagnosticsCommand>(c.payload));
+        return std::string(R"({"inputs":[],"outputs":[]})");
+      });
+
+  EXPECT_TRUE(dispatched);
+  EXPECT_EQ(response["status"].get<std::string>(), "OK");
+  ASSERT_TRUE(response.contains("response"));
+  EXPECT_TRUE(response["response"].contains("inputs"));
+  EXPECT_TRUE(response["response"].contains("outputs"));
+}

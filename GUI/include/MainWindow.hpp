@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "CommonDefinitions.hpp"
+#include "ContecPanelWindow.hpp"
 #include "GuiStateStore.hpp"
 #include "JoystickPanelWindow.h"
 #include "MotorPanelWindow.hpp"
@@ -30,6 +31,7 @@ class MainWindow : public QMainWindow {
   ~MainWindow() override;
   void openJoystickPanel();
   void openMotorPanel();
+  void openContecPanel();
   void onJoystickUpdate(int id, double x, double y, bool pressed);
 
  private:
@@ -48,5 +50,6 @@ class MainWindow : public QMainWindow {
   std::shared_ptr<QtLogSink> _qtSink;
   JoystickPanelWindow* joystickPanel = nullptr;
   MotorPanelWindow* motorPanel = nullptr;
+  ContecPanelWindow* contecPanel = nullptr;
 
 };

@@ -365,6 +365,7 @@ li.checked::marker { content: &quot;\2612&quot;; }
    </property>
    <addaction name="actionControl_panel_monitor"/>
    <addaction name="actionMotor_monitor"/>
+   <addaction name="actionContec_monitor"/>
   </widget>
    <addaction name="menuTools"/>
   </widget>
@@ -376,6 +377,11 @@ li.checked::marker { content: &quot;\2612&quot;; }
   <action name="actionMotor_monitor">
    <property name="text">
     <string>Motor monitor</string>
+   </property>
+  </action>
+  <action name="actionContec_monitor">
+   <property name="text">
+    <string>Contec monitor</string>
    </property>
   </action>
   <widget class="QStatusBar" name="statusbar"/>

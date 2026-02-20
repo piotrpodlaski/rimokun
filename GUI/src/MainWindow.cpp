@@ -83,6 +83,8 @@ MainWindow::MainWindow(QWidget* parent)
           &MainWindow::openJoystickPanel);
   connect(_ui->actionMotor_monitor, &QAction::triggered, this,
           &MainWindow::openMotorPanel);
+  connect(_ui->actionContec_monitor, &QAction::triggered, this,
+          &MainWindow::openContecPanel);
 }
 
 MainWindow::~MainWindow() {
@@ -122,6 +124,17 @@ void MainWindow::openMotorPanel() {
   motorPanel->show();
   motorPanel->raise();
   motorPanel->activateWindow();
+}
+
+void MainWindow::openContecPanel() {
+  if (contecPanel == nullptr) {
+    contecPanel = new ContecPanelWindow(this);
+    connect(contecPanel, &ContecPanelWindow::commandIssued, &_updater,
+            &Updater::sendCommand);
+  }
+  contecPanel->show();
+  contecPanel->raise();
+  contecPanel->activateWindow();
 }
 
 void MainWindow::onRobotStatusUpdate(const utl::RobotStatus& status) {

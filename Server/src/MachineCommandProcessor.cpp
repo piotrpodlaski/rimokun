@@ -124,6 +124,31 @@ nlohmann::json MachineCommandProcessor::processCommand(
     return response;
   }
 
+  if (type == "contecDiagnostics") {
+    try {
+      cmd::Command c;
+      c.payload = cmd::ContecDiagnosticsCommand{};
+      const auto reply = dispatch(std::move(c), 2s);
+      if (reply.empty()) {
+        response["status"] = "Error";
+        response["message"] =
+            "contecDiagnostics command returned empty diagnostics payload.";
+        return response;
+      }
+      try {
+        response["response"] = nlohmann::json::parse(reply);
+      } catch (...) {
+        response["status"] = "Error";
+        response["message"] = reply;
+      }
+    } catch (const std::exception& e) {
+      response["status"] = "Error";
+      response["message"] =
+          std::format("Invalid contecDiagnostics command: {}", e.what());
+    }
+    return response;
+  }
+
   const std::string msg = std::format("Unknown command type '{}'!", type);
   response["status"] = "Error";
   response["message"] = msg;

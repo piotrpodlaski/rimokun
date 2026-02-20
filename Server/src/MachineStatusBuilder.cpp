@@ -28,6 +28,8 @@ void MachineStatusBuilder::updateAndPublish(
           motorStatus.state = utl::ELEDState::Error;
           motorStatus.flags[utl::EMotorStatusFlags::BrakeApplied] =
               utl::ELEDState::Error;
+          motorStatus.flags[utl::EMotorStatusFlags::Enabled] =
+              utl::ELEDState::Error;
           motorStatus.flags[utl::EMotorStatusFlags::Warning] = utl::ELEDState::Off;
           motorStatus.flags[utl::EMotorStatusFlags::Alarm] = utl::ELEDState::Error;
           motorStatus.warningDescription.clear();
@@ -40,6 +42,8 @@ void MachineStatusBuilder::updateAndPublish(
         if (!motorControl->motors().contains(motorId)) {
           motorStatus.state = utl::ELEDState::Error;
           motorStatus.flags[utl::EMotorStatusFlags::BrakeApplied] =
+              utl::ELEDState::Error;
+          motorStatus.flags[utl::EMotorStatusFlags::Enabled] =
               utl::ELEDState::Error;
           motorStatus.flags[utl::EMotorStatusFlags::Warning] = utl::ELEDState::Off;
           motorStatus.flags[utl::EMotorStatusFlags::Alarm] = utl::ELEDState::Error;
@@ -62,6 +66,9 @@ void MachineStatusBuilder::updateAndPublish(
           // MB reflects electromagnetic brake output state. Active means brake released.
           motorStatus.flags[utl::EMotorStatusFlags::BrakeApplied] =
               brakeReleased ? utl::ELEDState::On : utl::ELEDState::Off;
+          motorStatus.flags[utl::EMotorStatusFlags::Enabled] =
+              motorControl->isEnabled(motorId) ? utl::ELEDState::On
+                                               : utl::ELEDState::Off;
 
           const bool hasWarning = Motor::isDriverOutputFlagSet(
               outputStatus.raw, MotorOutputFlag::Warning);
@@ -100,6 +107,8 @@ void MachineStatusBuilder::updateAndPublish(
           auto& motorStatus = status.motors[motorId];
           motorStatus.state = utl::ELEDState::Error;
           motorStatus.flags[utl::EMotorStatusFlags::BrakeApplied] =
+              utl::ELEDState::Error;
+          motorStatus.flags[utl::EMotorStatusFlags::Enabled] =
               utl::ELEDState::Error;
           motorStatus.flags[utl::EMotorStatusFlags::Warning] = utl::ELEDState::Off;
           motorStatus.flags[utl::EMotorStatusFlags::Alarm] = utl::ELEDState::Error;

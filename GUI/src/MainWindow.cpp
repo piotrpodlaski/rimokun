@@ -29,9 +29,12 @@ MainWindow::MainWindow(QWidget* parent)
     motStat->setTorque(69);
     motStat->setStatus(utl::ELEDState::Off);
     motStat->setBrake(utl::ELEDState::Off);
-    _motorPresenters.push_back(
-        std::make_unique<MotorStatsPresenter>(
-            dynamic_cast<MotorStats*>(motStat), eMot, &_stateStore, this));
+    motStat->setEnabled(utl::ELEDState::Off);
+    auto* motorStatsWidget = dynamic_cast<MotorStats*>(motStat);
+    _motorPresenters.push_back(std::make_unique<MotorStatsPresenter>(
+        motorStatsWidget, eMot, &_stateStore, this));
+    connect(motorStatsWidget, &MotorStats::clicked, this,
+            &MainWindow::openMotorPanelForMotor);
   }
   const auto leftChanger = _ui->leftChanger;
   const auto rightChanger = _ui->rightChanger;
@@ -124,6 +127,13 @@ void MainWindow::openMotorPanel() {
   motorPanel->show();
   motorPanel->raise();
   motorPanel->activateWindow();
+}
+
+void MainWindow::openMotorPanelForMotor(const utl::EMotor motor) {
+  openMotorPanel();
+  if (motorPanel) {
+    motorPanel->setSelectedMotor(motor);
+  }
 }
 
 void MainWindow::openContecPanel() {

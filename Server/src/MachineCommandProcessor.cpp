@@ -149,6 +149,56 @@ nlohmann::json MachineCommandProcessor::processCommand(
     return response;
   }
 
+  if (type == "setMotorEnabled") {
+    if (!command.contains("motor") || !command.contains("enabled") ||
+        !command.at("enabled").is_boolean()) {
+      response["status"] = "Error";
+      response["message"] =
+          "setMotorEnabled command requires 'motor' and boolean 'enabled'.";
+      return response;
+    }
+    try {
+      cmd::Command c;
+      c.payload = cmd::SetMotorEnabledCommand{
+          .motor = utl::enumFromJsonStringField<utl::EMotor>(command, "motor"),
+          .enabled = command.at("enabled").get<bool>()};
+      const auto reply = dispatch(std::move(c), 2s);
+      if (!reply.empty()) {
+        response["status"] = "Error";
+        response["message"] = reply;
+      }
+    } catch (const std::exception& e) {
+      response["status"] = "Error";
+      response["message"] =
+          std::format("Invalid setMotorEnabled command: {}", e.what());
+    }
+    return response;
+  }
+
+  if (type == "setAllMotorsEnabled") {
+    if (!command.contains("enabled") || !command.at("enabled").is_boolean()) {
+      response["status"] = "Error";
+      response["message"] =
+          "setAllMotorsEnabled command requires boolean 'enabled'.";
+      return response;
+    }
+    try {
+      cmd::Command c;
+      c.payload =
+          cmd::SetAllMotorsEnabledCommand{.enabled = command.at("enabled").get<bool>()};
+      const auto reply = dispatch(std::move(c), 2s);
+      if (!reply.empty()) {
+        response["status"] = "Error";
+        response["message"] = reply;
+      }
+    } catch (const std::exception& e) {
+      response["status"] = "Error";
+      response["message"] =
+          std::format("Invalid setAllMotorsEnabled command: {}", e.what());
+    }
+    return response;
+  }
+
   const std::string msg = std::format("Unknown command type '{}'!", type);
   response["status"] = "Error";
   response["message"] = msg;

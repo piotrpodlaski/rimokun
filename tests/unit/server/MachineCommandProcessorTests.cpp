@@ -341,3 +341,54 @@ TEST(MachineCommandProcessorTests,
   EXPECT_TRUE(response["response"].contains("inputs"));
   EXPECT_TRUE(response["response"].contains("outputs"));
 }
+
+TEST(MachineCommandProcessorTests, SetMotorEnabledCommandParsesAndDispatches) {
+  MachineCommandProcessor processor;
+  nlohmann::json command{
+      {"type", "setMotorEnabled"},
+      {"motor", "ZRight"},
+      {"enabled", false},
+  };
+
+  bool dispatched = false;
+  const auto response = processor.processCommand(
+      command, [&](cmd::Command c, const std::chrono::milliseconds timeout) {
+        dispatched = true;
+        EXPECT_EQ(timeout, 2s);
+        EXPECT_TRUE(std::holds_alternative<cmd::SetMotorEnabledCommand>(c.payload));
+        if (std::holds_alternative<cmd::SetMotorEnabledCommand>(c.payload)) {
+          const auto payload = std::get<cmd::SetMotorEnabledCommand>(c.payload);
+          EXPECT_EQ(payload.motor, utl::EMotor::ZRight);
+          EXPECT_FALSE(payload.enabled);
+        }
+        return std::string{};
+      });
+
+  EXPECT_TRUE(dispatched);
+  EXPECT_EQ(response["status"].get<std::string>(), "OK");
+}
+
+TEST(MachineCommandProcessorTests, SetAllMotorsEnabledCommandParsesAndDispatches) {
+  MachineCommandProcessor processor;
+  nlohmann::json command{
+      {"type", "setAllMotorsEnabled"},
+      {"enabled", true},
+  };
+
+  bool dispatched = false;
+  const auto response = processor.processCommand(
+      command, [&](cmd::Command c, const std::chrono::milliseconds timeout) {
+        dispatched = true;
+        EXPECT_EQ(timeout, 2s);
+        EXPECT_TRUE(std::holds_alternative<cmd::SetAllMotorsEnabledCommand>(
+            c.payload));
+        if (std::holds_alternative<cmd::SetAllMotorsEnabledCommand>(c.payload)) {
+          const auto payload = std::get<cmd::SetAllMotorsEnabledCommand>(c.payload);
+          EXPECT_TRUE(payload.enabled);
+        }
+        return std::string{};
+      });
+
+  EXPECT_TRUE(dispatched);
+  EXPECT_EQ(response["status"].get<std::string>(), "OK");
+}

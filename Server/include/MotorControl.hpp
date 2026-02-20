@@ -49,6 +49,9 @@ class MotorControl final : public MachineComponent {
   void setReverse(utl::EMotor motorId, bool enabled);
   void setJogPlus(utl::EMotor motorId, bool enabled);
   void setJogMinus(utl::EMotor motorId, bool enabled);
+  void setEnabled(utl::EMotor motorId, bool enabled);
+  void setAllEnabled(bool enabled);
+  [[nodiscard]] bool isEnabled(utl::EMotor motorId) const;
   [[nodiscard]] std::uint8_t readSelectedOperationId(utl::EMotor motorId);
   void resetAlarm(utl::EMotor motorId);
   void setSelectedOperationId(utl::EMotor motorId, std::uint8_t opId);
@@ -73,6 +76,7 @@ class MotorControl final : public MachineComponent {
   [[nodiscard]] MotorFlagStatus readInputStatus(utl::EMotor motorId);
   [[nodiscard]] MotorFlagStatus readOutputStatus(utl::EMotor motorId);
   [[nodiscard]] MotorDirectIoStatus readDirectIoStatus(utl::EMotor motorId);
+  [[nodiscard]] MotorRemoteIoStatus readRemoteIoStatus(utl::EMotor motorId);
   [[nodiscard]] bool hasAnyWarningOrAlarm();
   void setWarningState(bool warningActive);
   [[nodiscard]] MotorCodeDiagnostic diagnoseCurrentAlarm(utl::EMotor motorId);
@@ -113,6 +117,7 @@ class MotorControl final : public MachineComponent {
     std::int32_t deceleration{0x5fff};
     bool speedPairPrepared{false};
     bool positionPrepared{false};
+    bool enabled{true};
   };
   std::map<utl::EMotor, MotorRuntimeState> _runtime;
 

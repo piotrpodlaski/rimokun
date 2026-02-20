@@ -58,3 +58,25 @@ TEST(GuiCommandJsonAdapterTests, ContecDiagnosticsCommandMapsToJson) {
   ASSERT_TRUE(json.contains("type"));
   EXPECT_EQ(json["type"].get<std::string>(), "contecDiagnostics");
 }
+
+TEST(GuiCommandJsonAdapterTests, SetMotorEnabledCommandMapsToJson) {
+  GuiCommand command;
+  command.payload =
+      GuiSetMotorEnabledCommand{.motor = utl::EMotor::XLeft, .enabled = false};
+
+  const auto json = GuiCommandJsonAdapter::toJson(command);
+  ASSERT_TRUE(json.contains("type"));
+  EXPECT_EQ(json["type"].get<std::string>(), "setMotorEnabled");
+  EXPECT_EQ(json["motor"].get<std::string>(), "XLeft");
+  EXPECT_FALSE(json["enabled"].get<bool>());
+}
+
+TEST(GuiCommandJsonAdapterTests, SetAllMotorsEnabledCommandMapsToJson) {
+  GuiCommand command;
+  command.payload = GuiSetAllMotorsEnabledCommand{.enabled = true};
+
+  const auto json = GuiCommandJsonAdapter::toJson(command);
+  ASSERT_TRUE(json.contains("type"));
+  EXPECT_EQ(json["type"].get<std::string>(), "setAllMotorsEnabled");
+  EXPECT_TRUE(json["enabled"].get<bool>());
+}

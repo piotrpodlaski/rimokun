@@ -35,6 +35,15 @@ struct ResetMotorAlarmCommand {
   utl::EMotor motor;
 };
 
+struct SetMotorEnabledCommand {
+  utl::EMotor motor;
+  bool enabled;
+};
+
+struct SetAllMotorsEnabledCommand {
+  bool enabled;
+};
+
 struct ContecDiagnosticsCommand {};
 
 struct AuxCommand {
@@ -44,7 +53,8 @@ struct AuxCommand {
 
 struct Command {
   std::variant<ToolChangerCommand, ReconnectCommand, MotorDiagnosticsCommand,
-               ResetMotorAlarmCommand, ContecDiagnosticsCommand>
+               ResetMotorAlarmCommand, SetMotorEnabledCommand,
+               SetAllMotorsEnabledCommand, ContecDiagnosticsCommand>
       payload;
   std::promise<std::string> reply;
 };

@@ -4,12 +4,28 @@
 #include <format>
 #include <print>
 
+#include <QMouseEvent>
+#include <QEvent>
+
 #include "spdlog/spdlog.h"
 #include "ui_motorstats.h"
 
 MotorStats::MotorStats(QWidget* parent)
     : QWidget(parent), _ui(new Ui::MotorStats) {
   _ui->setupUi(this);
+  setCursor(Qt::PointingHandCursor);
+  setToolTip("Click to open motor monitor");
+  setStyleSheet(
+      "MotorStats:hover {"
+      "  border: 1px solid #4c93d6;"
+      "  border-radius: 6px;"
+      "  background-color: rgba(76, 147, 214, 0.08);"
+      "}");
+  const auto children = findChildren<QWidget*>();
+  for (auto* child : children) {
+    child->installEventFilter(this);
+    child->setCursor(Qt::PointingHandCursor);
+  }
 }
 
 namespace {
@@ -35,7 +51,7 @@ void MotorStats::setBrake(const utl::ELEDState value) const {
   _ui->brakeLED->setState(value);
 }
 void MotorStats::setEnabled(const utl::ELEDState value) const {
-  (void)value;
+  _ui->enabledLED->setState(value);
 }
 void MotorStats::setStatus(const utl::ELEDState value) const {
   _ui->statusLED->setState(value);
@@ -58,4 +74,24 @@ void MotorStats::handleUpdate(const utl::RobotStatus& rs) {
   }
   const auto motData = rs.motors.at(_motorId);
   configure(motData);
+}
+
+void MotorStats::mousePressEvent(QMouseEvent* event) {
+  if (event && event->button() == Qt::LeftButton) {
+    emit clicked(_motorId);
+    event->accept();
+    return;
+  }
+  QWidget::mousePressEvent(event);
+}
+
+bool MotorStats::eventFilter(QObject* watched, QEvent* event) {
+  if (watched && event && event->type() == QEvent::MouseButtonPress) {
+    const auto* mouseEvent = dynamic_cast<QMouseEvent*>(event);
+    if (mouseEvent && mouseEvent->button() == Qt::LeftButton) {
+      emit clicked(_motorId);
+      return true;
+    }
+  }
+  return QWidget::eventFilter(watched, event);
 }

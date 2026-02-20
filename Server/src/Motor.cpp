@@ -116,13 +116,20 @@ std::string joinFlags(const std::vector<std::string>& flags) {
   return out;
 }
 
-constexpr std::uint16_t kOperationIdMask =
-    static_cast<std::uint16_t>(MotorInputFlag::M0) |
-    static_cast<std::uint16_t>(MotorInputFlag::M1) |
-    static_cast<std::uint16_t>(MotorInputFlag::M2) |
-    static_cast<std::uint16_t>(MotorInputFlag::Ms0) |
-    static_cast<std::uint16_t>(MotorInputFlag::Ms1) |
-    static_cast<std::uint16_t>(MotorInputFlag::Ms2);
+constexpr std::uint16_t kFunctionFwd = 1;
+constexpr std::uint16_t kFunctionRvs = 2;
+constexpr std::uint16_t kFunctionHome = 3;
+constexpr std::uint16_t kFunctionStart = 4;
+constexpr std::uint16_t kFunctionStop = 18;
+constexpr std::uint16_t kFunctionPlusJog = 6;
+constexpr std::uint16_t kFunctionMinusJog = 7;
+constexpr std::uint16_t kFunctionM0 = 48;
+constexpr std::uint16_t kFunctionM1 = 49;
+constexpr std::uint16_t kFunctionM2 = 50;
+constexpr std::uint16_t kFunctionMs0 = 8;
+constexpr std::uint16_t kFunctionMs1 = 9;
+constexpr std::uint16_t kFunctionMs2 = 10;
+constexpr std::uint16_t kFunctionCOn = 17;
 
 int operationAddr(const int baseUpperAddr, const std::uint8_t opId) {
   if (opId > 63) {
@@ -242,6 +249,12 @@ std::string inputFunctionName(const std::uint16_t code) {
     default: return std::format("Unknown({})", code);
   }
 }
+
+constexpr std::array<std::uint16_t, 16> kDefaultNetInputFunctionCodes{
+    48, 49, 50, 4, 3, 18, 16, 0, 8, 9, 10, 5, 6, 7, 1, 2};
+
+constexpr std::array<std::uint16_t, 16> kDefaultNetOutputFunctionCodes{
+    48, 49, 50, 4, 70, 67, 66, 65, 80, 73, 74, 75, 72, 68, 69, 71};
 }  // namespace
 
 Motor::Motor(utl::EMotor id, int slaveAddress, MotorRegisterMap map)
@@ -252,6 +265,8 @@ void Motor::initialize(ModbusClient& bus) const {
   _selectedOperationIdCache.reset();
   _outputFunctionAssignments.reset();
   _inputFunctionAssignments.reset();
+  _netOutputFunctionAssignments.reset();
+  _netInputFunctionAssignments.reset();
   selectSlave(bus);
 
   // AR-KD2 sanity check: read present alarm register pair.
@@ -300,17 +315,24 @@ void Motor::initialize(ModbusClient& bus) const {
   const auto outputRaw = readDriverOutputStatusRaw(bus);
   _outputFunctionAssignments = readOutputFunctionAssignments(bus);
   _inputFunctionAssignments = readInputFunctionAssignments(bus);
+  _netOutputFunctionAssignments = readNetOutputFunctionAssignments(bus);
+  _netInputFunctionAssignments = readNetInputFunctionAssignments(bus);
   const auto ioRaw = readDirectIoAndBrakeStatusRaw(bus);
+  const auto remoteInRaw = readDriverInputCommandRaw(bus);
+  const auto remoteOutRaw = readDriverOutputStatusRaw(bus);
   const auto inputStatus = decodeDriverInputStatus(inputRaw);
   const auto outputStatus = decodeDriverOutputStatus(outputRaw);
   const auto ioStatus = decodeDirectIoAndBrakeStatus(ioRaw);
+  const auto remoteIoStatus = decodeRemoteIoStatus(remoteInRaw, remoteOutRaw);
   SPDLOG_INFO(
       "Motor {} (slave {}) input flags: 0x{:04X} [{}], output flags: 0x{:04X} "
-      "[{}], direct IO 00D4=0x{:04X} 00D5=0x{:04X} [{}]",
+      "[{}], direct IO 00D4=0x{:04X} 00D5=0x{:04X} [{}], remote IO "
+      "007D=0x{:04X} 007F=0x{:04X} [{}]",
       magic_enum::enum_name(_id), _slaveAddress, inputStatus.raw,
       joinFlags(inputStatus.activeFlags), outputStatus.raw,
       joinFlags(outputStatus.activeFlags), ioStatus.reg00D4, ioStatus.reg00D5,
-      joinFlags(ioStatus.activeFlags));
+      joinFlags(ioStatus.activeFlags), remoteIoStatus.reg007D,
+      remoteIoStatus.reg007F, joinFlags(remoteIoStatus.activeFlags));
 }
 
 std::uint32_t Motor::readU32(ModbusClient& bus, int upperAddr) const {
@@ -406,7 +428,7 @@ MotorCodeDiagnostic Motor::diagnoseCommunicationError(
 std::uint16_t Motor::readDriverInputCommandRaw(ModbusClient& bus) const {
   const auto raw = readU16(bus, _map.driverInputCommandLower);
   _driverInputCommandRawCache = raw;
-  _selectedOperationIdCache = decodeOperationIdFromInputRaw(raw);
+  _selectedOperationIdCache = decodeOperationIdFromInputRawMapped(raw);
   return raw;
 }
 
@@ -418,7 +440,7 @@ void Motor::writeDriverInputCommandRaw(ModbusClient& bus,
                                        const std::uint16_t raw) const {
   writeU16(bus, _map.driverInputCommandLower, raw);
   _driverInputCommandRawCache = raw;
-  _selectedOperationIdCache = decodeOperationIdFromInputRaw(raw);
+  _selectedOperationIdCache = decodeOperationIdFromInputRawMapped(raw);
 }
 
 void Motor::setDriverInputFlag(ModbusClient& bus, const MotorInputFlag flag,
@@ -426,9 +448,52 @@ void Motor::setDriverInputFlag(ModbusClient& bus, const MotorInputFlag flag,
   auto raw = _driverInputCommandRawCache.has_value()
                  ? *_driverInputCommandRawCache
                  : readDriverInputCommandRaw(bus);
-  const auto bit = static_cast<std::uint16_t>(flag);
-  raw = enabled ? static_cast<std::uint16_t>(raw | bit)
-                : static_cast<std::uint16_t>(raw & ~bit);
+  std::optional<std::uint16_t> bit;
+  const auto bitMaskFromMapped = [&](const std::uint16_t functionCode)
+      -> std::optional<std::uint16_t> {
+    if (const auto mappedBit = netInputBitForFunction(functionCode);
+        mappedBit.has_value()) {
+      return static_cast<std::uint16_t>(1u << *mappedBit);
+    }
+    return std::nullopt;
+  };
+  switch (flag) {
+    case MotorInputFlag::Start:
+      bit = bitMaskFromMapped(kFunctionStart);
+      if (!bit.has_value()) bit = fallbackInputBitMaskForFunction(kFunctionStart);
+      break;
+    case MotorInputFlag::Home:
+      bit = bitMaskFromMapped(kFunctionHome);
+      if (!bit.has_value()) bit = fallbackInputBitMaskForFunction(kFunctionHome);
+      break;
+    case MotorInputFlag::Stop:
+      bit = bitMaskFromMapped(kFunctionStop);
+      if (!bit.has_value()) bit = fallbackInputBitMaskForFunction(kFunctionStop);
+      break;
+    case MotorInputFlag::PlusJog:
+      bit = bitMaskFromMapped(kFunctionPlusJog);
+      if (!bit.has_value()) bit = fallbackInputBitMaskForFunction(kFunctionPlusJog);
+      break;
+    case MotorInputFlag::MinusJog:
+      bit = bitMaskFromMapped(kFunctionMinusJog);
+      if (!bit.has_value()) bit = fallbackInputBitMaskForFunction(kFunctionMinusJog);
+      break;
+    case MotorInputFlag::Fwd:
+      bit = bitMaskFromMapped(kFunctionFwd);
+      if (!bit.has_value()) bit = fallbackInputBitMaskForFunction(kFunctionFwd);
+      break;
+    case MotorInputFlag::Rvs:
+      bit = bitMaskFromMapped(kFunctionRvs);
+      if (!bit.has_value()) bit = fallbackInputBitMaskForFunction(kFunctionRvs);
+      break;
+    default:
+      break;
+  }
+  if (!bit.has_value()) {
+    bit = static_cast<std::uint16_t>(flag);
+  }
+  raw = enabled ? static_cast<std::uint16_t>(raw | *bit)
+                : static_cast<std::uint16_t>(raw & ~(*bit));
   writeDriverInputCommandRaw(bus, raw);
 }
 
@@ -472,6 +537,24 @@ void Motor::setJogMinus(ModbusClient& bus, const bool enabled) const {
   setDriverInputFlag(bus, MotorInputFlag::MinusJog, enabled);
 }
 
+void Motor::setEnabled(ModbusClient& bus, const bool enabled) const {
+  auto raw = _driverInputCommandRawCache.has_value()
+                 ? *_driverInputCommandRawCache
+                 : readDriverInputCommandRaw(bus);
+  const auto mappedBit = netInputBitForFunction(kFunctionCOn);
+  if (!mappedBit.has_value()) {
+    SPDLOG_WARN(
+        "Motor {} (slave {}) C-ON mapping not available (NET-IN function 17). "
+        "Enable/disable command is currently a placeholder.",
+        magic_enum::enum_name(_id), _slaveAddress);
+    return;
+  }
+  const auto mask = static_cast<std::uint16_t>(1u << *mappedBit);
+  raw = enabled ? static_cast<std::uint16_t>(raw | mask)
+                : static_cast<std::uint16_t>(raw & ~mask);
+  writeDriverInputCommandRaw(bus, raw);
+}
+
 std::uint8_t Motor::decodeOperationIdFromInputRaw(const std::uint16_t raw) {
   std::uint8_t opId = 0;
   if ((raw & static_cast<std::uint16_t>(MotorInputFlag::M0)) != 0) opId |= 1u;
@@ -489,7 +572,7 @@ std::uint8_t Motor::readSelectedOperationId(ModbusClient& bus) const {
   if (_selectedOperationIdCache.has_value()) {
     return *_selectedOperationIdCache;
   }
-  return decodeOperationIdFromInputRaw(readDriverInputCommandRaw(bus));
+  return decodeOperationIdFromInputRawMapped(readDriverInputCommandRaw(bus));
 }
 
 void Motor::setSelectedOperationId(ModbusClient& bus, const std::uint8_t opId) const {
@@ -500,13 +583,28 @@ void Motor::setSelectedOperationId(ModbusClient& bus, const std::uint8_t opId) c
   auto raw = _driverInputCommandRawCache.has_value()
                  ? *_driverInputCommandRawCache
                  : readDriverInputCommandRaw(bus);
-  raw = static_cast<std::uint16_t>(raw & ~kOperationIdMask);
-  if ((opId & 1u) != 0) raw |= static_cast<std::uint16_t>(MotorInputFlag::M0);
-  if ((opId & 2u) != 0) raw |= static_cast<std::uint16_t>(MotorInputFlag::M1);
-  if ((opId & 4u) != 0) raw |= static_cast<std::uint16_t>(MotorInputFlag::M2);
-  if ((opId & 8u) != 0) raw |= static_cast<std::uint16_t>(MotorInputFlag::Ms0);
-  if ((opId & 16u) != 0) raw |= static_cast<std::uint16_t>(MotorInputFlag::Ms1);
-  if ((opId & 32u) != 0) raw |= static_cast<std::uint16_t>(MotorInputFlag::Ms2);
+  raw = static_cast<std::uint16_t>(raw & ~operationIdMask());
+  const auto applyOpBit = [&](const std::uint8_t opMask,
+                              const std::uint16_t functionCode) {
+    if ((opId & opMask) == 0u) {
+      return;
+    }
+    const auto mappedBit = netInputBitForFunction(functionCode);
+    if (mappedBit.has_value()) {
+      raw = static_cast<std::uint16_t>(raw | static_cast<std::uint16_t>(1u << *mappedBit));
+      return;
+    }
+    if (const auto fallbackMask = fallbackInputBitMaskForFunction(functionCode);
+        fallbackMask.has_value()) {
+      raw = static_cast<std::uint16_t>(raw | *fallbackMask);
+    }
+  };
+  applyOpBit(1u, kFunctionM0);
+  applyOpBit(2u, kFunctionM1);
+  applyOpBit(4u, kFunctionM2);
+  applyOpBit(8u, kFunctionMs0);
+  applyOpBit(16u, kFunctionMs1);
+  applyOpBit(32u, kFunctionMs2);
   writeDriverInputCommandRaw(bus, raw);
 }
 
@@ -678,6 +776,52 @@ MotorDirectIoStatus Motor::decodeDirectIoAndBrakeStatus(
   return status;
 }
 
+MotorRemoteIoStatus Motor::decodeRemoteIoStatus(const std::uint16_t reg007D,
+                                                const std::uint16_t reg007F) const {
+  MotorRemoteIoStatus status{.reg007D = reg007D, .reg007F = reg007F};
+
+  const auto inputAssignments =
+      _netInputFunctionAssignments.value_or(kDefaultNetInputFunctionCodes);
+  const auto outputAssignments =
+      _netOutputFunctionAssignments.value_or(kDefaultNetOutputFunctionCodes);
+  const bool haveInputAssignments = _netInputFunctionAssignments.has_value();
+  const bool haveOutputAssignments = _netOutputFunctionAssignments.has_value();
+
+  for (std::size_t i = 0; i < 16; ++i) {
+    const auto inCode = inputAssignments[i];
+    const auto inActive = (reg007D & (1u << i)) != 0;
+    const auto inFunction =
+        haveInputAssignments ? describeInputFunctionCode(inCode)
+                             : (i == 7 ? std::string("not used")
+                                       : describeInputFunctionCode(inCode));
+    status.inputAssignments.push_back(
+        {.channel = std::format("NET-IN{}", i),
+         .function = inFunction,
+         .functionCode = inCode,
+         .active = inActive});
+    if (inActive) {
+      status.activeFlags.emplace_back(
+          std::format("NET-IN{}({})", i, inFunction));
+    }
+
+    const auto outCode = outputAssignments[i];
+    const auto outActive = (reg007F & (1u << i)) != 0;
+    const auto outFunction =
+        haveOutputAssignments ? describeOutputFunctionCode(outCode)
+                              : describeOutputFunctionCode(outCode);
+    status.outputAssignments.push_back(
+        {.channel = std::format("NET-OUT{}", i),
+         .function = outFunction,
+         .functionCode = outCode,
+         .active = outActive});
+    if (outActive) {
+      status.activeFlags.emplace_back(
+          std::format("NET-OUT{}({})", i, outFunction));
+    }
+  }
+  return status;
+}
+
 std::array<std::uint16_t, 16> Motor::readOutputFunctionAssignments(
     ModbusClient& bus) const {
   selectSlave(bus);
@@ -698,6 +842,50 @@ std::array<std::uint16_t, 16> Motor::readOutputFunctionAssignments(
   for (int i = 0; i < kChannels; ++i) {
     const auto lowerWordIndex = i * kWordsPerChannel + 1;
     out[static_cast<std::size_t>(i)] = (*regs)[static_cast<std::size_t>(lowerWordIndex)];
+  }
+  return out;
+}
+
+std::array<std::uint16_t, 16> Motor::readNetOutputFunctionAssignments(
+    ModbusClient& bus) const {
+  selectSlave(bus);
+  constexpr int kChannels = 16;
+  constexpr int kWordsPerChannel = 2;
+  auto regs =
+      bus.read_holding_registers(_map.netOutputFunctionSelectBase,
+                                 kChannels * kWordsPerChannel);
+  if (!regs || regs->size() != static_cast<std::size_t>(kChannels * kWordsPerChannel)) {
+    const auto reason = regs ? "Unexpected register count" : regs.error().message;
+    throw std::runtime_error(
+        std::format("Motor {} (slave {}) read NET-OUT function assignment failed: {}",
+                    magic_enum::enum_name(_id), _slaveAddress, reason));
+  }
+  std::array<std::uint16_t, 16> out{};
+  for (int i = 0; i < kChannels; ++i) {
+    out[static_cast<std::size_t>(i)] =
+        (*regs)[static_cast<std::size_t>(i * kWordsPerChannel + 1)];
+  }
+  return out;
+}
+
+std::array<std::uint16_t, 16> Motor::readNetInputFunctionAssignments(
+    ModbusClient& bus) const {
+  selectSlave(bus);
+  constexpr int kChannels = 16;
+  constexpr int kWordsPerChannel = 2;
+  auto regs =
+      bus.read_holding_registers(_map.netInputFunctionSelectBase,
+                                 kChannels * kWordsPerChannel);
+  if (!regs || regs->size() != static_cast<std::size_t>(kChannels * kWordsPerChannel)) {
+    const auto reason = regs ? "Unexpected register count" : regs.error().message;
+    throw std::runtime_error(
+        std::format("Motor {} (slave {}) read NET-IN function assignment failed: {}",
+                    magic_enum::enum_name(_id), _slaveAddress, reason));
+  }
+  std::array<std::uint16_t, 16> out{};
+  for (int i = 0; i < kChannels; ++i) {
+    out[static_cast<std::size_t>(i)] =
+        (*regs)[static_cast<std::size_t>(i * kWordsPerChannel + 1)];
   }
   return out;
 }
@@ -731,6 +919,82 @@ std::string Motor::describeOutputFunctionCode(const std::uint16_t code) {
 
 std::string Motor::describeInputFunctionCode(const std::uint16_t code) {
   return inputFunctionName(code);
+}
+
+std::optional<std::uint8_t> Motor::netInputBitForFunction(
+    const std::uint16_t functionCode) const {
+  if (!_netInputFunctionAssignments.has_value()) {
+    return std::nullopt;
+  }
+  for (std::size_t i = 0; i < _netInputFunctionAssignments->size(); ++i) {
+    if ((*_netInputFunctionAssignments)[i] == functionCode) {
+      return static_cast<std::uint8_t>(i);
+    }
+  }
+  return std::nullopt;
+}
+
+std::optional<std::uint16_t> Motor::fallbackInputBitMaskForFunction(
+    const std::uint16_t functionCode) {
+  switch (functionCode) {
+    case kFunctionM0: return static_cast<std::uint16_t>(MotorInputFlag::M0);
+    case kFunctionM1: return static_cast<std::uint16_t>(MotorInputFlag::M1);
+    case kFunctionM2: return static_cast<std::uint16_t>(MotorInputFlag::M2);
+    case kFunctionStart: return static_cast<std::uint16_t>(MotorInputFlag::Start);
+    case kFunctionHome: return static_cast<std::uint16_t>(MotorInputFlag::Home);
+    case kFunctionStop: return static_cast<std::uint16_t>(MotorInputFlag::Stop);
+    case kFunctionMs0: return static_cast<std::uint16_t>(MotorInputFlag::Ms0);
+    case kFunctionMs1: return static_cast<std::uint16_t>(MotorInputFlag::Ms1);
+    case kFunctionMs2: return static_cast<std::uint16_t>(MotorInputFlag::Ms2);
+    case kFunctionPlusJog:
+      return static_cast<std::uint16_t>(MotorInputFlag::PlusJog);
+    case kFunctionMinusJog:
+      return static_cast<std::uint16_t>(MotorInputFlag::MinusJog);
+    case kFunctionFwd: return static_cast<std::uint16_t>(MotorInputFlag::Fwd);
+    case kFunctionRvs: return static_cast<std::uint16_t>(MotorInputFlag::Rvs);
+    default: return std::nullopt;
+  }
+}
+
+std::uint16_t Motor::operationIdMask() const {
+  std::uint16_t mask = 0;
+  for (const auto code :
+       {kFunctionM0, kFunctionM1, kFunctionM2, kFunctionMs0, kFunctionMs1,
+        kFunctionMs2}) {
+    if (const auto mappedBit = netInputBitForFunction(code); mappedBit.has_value()) {
+      mask = static_cast<std::uint16_t>(mask | static_cast<std::uint16_t>(1u << *mappedBit));
+      continue;
+    }
+    if (const auto fallback = fallbackInputBitMaskForFunction(code);
+        fallback.has_value()) {
+      mask = static_cast<std::uint16_t>(mask | *fallback);
+    }
+  }
+  return mask;
+}
+
+std::uint8_t Motor::decodeOperationIdFromInputRawMapped(const std::uint16_t raw) const {
+  std::uint8_t opId = 0;
+  const auto decodeBit = [&](const std::uint8_t opBit, const std::uint16_t code) {
+    if (const auto mapped = netInputBitForFunction(code); mapped.has_value()) {
+      if ((raw & static_cast<std::uint16_t>(1u << *mapped)) != 0u) {
+        opId = static_cast<std::uint8_t>(opId | opBit);
+      }
+      return;
+    }
+    if (const auto fallback = fallbackInputBitMaskForFunction(code); fallback.has_value()) {
+      if ((raw & *fallback) != 0u) {
+        opId = static_cast<std::uint8_t>(opId | opBit);
+      }
+    }
+  };
+  decodeBit(1u, kFunctionM0);
+  decodeBit(2u, kFunctionM1);
+  decodeBit(4u, kFunctionM2);
+  decodeBit(8u, kFunctionMs0);
+  decodeBit(16u, kFunctionMs1);
+  decodeBit(32u, kFunctionMs2);
+  return opId;
 }
 
 void Motor::resetAlarm(ModbusClient& bus) const {

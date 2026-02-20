@@ -14,6 +14,8 @@ MotorRegisterMap makeArKd2RegisterMap() {
   map.directIoAndBrakeStatus = 0x00D4;
   map.outputFunctionSelectBase = 0x1140;
   map.inputFunctionSelectBase = 0x1100;
+  map.netInputFunctionSelectBase = 0x1160;
+  map.netOutputFunctionSelectBase = 0x1180;
 
   // 0x0180/0x0181: alarm reset command (used by existing lab script)
   map.alarmResetCommand = 0x0180;

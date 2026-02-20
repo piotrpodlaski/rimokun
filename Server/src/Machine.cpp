@@ -28,10 +28,14 @@ nlohmann::json makeDefaultIoAssignmentResponse(const utl::EMotor motor) {
       {"driverOutputRaw", 0u},
       {"ioOutputRaw", 0u},
       {"ioInputRaw", 0u},
+      {"netInputRaw", 0u},
+      {"netOutputRaw", 0u},
       {"inputFlags", nlohmann::json::array()},
       {"outputFlags", nlohmann::json::array()},
       {"ioOutputAssignments", nlohmann::json::array()},
       {"ioInputAssignments", nlohmann::json::array()},
+      {"netOutputAssignments", nlohmann::json::array()},
+      {"netInputAssignments", nlohmann::json::array()},
       {"alarm", nlohmann::json::object()},
       {"warning", nlohmann::json::object()},
   };
@@ -75,6 +79,29 @@ nlohmann::json makeDefaultIoAssignmentResponse(const utl::EMotor motor) {
       {{"channel", "HOMES"}, {"function", "HOMES"}, {"functionCode", 0}, {"active", false}});
   response["ioInputAssignments"].push_back(
       {{"channel", "SLIT"}, {"function", "SLIT"}, {"functionCode", 0}, {"active", false}});
+
+  const std::array<std::pair<const char*, unsigned int>, 16> defaultNetIn{
+      {{"M0", 48},       {"M1", 49},      {"M2", 50},      {"START", 4},
+       {"HOME", 3},      {"STOP", 18},    {"FREE", 16},    {"not used", 0},
+       {"MS0", 8},       {"MS1", 9},      {"MS2", 10},     {"SSTART", 5},
+       {"+JOG", 6},      {"-JOG", 7},     {"FWD", 1},      {"RVS", 2}}};
+  const std::array<std::pair<const char*, unsigned int>, 16> defaultNetOut{
+      {{"M0_R", 48},     {"M1_R", 49},    {"M2_R", 50},    {"START_R", 4},
+       {"HOME-P", 70},   {"READY", 67},   {"WNG", 66},     {"ALM", 65},
+       {"S-BSY", 80},    {"AREA1", 73},   {"AREA2", 74},   {"AREA3", 75},
+       {"TIM", 72},      {"MOVE", 68},    {"END", 69},     {"TLC", 71}}};
+  for (int i = 0; i < 16; ++i) {
+    response["netInputAssignments"].push_back(
+        {{"channel", std::format("NET-IN{}", i)},
+         {"function", defaultNetIn[static_cast<std::size_t>(i)].first},
+         {"functionCode", defaultNetIn[static_cast<std::size_t>(i)].second},
+         {"active", false}});
+    response["netOutputAssignments"].push_back(
+        {{"channel", std::format("NET-OUT{}", i)},
+         {"function", defaultNetOut[static_cast<std::size_t>(i)].first},
+         {"functionCode", defaultNetOut[static_cast<std::size_t>(i)].second},
+         {"active", false}});
+  }
   return response;
 }
 
@@ -257,6 +284,13 @@ void Machine::runOneCycle(LoopState& state) {
                                     [this](const cmd::ResetMotorAlarmCommand& c) {
                                       handleResetMotorAlarmCommand(c);
                                     },
+                                    [this](const cmd::SetMotorEnabledCommand& c) {
+                                      handleSetMotorEnabledCommand(c);
+                                    },
+                                    [this](
+                                        const cmd::SetAllMotorsEnabledCommand& c) {
+                                      handleSetAllMotorsEnabledCommand(c);
+                                    },
                                     [this, &responsePayload](
                                         const cmd::ContecDiagnosticsCommand& c) {
                                       responsePayload =
@@ -404,6 +438,7 @@ nlohmann::json Machine::handleMotorDiagnosticsCommand(
     const auto inputStatus = _motorControl.readInputStatus(c.motor);
     const auto outputStatus = _motorControl.readOutputStatus(c.motor);
     const auto directIoStatus = _motorControl.readDirectIoStatus(c.motor);
+    const auto remoteIoStatus = _motorControl.readRemoteIoStatus(c.motor);
     const auto alarm = _motorControl.diagnoseCurrentAlarm(c.motor);
     const auto warning = _motorControl.diagnoseCurrentWarning(c.motor);
 
@@ -411,6 +446,8 @@ nlohmann::json Machine::handleMotorDiagnosticsCommand(
     response["driverOutputRaw"] = outputStatus.raw;
     response["ioOutputRaw"] = directIoStatus.reg00D4;
     response["ioInputRaw"] = directIoStatus.reg00D5;
+    response["netInputRaw"] = remoteIoStatus.reg007D;
+    response["netOutputRaw"] = remoteIoStatus.reg007F;
     response["inputFlags"] = nlohmann::json::array();
     for (const auto flag : inputStatus.activeFlags) {
       response["inputFlags"].push_back(std::string(flag));
@@ -431,6 +468,24 @@ nlohmann::json Machine::handleMotorDiagnosticsCommand(
     response["ioInputAssignments"] = nlohmann::json::array();
     for (const auto& assignment : directIoStatus.inputAssignments) {
       response["ioInputAssignments"].push_back(nlohmann::json{
+          {"channel", assignment.channel},
+          {"function", assignment.function},
+          {"functionCode", assignment.functionCode},
+          {"active", assignment.active},
+      });
+    }
+    response["netOutputAssignments"] = nlohmann::json::array();
+    for (const auto& assignment : remoteIoStatus.outputAssignments) {
+      response["netOutputAssignments"].push_back(nlohmann::json{
+          {"channel", assignment.channel},
+          {"function", assignment.function},
+          {"functionCode", assignment.functionCode},
+          {"active", assignment.active},
+      });
+    }
+    response["netInputAssignments"] = nlohmann::json::array();
+    for (const auto& assignment : remoteIoStatus.inputAssignments) {
+      response["netInputAssignments"].push_back(nlohmann::json{
           {"channel", assignment.channel},
           {"function", assignment.function},
           {"functionCode", assignment.functionCode},
@@ -459,6 +514,15 @@ nlohmann::json Machine::handleMotorDiagnosticsCommand(
 
 void Machine::handleResetMotorAlarmCommand(const cmd::ResetMotorAlarmCommand& c) {
   _motorControl.resetAlarm(c.motor);
+}
+
+void Machine::handleSetMotorEnabledCommand(const cmd::SetMotorEnabledCommand& c) {
+  _motorControl.setEnabled(c.motor, c.enabled);
+}
+
+void Machine::handleSetAllMotorsEnabledCommand(
+    const cmd::SetAllMotorsEnabledCommand& c) {
+  _motorControl.setAllEnabled(c.enabled);
 }
 
 nlohmann::json Machine::handleContecDiagnosticsCommand(
@@ -532,7 +596,9 @@ void Machine::makeDummyStatus() {
         .state = ELEDState::Off,
         .warningDescription = "",
         .alarmDescription = "",
-        .flags = {{EMotorStatusFlags::Warning, ELEDState::Off},
+        .flags = {{EMotorStatusFlags::BrakeApplied, ELEDState::Off},
+                  {EMotorStatusFlags::Enabled, ELEDState::Off},
+                  {EMotorStatusFlags::Warning, ELEDState::Off},
                   {EMotorStatusFlags::Alarm, ELEDState::Off}}};
   }
   _robotStatus.toolChangers[EArm::Left] = {

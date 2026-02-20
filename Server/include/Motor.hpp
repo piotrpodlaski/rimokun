@@ -94,6 +94,21 @@ struct MotorDirectIoStatus {
   std::vector<AssignedSignal> inputAssignments;
 };
 
+struct MotorRemoteIoStatus {
+  struct AssignedSignal {
+    std::string channel;
+    std::string function;
+    std::uint16_t functionCode{0};
+    bool active{false};
+  };
+
+  std::uint16_t reg007D{0};
+  std::uint16_t reg007F{0};
+  std::vector<std::string> activeFlags;
+  std::vector<AssignedSignal> outputAssignments;
+  std::vector<AssignedSignal> inputAssignments;
+};
+
 enum class MotorOperationMode : std::int32_t {
   Incremental = 0,
   Absolute = 1,
@@ -147,6 +162,7 @@ class Motor {
   void setReverse(ModbusClient& bus, bool enabled) const;
   void setJogPlus(ModbusClient& bus, bool enabled) const;
   void setJogMinus(ModbusClient& bus, bool enabled) const;
+  void setEnabled(ModbusClient& bus, bool enabled) const;
   [[nodiscard]] static std::uint8_t decodeOperationIdFromInputRaw(
       std::uint16_t raw);
   [[nodiscard]] std::uint8_t readSelectedOperationId(ModbusClient& bus) const;
@@ -175,6 +191,8 @@ class Motor {
   [[nodiscard]] MotorFlagStatus decodeDriverOutputStatus(std::uint16_t raw) const;
   [[nodiscard]] MotorDirectIoStatus decodeDirectIoAndBrakeStatus(
       std::uint32_t raw) const;
+  [[nodiscard]] MotorRemoteIoStatus decodeRemoteIoStatus(
+      std::uint16_t reg007D, std::uint16_t reg007F) const;
   void resetAlarm(ModbusClient& bus) const;
 
   [[nodiscard]] const MotorRegisterMap& map() const { return _map; }
@@ -184,8 +202,19 @@ class Motor {
       ModbusClient& bus) const;
   [[nodiscard]] std::array<std::uint16_t, 12> readInputFunctionAssignments(
       ModbusClient& bus) const;
+  [[nodiscard]] std::array<std::uint16_t, 16> readNetOutputFunctionAssignments(
+      ModbusClient& bus) const;
+  [[nodiscard]] std::array<std::uint16_t, 16> readNetInputFunctionAssignments(
+      ModbusClient& bus) const;
   [[nodiscard]] static std::string describeOutputFunctionCode(std::uint16_t code);
   [[nodiscard]] static std::string describeInputFunctionCode(std::uint16_t code);
+  [[nodiscard]] std::uint16_t operationIdMask() const;
+  [[nodiscard]] std::optional<std::uint8_t> netInputBitForFunction(
+      std::uint16_t functionCode) const;
+  [[nodiscard]] static std::optional<std::uint16_t> fallbackInputBitMaskForFunction(
+      std::uint16_t functionCode);
+  [[nodiscard]] std::uint8_t decodeOperationIdFromInputRawMapped(
+      std::uint16_t raw) const;
 
   void selectSlave(ModbusClient& bus) const;
 
@@ -196,4 +225,6 @@ class Motor {
   mutable std::optional<std::uint8_t> _selectedOperationIdCache;
   mutable std::optional<std::array<std::uint16_t, 16>> _outputFunctionAssignments;
   mutable std::optional<std::array<std::uint16_t, 12>> _inputFunctionAssignments;
+  mutable std::optional<std::array<std::uint16_t, 16>> _netOutputFunctionAssignments;
+  mutable std::optional<std::array<std::uint16_t, 16>> _netInputFunctionAssignments;
 };

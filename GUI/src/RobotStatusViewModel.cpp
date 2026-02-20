@@ -54,5 +54,9 @@ ResetControlsViewModel RobotStatusViewModel::resetControlsForStatus(
   vm.resetContecEnabled = (vm.contec == utl::ELEDState::Error);
   vm.resetMotorEnabled = (vm.motor == utl::ELEDState::Error);
   vm.resetControlPanelEnabled = (vm.controlPanel == utl::ELEDState::Error);
+  vm.enableAllMotorsEnabled =
+      vm.motor == utl::ELEDState::On || vm.motor == utl::ELEDState::Warning;
+  vm.disableAllMotorsEnabled =
+      vm.motor == utl::ELEDState::On || vm.motor == utl::ELEDState::Warning;
   return vm;
 }

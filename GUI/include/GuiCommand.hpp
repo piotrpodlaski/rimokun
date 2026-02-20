@@ -25,6 +25,15 @@ struct GuiResetMotorAlarmCommand {
   utl::EMotor motor;
 };
 
+struct GuiSetMotorEnabledCommand {
+  utl::EMotor motor;
+  bool enabled;
+};
+
+struct GuiSetAllMotorsEnabledCommand {
+  bool enabled;
+};
+
 struct GuiContecDiagnosticsCommand {};
 
 struct GuiRawCommand {
@@ -34,6 +43,7 @@ struct GuiRawCommand {
 struct GuiCommand {
   std::variant<GuiToolChangerCommand, GuiReconnectCommand,
                GuiMotorDiagnosticsCommand, GuiResetMotorAlarmCommand,
+               GuiSetMotorEnabledCommand, GuiSetAllMotorsEnabledCommand,
                GuiContecDiagnosticsCommand, GuiRawCommand>
       payload;
 };

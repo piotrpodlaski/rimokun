@@ -31,6 +31,7 @@ class MainWindow : public QMainWindow {
   ~MainWindow() override;
   void openJoystickPanel();
   void openMotorPanel();
+  void openMotorPanelForMotor(utl::EMotor motor);
   void openContecPanel();
   void onJoystickUpdate(int id, double x, double y, bool pressed);
 

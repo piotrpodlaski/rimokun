@@ -27,6 +27,7 @@ class MotorPanelWindow final : public QDialog, public ResponseConsumer {
  public:
   explicit MotorPanelWindow(QWidget* parent = nullptr);
   void setRobotStatus(const utl::RobotStatus& status);
+  void setSelectedMotor(utl::EMotor motor);
   bool suppressGlobalErrorPopup() const override { return true; }
   void processResponse(const GuiResponse& response) override;
 
@@ -37,12 +38,19 @@ class MotorPanelWindow final : public QDialog, public ResponseConsumer {
   void closeEvent(QCloseEvent* event) override;
 
  private:
-  enum class PendingRequest { None, Diagnostics, ResetAlarm };
+  enum class PendingRequest {
+    None,
+    Diagnostics,
+    ResetAlarm,
+    EnableMotor,
+    DisableMotor,
+  };
 
   void rebuildMotorList(const std::vector<utl::EMotor>& motors);
   void updateStateLamp();
   void requestDiagnostics();
   void requestResetAlarm();
+  void requestSetEnabled(bool enabled);
   [[nodiscard]] std::optional<utl::EMotor> selectedMotor() const;
   void updateFromDiagnostics(const nlohmann::json& payload);
   void createAssignmentRows(
@@ -54,16 +62,23 @@ class MotorPanelWindow final : public QDialog, public ResponseConsumer {
 
   QComboBox* _motorSelector{nullptr};
   LedIndicator* _stateLamp{nullptr};
+  LedIndicator* _enabledLamp{nullptr};
   QLabel* _inputRawLabel{nullptr};
   QLabel* _outputRawLabel{nullptr};
+  QLabel* _netInputRawLabel{nullptr};
+  QLabel* _netOutputRawLabel{nullptr};
   QTextEdit* _alarmText{nullptr};
   QTextEdit* _warningText{nullptr};
   QPushButton* _refreshButton{nullptr};
   QPushButton* _resetAlarmButton{nullptr};
+  QPushButton* _enableButton{nullptr};
+  QPushButton* _disableButton{nullptr};
   QCheckBox* _autoRefreshCheck{nullptr};
   QTimer* _refreshTimer{nullptr};
   std::map<std::string, std::pair<QLabel*, LedIndicator*>> _inputAssignmentRows;
   std::map<std::string, std::pair<QLabel*, LedIndicator*>> _outputAssignmentRows;
+  std::map<std::string, std::pair<QLabel*, LedIndicator*>> _netInputAssignmentRows;
+  std::map<std::string, std::pair<QLabel*, LedIndicator*>> _netOutputAssignmentRows;
 
   std::vector<utl::EMotor> _visibleMotors;
   utl::RobotStatus _lastStatus;

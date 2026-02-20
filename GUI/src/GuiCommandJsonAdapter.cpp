@@ -27,6 +27,17 @@ nlohmann::json GuiCommandJsonAdapter::toJson(const GuiCommand& command) {
               {"type", "resetMotorAlarm"},
               {"motor", utl::enumToString(cmd.motor)},
           };
+        } else if constexpr (std::is_same_v<CmdT, GuiSetMotorEnabledCommand>) {
+          return nlohmann::json{
+              {"type", "setMotorEnabled"},
+              {"motor", utl::enumToString(cmd.motor)},
+              {"enabled", cmd.enabled},
+          };
+        } else if constexpr (std::is_same_v<CmdT, GuiSetAllMotorsEnabledCommand>) {
+          return nlohmann::json{
+              {"type", "setAllMotorsEnabled"},
+              {"enabled", cmd.enabled},
+          };
         } else if constexpr (std::is_same_v<CmdT, GuiContecDiagnosticsCommand>) {
           return nlohmann::json{
               {"type", "contecDiagnostics"},

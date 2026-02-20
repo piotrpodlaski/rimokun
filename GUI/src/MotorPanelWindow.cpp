@@ -34,6 +34,7 @@ MotorPanelWindow::MotorPanelWindow(QWidget* parent) : QDialog(parent) {
   setWindowModality(Qt::NonModal);
   setWindowFlag(Qt::Tool, true);
   setAttribute(Qt::WA_DeleteOnClose, false);
+  resize(1500, 900);
 
   auto* root = new QVBoxLayout(this);
   root->setContentsMargins(10, 10, 10, 10);
@@ -43,16 +44,23 @@ MotorPanelWindow::MotorPanelWindow(QWidget* parent) : QDialog(parent) {
   auto* motorLabel = new QLabel("Motor:", this);
   _motorSelector = new QComboBox(this);
   _stateLamp = new LedIndicator(this);
+  _enabledLamp = new LedIndicator(this);
   _refreshButton = new QPushButton("Refresh", this);
   _resetAlarmButton = new QPushButton("Reset alarm", this);
+  _enableButton = new QPushButton("Enable", this);
+  _disableButton = new QPushButton("Disable", this);
   _autoRefreshCheck = new QCheckBox("Auto-refresh", this);
   _autoRefreshCheck->setChecked(false);
   topRow->addWidget(motorLabel);
   topRow->addWidget(_motorSelector, 1);
   topRow->addWidget(new QLabel("State:", this));
   topRow->addWidget(_stateLamp);
+  topRow->addWidget(new QLabel("Enabled:", this));
+  topRow->addWidget(_enabledLamp);
   topRow->addWidget(_refreshButton);
   topRow->addWidget(_resetAlarmButton);
+  topRow->addWidget(_enableButton);
+  topRow->addWidget(_disableButton);
   topRow->addWidget(_autoRefreshCheck);
   root->addLayout(topRow);
 
@@ -60,8 +68,12 @@ MotorPanelWindow::MotorPanelWindow(QWidget* parent) : QDialog(parent) {
   auto* rawForm = new QFormLayout(rawGroup);
   _inputRawLabel = new QLabel("-", rawGroup);
   _outputRawLabel = new QLabel("-", rawGroup);
+  _netInputRawLabel = new QLabel("-", rawGroup);
+  _netOutputRawLabel = new QLabel("-", rawGroup);
   rawForm->addRow("OUT state (0x00D4):", _outputRawLabel);
   rawForm->addRow("IN state (0x00D5):", _inputRawLabel);
+  rawForm->addRow("NET-OUT state (0x007F):", _netOutputRawLabel);
+  rawForm->addRow("NET-IN state (0x007D):", _netInputRawLabel);
   root->addWidget(rawGroup);
 
   auto* flagsGroup = new QGroupBox("Mapped I/O", this);
@@ -82,7 +94,32 @@ MotorPanelWindow::MotorPanelWindow(QWidget* parent) : QDialog(parent) {
 
   flagsGrid->addWidget(inputGroup, 0, 0);
   flagsGrid->addWidget(outputGroup, 0, 1);
-  root->addWidget(flagsGroup, 1);
+
+  auto* netFlagsGroup = new QGroupBox("Mapped NET I/O", this);
+  auto* netFlagsGrid = new QGridLayout(netFlagsGroup);
+  auto* netInputGroup = new QGroupBox("NET Inputs", netFlagsGroup);
+  auto* netOutputGroup = new QGroupBox("NET Outputs", netFlagsGroup);
+  auto* netInputLayout = new QGridLayout(netInputGroup);
+  auto* netOutputLayout = new QGridLayout(netOutputGroup);
+  createAssignmentRows(
+      netInputLayout,
+      {"NET-IN0", "NET-IN1", "NET-IN2", "NET-IN3", "NET-IN4", "NET-IN5",
+       "NET-IN6", "NET-IN7", "NET-IN8", "NET-IN9", "NET-IN10", "NET-IN11",
+       "NET-IN12", "NET-IN13", "NET-IN14", "NET-IN15"},
+      _netInputAssignmentRows);
+  createAssignmentRows(
+      netOutputLayout,
+      {"NET-OUT0", "NET-OUT1", "NET-OUT2", "NET-OUT3", "NET-OUT4", "NET-OUT5",
+       "NET-OUT6", "NET-OUT7", "NET-OUT8", "NET-OUT9", "NET-OUT10",
+       "NET-OUT11", "NET-OUT12", "NET-OUT13", "NET-OUT14", "NET-OUT15"},
+      _netOutputAssignmentRows);
+  netFlagsGrid->addWidget(netInputGroup, 0, 0);
+  netFlagsGrid->addWidget(netOutputGroup, 0, 1);
+
+  auto* allMappingsRow = new QHBoxLayout();
+  allMappingsRow->addWidget(flagsGroup, 1);
+  allMappingsRow->addWidget(netFlagsGroup, 1);
+  root->addLayout(allMappingsRow, 1);
 
   auto* diagGroup = new QGroupBox("Diagnostics", this);
   auto* diagGrid = new QGridLayout(diagGroup);
@@ -104,6 +141,10 @@ MotorPanelWindow::MotorPanelWindow(QWidget* parent) : QDialog(parent) {
           [this]() { requestDiagnostics(); });
   connect(_resetAlarmButton, &QPushButton::clicked, this,
           [this]() { requestResetAlarm(); });
+  connect(_enableButton, &QPushButton::clicked, this,
+          [this]() { requestSetEnabled(true); });
+  connect(_disableButton, &QPushButton::clicked, this,
+          [this]() { requestSetEnabled(false); });
   connect(_motorSelector, &QComboBox::currentIndexChanged, this,
           [this](int) { requestDiagnostics(); });
   connect(_refreshTimer, &QTimer::timeout, this, [this]() {
@@ -124,6 +165,17 @@ void MotorPanelWindow::setRobotStatus(const utl::RobotStatus& status) {
   updateStateLamp();
 }
 
+void MotorPanelWindow::setSelectedMotor(const utl::EMotor motor) {
+  if (!_motorSelector) {
+    return;
+  }
+  const auto index = _motorSelector->findData(static_cast<int>(motor));
+  if (index >= 0) {
+    _motorSelector->setCurrentIndex(index);
+    requestDiagnostics();
+  }
+}
+
 void MotorPanelWindow::processResponse(const GuiResponse& response) {
   const auto pending = _pendingRequest;
   _pendingRequest = PendingRequest::None;
@@ -137,6 +189,11 @@ void MotorPanelWindow::processResponse(const GuiResponse& response) {
     return;
   }
   if (pending == PendingRequest::ResetAlarm) {
+    requestDiagnostics();
+    return;
+  }
+  if (pending == PendingRequest::EnableMotor ||
+      pending == PendingRequest::DisableMotor) {
     requestDiagnostics();
     return;
   }
@@ -173,6 +230,8 @@ void MotorPanelWindow::rebuildMotorList(const std::vector<utl::EMotor>& motors) 
     _motorSelector->setEnabled(false);
     _refreshButton->setEnabled(false);
     _resetAlarmButton->setEnabled(false);
+    _enableButton->setEnabled(false);
+    _disableButton->setEnabled(false);
     return;
   }
   _motorSelector->setEnabled(true);
@@ -192,12 +251,22 @@ void MotorPanelWindow::updateStateLamp() {
   const auto motor = selectedMotor();
   if (!motor.has_value() || !_lastStatus.motors.contains(*motor)) {
     _stateLamp->setState(utl::ELEDState::Off);
+    _enabledLamp->setState(utl::ELEDState::Off);
     _resetAlarmButton->setEnabled(false);
+    _enableButton->setEnabled(false);
+    _disableButton->setEnabled(false);
     return;
   }
   const auto& status = _lastStatus.motors.at(*motor);
   _stateLamp->setState(status.state);
+  const auto enabledIt = status.flags.find(utl::EMotorStatusFlags::Enabled);
+  const auto enabledState = enabledIt == status.flags.end()
+                                ? utl::ELEDState::Off
+                                : enabledIt->second;
+  _enabledLamp->setState(enabledState);
   _resetAlarmButton->setEnabled(status.state == utl::ELEDState::Error);
+  _enableButton->setEnabled(enabledState != utl::ELEDState::On);
+  _disableButton->setEnabled(enabledState == utl::ELEDState::On);
 }
 
 void MotorPanelWindow::requestDiagnostics() {
@@ -219,6 +288,19 @@ void MotorPanelWindow::requestResetAlarm() {
   GuiCommand command;
   command.payload = GuiResetMotorAlarmCommand{.motor = *motor};
   _pendingRequest = PendingRequest::ResetAlarm;
+  emit commandIssued(command);
+}
+
+void MotorPanelWindow::requestSetEnabled(const bool enabled) {
+  const auto motor = selectedMotor();
+  if (!motor.has_value()) {
+    return;
+  }
+  GuiCommand command;
+  command.payload =
+      GuiSetMotorEnabledCommand{.motor = *motor, .enabled = enabled};
+  _pendingRequest =
+      enabled ? PendingRequest::EnableMotor : PendingRequest::DisableMotor;
   emit commandIssued(command);
 }
 
@@ -249,6 +331,21 @@ void MotorPanelWindow::updateFromDiagnostics(const nlohmann::json& payload) {
   } else {
     _outputRawLabel->setText("-");
   }
+  if (payload.contains("netInputRaw") && payload["netInputRaw"].is_number_unsigned()) {
+    _netInputRawLabel->setText(
+        QString("0x%1").arg(payload["netInputRaw"].get<unsigned int>(), 4, 16,
+                            QLatin1Char('0')));
+  } else {
+    _netInputRawLabel->setText("-");
+  }
+  if (payload.contains("netOutputRaw") &&
+      payload["netOutputRaw"].is_number_unsigned()) {
+    _netOutputRawLabel->setText(
+        QString("0x%1").arg(payload["netOutputRaw"].get<unsigned int>(), 4, 16,
+                            QLatin1Char('0')));
+  } else {
+    _netOutputRawLabel->setText("-");
+  }
 
   updateAssignmentRows(payload.contains("ioOutputAssignments")
                            ? payload["ioOutputAssignments"]
@@ -258,6 +355,14 @@ void MotorPanelWindow::updateFromDiagnostics(const nlohmann::json& payload) {
                            ? payload["ioInputAssignments"]
                            : nlohmann::json::array(),
                        _inputAssignmentRows);
+  updateAssignmentRows(payload.contains("netOutputAssignments")
+                           ? payload["netOutputAssignments"]
+                           : nlohmann::json::array(),
+                       _netOutputAssignmentRows);
+  updateAssignmentRows(payload.contains("netInputAssignments")
+                           ? payload["netInputAssignments"]
+                           : nlohmann::json::array(),
+                       _netInputAssignmentRows);
 
   auto formatDiag = [](const nlohmann::json& diag) -> QString {
     if (!diag.is_object()) {
@@ -297,12 +402,16 @@ void MotorPanelWindow::createAssignmentRows(
     auto* mappingLabel = new QLabel("-", this);
     auto* led = new LedIndicator(this);
     led->setState(utl::ELEDState::Off);
+    led->setFixedSize(14, 14);
+    mappingLabel->setAlignment(Qt::AlignVCenter | Qt::AlignLeft);
     layout->addWidget(mappingLabel, row, 0);
-    layout->addWidget(led, row, 1);
+    layout->addWidget(led, row, 1, Qt::AlignTop | Qt::AlignHCenter);
     targetRows.emplace(channel, std::make_pair(mappingLabel, led));
     ++row;
   }
   layout->setColumnStretch(0, 1);
+  layout->setRowStretch(row, 1);
+  layout->setAlignment(Qt::AlignTop);
 }
 
 void MotorPanelWindow::updateAssignmentRows(

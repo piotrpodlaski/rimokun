@@ -5,6 +5,8 @@
 
 #include "VMotorStats.hpp"
 
+class QMouseEvent;
+
 namespace Ui {
 class MotorStats;
 }
@@ -25,8 +27,15 @@ class MotorStats : public QWidget, public VMotorStats {
   void setStatus(utl::ELEDState value) const override;
   void setMotorId(utl::EMotor id) override;
 
+ signals:
+  void clicked(utl::EMotor motor);
+
  public slots:
   void handleUpdate(const utl::RobotStatus&);
+
+ protected:
+  void mousePressEvent(QMouseEvent* event) override;
+  bool eventFilter(QObject* watched, QEvent* event) override;
 
  private:
   std::string _motorName;

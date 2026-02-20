@@ -61,6 +61,9 @@ class Machine {
   virtual nlohmann::json handleMotorDiagnosticsCommand(
       const cmd::MotorDiagnosticsCommand& c);
   virtual void handleResetMotorAlarmCommand(const cmd::ResetMotorAlarmCommand& c);
+  virtual void handleSetMotorEnabledCommand(const cmd::SetMotorEnabledCommand& c);
+  virtual void handleSetAllMotorsEnabledCommand(
+      const cmd::SetAllMotorsEnabledCommand& c);
   virtual nlohmann::json handleContecDiagnosticsCommand(
       const cmd::ContecDiagnosticsCommand& c);
  private:

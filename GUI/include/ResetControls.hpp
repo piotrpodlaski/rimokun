@@ -27,6 +27,8 @@ class ResetControls : public QWidget {
   QPushButton* _bResetContec;
   QPushButton* _bResetMotors;
   QPushButton* _bResetControlPanel;
+  QPushButton* _bEnableAllMotors;
+  QPushButton* _bDisableAllMotors;
   LedIndicator* _lServerLed;
   LedIndicator* _lContecLed;
   LedIndicator* _lMotorLed;

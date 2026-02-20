@@ -851,19 +851,41 @@ std::array<std::uint16_t, 16> Motor::readNetOutputFunctionAssignments(
   selectSlave(bus);
   constexpr int kChannels = 16;
   constexpr int kWordsPerChannel = 2;
-  auto regs =
+  constexpr int kMaxRegistersPerRead = 16;
+  auto regsFirstHalf =
       bus.read_holding_registers(_map.netOutputFunctionSelectBase,
-                                 kChannels * kWordsPerChannel);
-  if (!regs || regs->size() != static_cast<std::size_t>(kChannels * kWordsPerChannel)) {
-    const auto reason = regs ? "Unexpected register count" : regs.error().message;
+                                 kMaxRegistersPerRead);
+  if (!regsFirstHalf ||
+      regsFirstHalf->size() != static_cast<std::size_t>(kMaxRegistersPerRead)) {
+    const auto reason = regsFirstHalf ? "Unexpected register count"
+                                      : regsFirstHalf.error().message;
     throw std::runtime_error(
         std::format("Motor {} (slave {}) read NET-OUT function assignment failed: {}",
                     magic_enum::enum_name(_id), _slaveAddress, reason));
   }
+  auto regsSecondHalf =
+      bus.read_holding_registers(
+          _map.netOutputFunctionSelectBase + kMaxRegistersPerRead,
+          kMaxRegistersPerRead);
+  if (!regsSecondHalf ||
+      regsSecondHalf->size() != static_cast<std::size_t>(kMaxRegistersPerRead)) {
+    const auto reason = regsSecondHalf ? "Unexpected register count"
+                                       : regsSecondHalf.error().message;
+    throw std::runtime_error(
+        std::format("Motor {} (slave {}) read NET-OUT function assignment failed: {}",
+                    magic_enum::enum_name(_id), _slaveAddress, reason));
+  }
+
+  std::array<std::uint16_t, kChannels * kWordsPerChannel> regs{};
+  for (int i = 0; i < kMaxRegistersPerRead; ++i) {
+    regs[static_cast<std::size_t>(i)] = (*regsFirstHalf)[static_cast<std::size_t>(i)];
+    regs[static_cast<std::size_t>(i + kMaxRegistersPerRead)] =
+        (*regsSecondHalf)[static_cast<std::size_t>(i)];
+  }
   std::array<std::uint16_t, 16> out{};
   for (int i = 0; i < kChannels; ++i) {
     out[static_cast<std::size_t>(i)] =
-        (*regs)[static_cast<std::size_t>(i * kWordsPerChannel + 1)];
+        regs[static_cast<std::size_t>(i * kWordsPerChannel + 1)];
   }
   return out;
 }
@@ -873,19 +895,41 @@ std::array<std::uint16_t, 16> Motor::readNetInputFunctionAssignments(
   selectSlave(bus);
   constexpr int kChannels = 16;
   constexpr int kWordsPerChannel = 2;
-  auto regs =
+  constexpr int kMaxRegistersPerRead = 16;
+  auto regsFirstHalf =
       bus.read_holding_registers(_map.netInputFunctionSelectBase,
-                                 kChannels * kWordsPerChannel);
-  if (!regs || regs->size() != static_cast<std::size_t>(kChannels * kWordsPerChannel)) {
-    const auto reason = regs ? "Unexpected register count" : regs.error().message;
+                                 kMaxRegistersPerRead);
+  if (!regsFirstHalf ||
+      regsFirstHalf->size() != static_cast<std::size_t>(kMaxRegistersPerRead)) {
+    const auto reason = regsFirstHalf ? "Unexpected register count"
+                                      : regsFirstHalf.error().message;
     throw std::runtime_error(
         std::format("Motor {} (slave {}) read NET-IN function assignment failed: {}",
                     magic_enum::enum_name(_id), _slaveAddress, reason));
   }
+  auto regsSecondHalf =
+      bus.read_holding_registers(
+          _map.netInputFunctionSelectBase + kMaxRegistersPerRead,
+          kMaxRegistersPerRead);
+  if (!regsSecondHalf ||
+      regsSecondHalf->size() != static_cast<std::size_t>(kMaxRegistersPerRead)) {
+    const auto reason = regsSecondHalf ? "Unexpected register count"
+                                       : regsSecondHalf.error().message;
+    throw std::runtime_error(
+        std::format("Motor {} (slave {}) read NET-IN function assignment failed: {}",
+                    magic_enum::enum_name(_id), _slaveAddress, reason));
+  }
+
+  std::array<std::uint16_t, kChannels * kWordsPerChannel> regs{};
+  for (int i = 0; i < kMaxRegistersPerRead; ++i) {
+    regs[static_cast<std::size_t>(i)] = (*regsFirstHalf)[static_cast<std::size_t>(i)];
+    regs[static_cast<std::size_t>(i + kMaxRegistersPerRead)] =
+        (*regsSecondHalf)[static_cast<std::size_t>(i)];
+  }
   std::array<std::uint16_t, 16> out{};
   for (int i = 0; i < kChannels; ++i) {
     out[static_cast<std::size_t>(i)] =
-        (*regs)[static_cast<std::size_t>(i * kWordsPerChannel + 1)];
+        regs[static_cast<std::size_t>(i * kWordsPerChannel + 1)];
   }
   return out;
 }

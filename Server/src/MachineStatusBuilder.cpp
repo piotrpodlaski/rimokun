@@ -3,6 +3,7 @@
 #include <array>
 #include <exception>
 #include <format>
+#include <algorithm>
 
 #include <Logger.hpp>
 #include <Motor.hpp>
@@ -25,6 +26,8 @@ void MachineStatusBuilder::updateAndPublish(
 
         if (componentState == MachineComponent::State::Error) {
           motorStatus.state = utl::ELEDState::Error;
+          motorStatus.flags[utl::EMotorStatusFlags::BrakeApplied] =
+              utl::ELEDState::Error;
           motorStatus.flags[utl::EMotorStatusFlags::Warning] = utl::ELEDState::Off;
           motorStatus.flags[utl::EMotorStatusFlags::Alarm] = utl::ELEDState::Error;
           motorStatus.warningDescription.clear();
@@ -36,6 +39,8 @@ void MachineStatusBuilder::updateAndPublish(
 
         if (!motorControl->motors().contains(motorId)) {
           motorStatus.state = utl::ELEDState::Error;
+          motorStatus.flags[utl::EMotorStatusFlags::BrakeApplied] =
+              utl::ELEDState::Error;
           motorStatus.flags[utl::EMotorStatusFlags::Warning] = utl::ELEDState::Off;
           motorStatus.flags[utl::EMotorStatusFlags::Alarm] = utl::ELEDState::Error;
           motorStatus.warningDescription.clear();
@@ -47,6 +52,17 @@ void MachineStatusBuilder::updateAndPublish(
 
         try {
           const auto outputStatus = motorControl->readOutputStatus(motorId);
+          const auto directIoStatus = motorControl->readDirectIoStatus(motorId);
+          const auto mbIt = std::find_if(
+              directIoStatus.outputAssignments.begin(),
+              directIoStatus.outputAssignments.end(),
+              [](const auto& signal) { return signal.channel == "MB"; });
+          const bool brakeReleased =
+              mbIt != directIoStatus.outputAssignments.end() && mbIt->active;
+          // MB reflects electromagnetic brake output state. Active means brake released.
+          motorStatus.flags[utl::EMotorStatusFlags::BrakeApplied] =
+              brakeReleased ? utl::ELEDState::On : utl::ELEDState::Off;
+
           const bool hasWarning = Motor::isDriverOutputFlagSet(
               outputStatus.raw, MotorOutputFlag::Warning);
           const bool hasAlarm = Motor::isDriverOutputFlagSet(outputStatus.raw,
@@ -83,6 +99,8 @@ void MachineStatusBuilder::updateAndPublish(
                       magic_enum::enum_name(motorId), ex.what());
           auto& motorStatus = status.motors[motorId];
           motorStatus.state = utl::ELEDState::Error;
+          motorStatus.flags[utl::EMotorStatusFlags::BrakeApplied] =
+              utl::ELEDState::Error;
           motorStatus.flags[utl::EMotorStatusFlags::Warning] = utl::ELEDState::Off;
           motorStatus.flags[utl::EMotorStatusFlags::Alarm] = utl::ELEDState::Error;
           motorStatus.warningDescription.clear();

@@ -1,4 +1,5 @@
 #include <Config.hpp>
+#include <ExceptionUtils.hpp>
 #include <JsonExtensions.hpp>
 #include <Machine.hpp>
 #include <TimingMetrics.hpp>
@@ -15,7 +16,7 @@ unsigned int requireMappingIndex(
     const std::string_view key) {
   const auto it = mapping.find(std::string(key));
   if (it == mapping.end()) {
-    throw std::runtime_error(
+    utl::throwRuntimeError(
         std::format("Missing required signal mapping key '{}'", key));
   }
   return it->second;
@@ -122,7 +123,7 @@ Machine::Machine() : Machine(std::make_shared<SteadyClockAdapter>()) {}
 
 Machine::Machine(std::shared_ptr<IClock> clock) : _clock(std::move(clock)) {
   if (!_clock) {
-    throw std::runtime_error("Machine requires a non-null clock instance.");
+    utl::throwRuntimeError("Machine requires a non-null clock instance.");
   }
   auto& cfg = utl::Config::instance();
   _inputMapping = cfg.getRequired<std::map<std::string, unsigned int>>(
@@ -135,6 +136,8 @@ Machine::Machine(std::shared_ptr<IClock> clock) : _clock(std::move(clock)) {
   const auto updateIntervalMS = cfg.getOptional<int>(
       "Machine", "updateIntervalMS",
       cfg.getOptional<int>("Machine", "statusPublishPeriodMS", 50));
+  _statusUpdatesEnabled =
+      cfg.getOptional<bool>("Machine", "statusUpdatesEnabled", true);
 
   _loopInterval = std::chrono::milliseconds{std::max(1, loopIntervalMS)};
   _updateInterval = std::chrono::milliseconds{std::max(1, updateIntervalMS)};
@@ -185,7 +188,7 @@ void Machine::setOutputs(const signalMap_t& signals) {
     for (const auto& [signal, value] : signals) {
       const auto it = _outputMapping.find(signal);
       if (it == _outputMapping.end()) {
-        throw std::runtime_error(
+        utl::throwRuntimeError(
             std::format("Unknown output signal '{}'", signal));
       }
       validateMappedIndex(signal, it->second, outputs.size(), "output");
@@ -234,7 +237,7 @@ void Machine::validateMappedIndex(const std::string_view signal,
                                   const std::size_t ioSize,
                                   const std::string_view ioKind) {
   if (index >= ioSize) {
-    throw std::runtime_error(std::format(
+    utl::throwRuntimeError(std::format(
         "{} mapping '{}' points outside Contec {} range (index={}, size={})",
         ioKind == "input" ? "Input" : "Output", signal, ioKind, index, ioSize));
   }
@@ -250,7 +253,7 @@ void Machine::processThread() {
 
 Machine::LoopState Machine::makeInitialLoopState() const {
   if (!_loopRunner) {
-    throw std::runtime_error("Machine is not wired. Call MachineRuntime::wireMachine first.");
+    utl::throwRuntimeError("Machine is not wired. Call MachineRuntime::wireMachine first.");
   }
   return _loopRunner->makeInitialState();
 }
@@ -258,7 +261,7 @@ Machine::LoopState Machine::makeInitialLoopState() const {
 void Machine::runOneCycle(LoopState& state) {
   RIMO_TIMED_SCOPE("Machine::runOneCycle");
   if (!_loopRunner) {
-    throw std::runtime_error("Machine is not wired. Call MachineRuntime::wireMachine first.");
+    utl::throwRuntimeError("Machine is not wired. Call MachineRuntime::wireMachine first.");
   }
   try {
     ++_ioCacheCycle;
@@ -307,7 +310,12 @@ void Machine::runOneCycle(LoopState& state) {
             }
           }
         },
-        [this]() { updateStatus(); }, state);
+        [this]() {
+          if (_statusUpdatesEnabled) {
+            updateStatus();
+          }
+        },
+        state);
   } catch (const std::exception& e) {
     SPDLOG_ERROR(
         "Unhandled exception in machine loop cycle: {}. "
@@ -369,7 +377,7 @@ std::string Machine::dispatchCommandAndWait(cmd::Command command,
 void Machine::controlLoopTasks() {
   RIMO_TIMED_SCOPE("Machine::controlLoopTasks");
   if (!_controller) {
-    throw std::runtime_error("Machine controller is not wired.");
+    utl::throwRuntimeError("Machine controller is not wired.");
   }
   try {
     _controller->runControlLoopTasks();
@@ -394,14 +402,14 @@ void Machine::initialize() {
   std::lock_guard<std::mutex> lock(_lifecycleMutex);
   if (!_loopRunner || !_controller || !_componentService || !_statusBuilder ||
       !_commandProcessor || !_commandServer) {
-    throw std::runtime_error(
+    utl::throwRuntimeError(
         "Machine collaborators are not wired. Use MachineRuntime::wireMachine "
         "before initialize().");
   }
   bool expected = false;
   if (!_isRunning.compare_exchange_strong(expected, true,
                                           std::memory_order_acq_rel)) {
-    throw std::runtime_error("Machine is already running.");
+    utl::throwRuntimeError("Machine is already running.");
   }
   makeDummyStatus();
   _componentService->initializeAll();
@@ -426,7 +434,7 @@ void Machine::handleToolChangerCommand(const cmd::ToolChangerCommand& c) {
 void Machine::handleReconnectCommand(const cmd::ReconnectCommand& c) {
   const auto result = _componentService->reconnect(c.robotComponent);
   if (!result.empty()) {
-    throw std::runtime_error(result);
+    utl::throwRuntimeError(result);
   }
   makeDummyStatus();
 }

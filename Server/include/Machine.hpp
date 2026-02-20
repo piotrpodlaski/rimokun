@@ -89,6 +89,7 @@ class Machine {
   std::atomic<bool> _isRunning{false};
   std::chrono::milliseconds _loopInterval{10};
   std::chrono::milliseconds _updateInterval{50};
+  bool _statusUpdatesEnabled{true};
   std::shared_ptr<IClock> _clock;
   utl::RimoServer<utl::RobotStatus> _robotServer;
   std::thread _commandServerThread;

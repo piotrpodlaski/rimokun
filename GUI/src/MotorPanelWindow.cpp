@@ -9,9 +9,11 @@
 #include <QFormLayout>
 #include <QGridLayout>
 #include <QGroupBox>
+#include <QHideEvent>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QPushButton>
+#include <QShowEvent>
 #include <QTextEdit>
 #include <QTimer>
 #include <QVBoxLayout>
@@ -135,7 +137,6 @@ MotorPanelWindow::MotorPanelWindow(QWidget* parent) : QDialog(parent) {
 
   _refreshTimer = new QTimer(this);
   _refreshTimer->setInterval(500);
-  _refreshTimer->start();
 
   connect(_refreshButton, &QPushButton::clicked, this,
           [this]() { requestDiagnostics(); });
@@ -148,7 +149,7 @@ MotorPanelWindow::MotorPanelWindow(QWidget* parent) : QDialog(parent) {
   connect(_motorSelector, &QComboBox::currentIndexChanged, this,
           [this](int) { requestDiagnostics(); });
   connect(_refreshTimer, &QTimer::timeout, this, [this]() {
-    if (_autoRefreshCheck->isChecked()) {
+    if (isVisible() && _autoRefreshCheck->isChecked()) {
       requestDiagnostics();
     }
   });
@@ -212,6 +213,20 @@ void MotorPanelWindow::processResponse(const GuiResponse& response) {
 void MotorPanelWindow::closeEvent(QCloseEvent* event) {
   hide();
   event->ignore();
+}
+
+void MotorPanelWindow::showEvent(QShowEvent* event) {
+  QDialog::showEvent(event);
+  if (_refreshTimer != nullptr && !_refreshTimer->isActive()) {
+    _refreshTimer->start();
+  }
+}
+
+void MotorPanelWindow::hideEvent(QHideEvent* event) {
+  QDialog::hideEvent(event);
+  if (_refreshTimer != nullptr && _refreshTimer->isActive()) {
+    _refreshTimer->stop();
+  }
 }
 
 void MotorPanelWindow::rebuildMotorList(const std::vector<utl::EMotor>& motors) {

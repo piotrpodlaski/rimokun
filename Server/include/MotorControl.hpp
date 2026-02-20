@@ -52,6 +52,7 @@ class MotorControl final : public MachineComponent {
   void setEnabled(utl::EMotor motorId, bool enabled);
   void setAllEnabled(bool enabled);
   [[nodiscard]] bool isEnabled(utl::EMotor motorId) const;
+  [[nodiscard]] bool isEnableControllable(utl::EMotor motorId) const;
   [[nodiscard]] std::uint8_t readSelectedOperationId(utl::EMotor motorId);
   void resetAlarm(utl::EMotor motorId);
   void setSelectedOperationId(utl::EMotor motorId, std::uint8_t opId);
@@ -118,6 +119,7 @@ class MotorControl final : public MachineComponent {
     bool speedPairPrepared{false};
     bool positionPrepared{false};
     bool enabled{true};
+    bool enableControllable{false};
   };
   std::map<utl::EMotor, MotorRuntimeState> _runtime;
 

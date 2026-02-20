@@ -65,15 +65,19 @@ void MachineStatusBuilder::updateAndPublish(
               mbIt != directIoStatus.outputAssignments.end() && mbIt->active;
           // MB reflects electromagnetic brake output state. Active means brake released.
           motorStatus.flags[utl::EMotorStatusFlags::BrakeApplied] =
-              brakeReleased ? utl::ELEDState::On : utl::ELEDState::Off;
-          motorStatus.flags[utl::EMotorStatusFlags::Enabled] =
-              motorControl->isEnabled(motorId) ? utl::ELEDState::On
-                                               : utl::ELEDState::Off;
+              brakeReleased ? utl::ELEDState::Off : utl::ELEDState::On;
 
           const bool hasWarning = Motor::isDriverOutputFlagSet(
               outputStatus.raw, MotorOutputFlag::Warning);
           const bool hasAlarm = Motor::isDriverOutputFlagSet(outputStatus.raw,
                                                              MotorOutputFlag::Alarm);
+          const bool enableControllable =
+              motorControl->isEnableControllable(motorId);
+          const bool enabledForStatus =
+              !hasAlarm &&
+              (enableControllable ? motorControl->isEnabled(motorId) : true);
+          motorStatus.flags[utl::EMotorStatusFlags::Enabled] =
+              enabledForStatus ? utl::ELEDState::On : utl::ELEDState::Off;
           hasAnyMotorWarningOrAlarm = hasAnyMotorWarningOrAlarm || hasWarning || hasAlarm;
 
           motorStatus.flags[utl::EMotorStatusFlags::Warning] =

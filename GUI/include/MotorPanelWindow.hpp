@@ -15,8 +15,10 @@ class QCheckBox;
 class QCloseEvent;
 class QComboBox;
 class QGridLayout;
+class QHideEvent;
 class QLabel;
 class QPushButton;
+class QShowEvent;
 class QTextEdit;
 class QTimer;
 class LedIndicator;
@@ -36,6 +38,8 @@ class MotorPanelWindow final : public QDialog, public ResponseConsumer {
 
  protected:
   void closeEvent(QCloseEvent* event) override;
+  void showEvent(QShowEvent* event) override;
+  void hideEvent(QHideEvent* event) override;
 
  private:
   enum class PendingRequest {

@@ -73,6 +73,105 @@ std::filesystem::path writeMotorControlConfigWithCurrents(
   return path;
 }
 
+std::filesystem::path writeMotorControlConfigWithStartingSpeed(
+    const std::string& motorAddressValue, const int startingSpeed) {
+  const auto stamp =
+      std::chrono::high_resolution_clock::now().time_since_epoch().count();
+  const auto path =
+      std::filesystem::temp_directory_path() /
+      ("rimokun_motor_control_starting_speed_test_" + std::to_string(stamp) +
+       ".yaml");
+
+  std::ofstream out(path);
+  out << "classes:\n";
+  out << "  MotorControl:\n";
+  out << "    model: \"AR-KD2\"\n";
+  out << "    transport:\n";
+  out << "      type: \"serialRtu\"\n";
+  out << "      serial:\n";
+  out << "        device: \"/dev/fake\"\n";
+  out << "        baud: 115200\n";
+  out << "        parity: \"N\"\n";
+  out << "        dataBits: 8\n";
+  out << "        stopBits: 1\n";
+  out << "    responseTimeoutMS: 1000\n";
+  out << "    motors:\n";
+  out << "      XLeft:\n";
+  out << "        address: " << motorAddressValue << "\n";
+  out << "        startingSpeed: " << startingSpeed << "\n";
+  out.close();
+
+  return path;
+}
+
+std::filesystem::path writeMotorControlConfigWithProtectionThresholds(
+    const std::string& motorAddressValue, const int overloadWarning,
+    const int overloadAlarm, const int excessivePositionDeviationWarning,
+    const int excessivePositionDeviationAlarm) {
+  const auto stamp =
+      std::chrono::high_resolution_clock::now().time_since_epoch().count();
+  const auto path =
+      std::filesystem::temp_directory_path() /
+      ("rimokun_motor_control_protection_thresholds_test_" +
+       std::to_string(stamp) + ".yaml");
+
+  std::ofstream out(path);
+  out << "classes:\n";
+  out << "  MotorControl:\n";
+  out << "    model: \"AR-KD2\"\n";
+  out << "    transport:\n";
+  out << "      type: \"serialRtu\"\n";
+  out << "      serial:\n";
+  out << "        device: \"/dev/fake\"\n";
+  out << "        baud: 115200\n";
+  out << "        parity: \"N\"\n";
+  out << "        dataBits: 8\n";
+  out << "        stopBits: 1\n";
+  out << "    responseTimeoutMS: 1000\n";
+  out << "    motors:\n";
+  out << "      XLeft:\n";
+  out << "        address: " << motorAddressValue << "\n";
+  out << "        overloadWarning: " << overloadWarning << "\n";
+  out << "        overloadAlarm: " << overloadAlarm << "\n";
+  out << "        excessivePositionDeviationWarning: "
+      << excessivePositionDeviationWarning << "\n";
+  out << "        excessivePositionDeviationAlarm: "
+      << excessivePositionDeviationAlarm << "\n";
+  out.close();
+
+  return path;
+}
+
+std::filesystem::path writeMotorControlConfigWithGroupId(
+    const std::string& motorAddressValue, const int groupId) {
+  const auto stamp =
+      std::chrono::high_resolution_clock::now().time_since_epoch().count();
+  const auto path =
+      std::filesystem::temp_directory_path() /
+      ("rimokun_motor_control_group_id_test_" + std::to_string(stamp) + ".yaml");
+
+  std::ofstream out(path);
+  out << "classes:\n";
+  out << "  MotorControl:\n";
+  out << "    model: \"AR-KD2\"\n";
+  out << "    transport:\n";
+  out << "      type: \"serialRtu\"\n";
+  out << "      serial:\n";
+  out << "        device: \"/dev/fake\"\n";
+  out << "        baud: 115200\n";
+  out << "        parity: \"N\"\n";
+  out << "        dataBits: 8\n";
+  out << "        stopBits: 1\n";
+  out << "    responseTimeoutMS: 1000\n";
+  out << "    motors:\n";
+  out << "      XLeft:\n";
+  out << "        address: " << motorAddressValue << "\n";
+  out << "        groupId: " << groupId << "\n";
+  out.close();
+
+  return path;
+}
+
 std::uint8_t readSelectedOperationIdForMotor(const int slave) {
   return Motor::decodeOperationIdFromInputRaw(
       fake_modbus::getHoldingRegister(slave, makeArKd2RegisterMap().driverInputCommandLower));
@@ -279,6 +378,73 @@ TEST(MotorControlTests, InitializeAppliesDefaultCurrentsWhenNotConfigured) {
             static_cast<std::uint16_t>(500u >> 16));
   EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.stopCurrent + 1),
             static_cast<std::uint16_t>(500u & 0xFFFFu));
+
+  std::filesystem::remove(configPath);
+}
+
+TEST(MotorControlTests, InitializeAppliesConfiguredStartingSpeed) {
+  fake_modbus::reset();
+  const auto configPath = writeMotorControlConfigWithStartingSpeed("5", 1234);
+  utl::Config::instance().setConfigPath(configPath.string());
+
+  MotorControl control;
+  control.initialize();
+
+  const auto map = makeArKd2RegisterMap();
+  EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.startingSpeed),
+            static_cast<std::uint16_t>(1234u >> 16));
+  EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.startingSpeed + 1),
+            static_cast<std::uint16_t>(1234u & 0xFFFFu));
+
+  std::filesystem::remove(configPath);
+}
+
+TEST(MotorControlTests, InitializeAppliesConfiguredGroupId) {
+  fake_modbus::reset();
+  const auto configPath = writeMotorControlConfigWithGroupId("5", 7);
+  utl::Config::instance().setConfigPath(configPath.string());
+
+  MotorControl control;
+  control.initialize();
+
+  const auto map = makeArKd2RegisterMap();
+  EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.groupId),
+            static_cast<std::uint16_t>(7u >> 16));
+  EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.groupId + 1),
+            static_cast<std::uint16_t>(7u & 0xFFFFu));
+
+  std::filesystem::remove(configPath);
+}
+
+TEST(MotorControlTests, InitializeAppliesConfiguredProtectionThresholds) {
+  fake_modbus::reset();
+  const auto configPath =
+      writeMotorControlConfigWithProtectionThresholds("5", 111, 222, 333, 444);
+  utl::Config::instance().setConfigPath(configPath.string());
+
+  MotorControl control;
+  control.initialize();
+
+  const auto map = makeArKd2RegisterMap();
+  EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.overloadWarning),
+            static_cast<std::uint16_t>(111u >> 16));
+  EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.overloadWarning + 1),
+            static_cast<std::uint16_t>(111u & 0xFFFFu));
+  EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.overloadAlarm),
+            static_cast<std::uint16_t>(222u >> 16));
+  EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.overloadAlarm + 1),
+            static_cast<std::uint16_t>(222u & 0xFFFFu));
+  EXPECT_EQ(
+      fake_modbus::getHoldingRegister(5, map.excessivePositionDeviationWarning),
+      static_cast<std::uint16_t>(333u >> 16));
+  EXPECT_EQ(fake_modbus::getHoldingRegister(
+                5, map.excessivePositionDeviationWarning + 1),
+            static_cast<std::uint16_t>(333u & 0xFFFFu));
+  EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.excessivePositionDeviationAlarm),
+            static_cast<std::uint16_t>(444u >> 16));
+  EXPECT_EQ(fake_modbus::getHoldingRegister(
+                5, map.excessivePositionDeviationAlarm + 1),
+            static_cast<std::uint16_t>(444u & 0xFFFFu));
 
   std::filesystem::remove(configPath);
 }

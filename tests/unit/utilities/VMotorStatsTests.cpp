@@ -9,6 +9,7 @@ class FakeMotorStats final : public VMotorStats {
 
   void setTorque(int value) const override { torque = value; }
   void setSpeed(double value) const override { speed = value; }
+  void setSpeedRpm(double value) const override { speedRpm = value; }
   void setCurrentPosition(double value) const override { currentPosition = value; }
   void setTargetPosition(double value) const override { targetPosition = value; }
   void setBrake(utl::ELEDState value) const override { brake = value; }
@@ -18,6 +19,7 @@ class FakeMotorStats final : public VMotorStats {
 
   mutable int torque{0};
   mutable double speed{0};
+  mutable double speedRpm{0};
   mutable double currentPosition{0};
   mutable double targetPosition{0};
   mutable utl::ELEDState brake{utl::ELEDState::On};
@@ -33,6 +35,7 @@ TEST(VMotorStatsTests, ConfigureCopiesNumericFieldsAndFlags) {
       .currentPosition = 101.0,
       .targetPosition = -22.0,
       .speed = 5.5,
+      .speedRpm = 123.0,
       .torque = 17,
       .state = utl::ELEDState::Warning,
       .flags = {{utl::EMotorStatusFlags::BrakeApplied, utl::ELEDState::Error},
@@ -43,6 +46,7 @@ TEST(VMotorStatsTests, ConfigureCopiesNumericFieldsAndFlags) {
   EXPECT_DOUBLE_EQ(stats.currentPosition, 101.0);
   EXPECT_DOUBLE_EQ(stats.targetPosition, -22.0);
   EXPECT_DOUBLE_EQ(stats.speed, 5.5);
+  EXPECT_DOUBLE_EQ(stats.speedRpm, 123.0);
   EXPECT_EQ(stats.torque, 17);
   EXPECT_EQ(stats.status, utl::ELEDState::Warning);
   EXPECT_EQ(stats.brake, utl::ELEDState::Error);
@@ -58,6 +62,7 @@ TEST(VMotorStatsTests, ConfigureDefaultsFlagsToOffWhenMissing) {
       .currentPosition = 0,
       .targetPosition = 0,
       .speed = 0,
+      .speedRpm = 0,
       .torque = 0,
       .state = utl::ELEDState::Off,
       .flags = {}};

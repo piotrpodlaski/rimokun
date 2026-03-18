@@ -1,4 +1,5 @@
 #include <Motor.hpp>
+#include <ExceptionUtils.hpp>
 
 #include <ArKd2Diagnostics.hpp>
 #include <ArKd2FullRegisterMap.hpp>
@@ -133,7 +134,7 @@ constexpr std::uint16_t kFunctionCOn = 17;
 
 int operationAddr(const int baseUpperAddr, const std::uint8_t opId) {
   if (opId > 63) {
-    throw std::runtime_error(std::format("Invalid operation id {} (allowed 0..63)",
+    utl::throwRuntimeError(std::format("Invalid operation id {} (allowed 0..63)",
                                          static_cast<int>(opId)));
   }
   return baseUpperAddr + static_cast<int>(opId) * 2;
@@ -278,7 +279,7 @@ void Motor::initialize(ModbusClient& bus) const {
                            registerLabel(_map.presentAlarm),
                            alarm.error().message);
     SPDLOG_ERROR(msg);
-    throw std::runtime_error(msg);
+    utl::throwRuntimeError(msg);
   }
 
   const auto alarmCode = readAlarmCode(bus);
@@ -344,7 +345,7 @@ std::uint32_t Motor::readU32(ModbusClient& bus, int upperAddr) const {
     auto msg = std::format("Motor {} (slave {}) readU32({}) failed: {}",
                            magic_enum::enum_name(_id), _slaveAddress,
                            registerLabel(upperAddr), reason);
-    throw std::runtime_error(msg);
+    utl::throwRuntimeError(msg);
   }
   return (static_cast<std::uint32_t>((*regs)[0]) << 16) |
          static_cast<std::uint32_t>((*regs)[1]);
@@ -359,7 +360,7 @@ std::uint16_t Motor::readU16(ModbusClient& bus, const int addr) const {
     auto msg = std::format("Motor {} (slave {}) readU16(0x{:04X}) failed: {}",
                            magic_enum::enum_name(_id), _slaveAddress, addr,
                            reason);
-    throw std::runtime_error(msg);
+    utl::throwRuntimeError(msg);
   }
   return (*regs)[0];
 }
@@ -374,7 +375,7 @@ void Motor::writeU16(ModbusClient& bus, const int addr,
         "Motor {} (slave {}) writeU16(0x{:04X}, 0x{:04X}) failed: {}",
         magic_enum::enum_name(_id), _slaveAddress, addr, value,
         wr.error().message);
-    throw std::runtime_error(msg);
+    utl::throwRuntimeError(msg);
   }
 }
 
@@ -391,7 +392,7 @@ void Motor::writeInt32(ModbusClient& bus, int upperAddr, std::int32_t value) con
         std::format("Motor {} (slave {}) writeInt32({}, {}) failed: {}",
                     magic_enum::enum_name(_id), _slaveAddress,
                     registerLabel(upperAddr), value, wr.error().message);
-    throw std::runtime_error(msg);
+    utl::throwRuntimeError(msg);
   }
 }
 
@@ -577,7 +578,7 @@ std::uint8_t Motor::readSelectedOperationId(ModbusClient& bus) const {
 
 void Motor::setSelectedOperationId(ModbusClient& bus, const std::uint8_t opId) const {
   if (opId > 63) {
-    throw std::runtime_error(std::format("Invalid operation id {} (allowed 0..63)",
+    utl::throwRuntimeError(std::format("Invalid operation id {} (allowed 0..63)",
                                          static_cast<int>(opId)));
   }
   auto raw = _driverInputCommandRawCache.has_value()
@@ -649,6 +650,32 @@ void Motor::setStopCurrent(ModbusClient& bus, const std::int32_t current) const 
   writeInt32(bus, _map.stopCurrent, current);
 }
 
+void Motor::setStartingSpeed(ModbusClient& bus, const std::int32_t speed) const {
+  writeInt32(bus, _map.startingSpeed, speed);
+}
+
+void Motor::setOverloadAlarm(ModbusClient& bus, const std::int32_t value) const {
+  writeInt32(bus, _map.overloadAlarm, value);
+}
+
+void Motor::setExcessivePositionDeviationAlarm(ModbusClient& bus,
+                                               const std::int32_t value) const {
+  writeInt32(bus, _map.excessivePositionDeviationAlarm, value);
+}
+
+void Motor::setOverloadWarning(ModbusClient& bus, const std::int32_t value) const {
+  writeInt32(bus, _map.overloadWarning, value);
+}
+
+void Motor::setExcessivePositionDeviationWarning(ModbusClient& bus,
+                                                 const std::int32_t value) const {
+  writeInt32(bus, _map.excessivePositionDeviationWarning, value);
+}
+
+void Motor::setGroupId(ModbusClient& bus, const std::int32_t value) const {
+  writeInt32(bus, _map.groupId, value);
+}
+
 void Motor::configureConstantSpeedPair(ModbusClient& bus,
                                        const std::int32_t speedOp0,
                                        const std::int32_t speedOp1,
@@ -699,6 +726,50 @@ MotorFlagStatus Motor::decodeDriverOutputStatus(const std::uint16_t raw) const {
 
 std::uint32_t Motor::readDirectIoAndBrakeStatusRaw(ModbusClient& bus) const {
   return readU32(bus, _map.directIoAndBrakeStatus);
+}
+
+MotorMonitorSnapshot Motor::readMonitorSnapshot(ModbusClient& bus) const {
+  RIMO_TIMED_SCOPE("Motor::readMonitorSnapshot");
+  const int baseAddr = _map.commandPosition;
+  const int lastAddr = _map.directIoAndBrakeStatus + 1;
+  const int wordCount = lastAddr - baseAddr + 1;
+  if (wordCount <= 0) {
+    utl::throwRuntimeError(std::format(
+        "Motor {} (slave {}) invalid monitor snapshot range: 0x{:04X}-0x{:04X}",
+        magic_enum::enum_name(_id), _slaveAddress, baseAddr, lastAddr));
+  }
+
+  selectSlave(bus);
+  auto regs = bus.read_holding_registers(baseAddr, wordCount);
+  if (!regs || regs->size() != static_cast<std::size_t>(wordCount)) {
+    const auto reason = regs ? "Unexpected register count" : regs.error().message;
+    auto msg = std::format(
+        "Motor {} (slave {}) read monitor snapshot 0x{:04X}-0x{:04X} failed: {}",
+        magic_enum::enum_name(_id), _slaveAddress, baseAddr, lastAddr, reason);
+    utl::throwRuntimeError(msg);
+  }
+
+  const auto readI32At = [&](const int upperAddr) -> std::int32_t {
+    const auto idx = upperAddr - baseAddr;
+    if (idx < 0 || idx + 1 >= wordCount) {
+      utl::throwRuntimeError(std::format(
+          "Motor {} (slave {}) monitor snapshot index out of range for 0x{:04X}",
+          magic_enum::enum_name(_id), _slaveAddress, upperAddr));
+    }
+    const std::uint32_t raw =
+        (static_cast<std::uint32_t>((*regs)[static_cast<std::size_t>(idx)]) << 16) |
+        static_cast<std::uint32_t>((*regs)[static_cast<std::size_t>(idx + 1)]);
+    return static_cast<std::int32_t>(raw);
+  };
+
+  const auto idxD4 = _map.directIoAndBrakeStatus - baseAddr;
+  return {
+      .commandPosition = readI32At(_map.commandPosition),
+      .actualSpeed = readI32At(_map.actualSpeed),
+      .actualPosition = readI32At(_map.actualPosition),
+      .reg00D4 = (*regs)[static_cast<std::size_t>(idxD4)],
+      .reg00D5 = (*regs)[static_cast<std::size_t>(idxD4 + 1)],
+  };
 }
 
 MotorDirectIoStatus Motor::decodeDirectIoAndBrakeStatus(
@@ -834,7 +905,7 @@ std::array<std::uint16_t, 16> Motor::readOutputFunctionAssignments(
                                  kChannels * kWordsPerChannel);
   if (!regs || regs->size() != static_cast<std::size_t>(kChannels * kWordsPerChannel)) {
     const auto reason = regs ? "Unexpected register count" : regs.error().message;
-    throw std::runtime_error(
+    utl::throwRuntimeError(
         std::format("Motor {} (slave {}) read output function assignment failed: {}",
                     magic_enum::enum_name(_id), _slaveAddress, reason));
   }
@@ -859,7 +930,7 @@ std::array<std::uint16_t, 16> Motor::readNetOutputFunctionAssignments(
       regsFirstHalf->size() != static_cast<std::size_t>(kMaxRegistersPerRead)) {
     const auto reason = regsFirstHalf ? "Unexpected register count"
                                       : regsFirstHalf.error().message;
-    throw std::runtime_error(
+    utl::throwRuntimeError(
         std::format("Motor {} (slave {}) read NET-OUT function assignment failed: {}",
                     magic_enum::enum_name(_id), _slaveAddress, reason));
   }
@@ -871,7 +942,7 @@ std::array<std::uint16_t, 16> Motor::readNetOutputFunctionAssignments(
       regsSecondHalf->size() != static_cast<std::size_t>(kMaxRegistersPerRead)) {
     const auto reason = regsSecondHalf ? "Unexpected register count"
                                        : regsSecondHalf.error().message;
-    throw std::runtime_error(
+    utl::throwRuntimeError(
         std::format("Motor {} (slave {}) read NET-OUT function assignment failed: {}",
                     magic_enum::enum_name(_id), _slaveAddress, reason));
   }
@@ -903,7 +974,7 @@ std::array<std::uint16_t, 16> Motor::readNetInputFunctionAssignments(
       regsFirstHalf->size() != static_cast<std::size_t>(kMaxRegistersPerRead)) {
     const auto reason = regsFirstHalf ? "Unexpected register count"
                                       : regsFirstHalf.error().message;
-    throw std::runtime_error(
+    utl::throwRuntimeError(
         std::format("Motor {} (slave {}) read NET-IN function assignment failed: {}",
                     magic_enum::enum_name(_id), _slaveAddress, reason));
   }
@@ -915,7 +986,7 @@ std::array<std::uint16_t, 16> Motor::readNetInputFunctionAssignments(
       regsSecondHalf->size() != static_cast<std::size_t>(kMaxRegistersPerRead)) {
     const auto reason = regsSecondHalf ? "Unexpected register count"
                                        : regsSecondHalf.error().message;
-    throw std::runtime_error(
+    utl::throwRuntimeError(
         std::format("Motor {} (slave {}) read NET-IN function assignment failed: {}",
                     magic_enum::enum_name(_id), _slaveAddress, reason));
   }
@@ -945,7 +1016,7 @@ std::array<std::uint16_t, 12> Motor::readInputFunctionAssignments(
                                          kChannels * kWordsPerChannel);
   if (!regs || regs->size() != static_cast<std::size_t>(kChannels * kWordsPerChannel)) {
     const auto reason = regs ? "Unexpected register count" : regs.error().message;
-    throw std::runtime_error(
+    utl::throwRuntimeError(
         std::format("Motor {} (slave {}) read input function assignment failed: {}",
                     magic_enum::enum_name(_id), _slaveAddress, reason));
   }
@@ -1058,6 +1129,6 @@ void Motor::selectSlave(ModbusClient& bus) const {
                            _slaveAddress, magic_enum::enum_name(_id),
                            s.error().message);
     SPDLOG_ERROR(msg);
-    throw std::runtime_error(msg);
+    utl::throwRuntimeError(msg);
   }
 }

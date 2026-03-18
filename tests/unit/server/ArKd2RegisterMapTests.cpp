@@ -8,6 +8,7 @@
 
 TEST(ArKd2RegisterMapTests, CoreAddressesMatchExpectedManualValues) {
   const auto map = makeArKd2RegisterMap();
+  EXPECT_EQ(map.groupId, 0x0030);
   EXPECT_EQ(map.driverInputCommandLower, 0x007D);
   EXPECT_EQ(map.driverOutputCommandLower, 0x007F);
   EXPECT_EQ(map.presentAlarm, 0x0080);
@@ -15,6 +16,11 @@ TEST(ArKd2RegisterMapTests, CoreAddressesMatchExpectedManualValues) {
   EXPECT_EQ(map.communicationErrorCode, 0x00AC);
   EXPECT_EQ(map.directIoAndBrakeStatus, 0x00D4);
   EXPECT_EQ(map.alarmResetCommand, 0x0180);
+  EXPECT_EQ(map.startingSpeed, 0x0284);
+  EXPECT_EQ(map.overloadAlarm, 0x0300);
+  EXPECT_EQ(map.excessivePositionDeviationAlarm, 0x0302);
+  EXPECT_EQ(map.overloadWarning, 0x0342);
+  EXPECT_EQ(map.excessivePositionDeviationWarning, 0x034A);
   EXPECT_EQ(map.positionNo0, 0x0400);
   EXPECT_EQ(map.speedNo0, 0x0480);
   EXPECT_EQ(map.operationModeNo0, 0x0500);
@@ -53,6 +59,7 @@ TEST(ArKd2RegisterMapTests, CompactMapAddressesExistInFullRegisterMap) {
   const auto map = makeArKd2RegisterMap();
   const std::vector<int> addresses{
       map.driverInputCommandLower,
+      map.groupId,
       map.driverOutputCommandLower,
       map.presentAlarm,
       map.presentWarning,
@@ -63,6 +70,11 @@ TEST(ArKd2RegisterMapTests, CompactMapAddressesExistInFullRegisterMap) {
       map.commandSpeed,
       map.actualPosition,
       map.actualSpeed,
+      map.startingSpeed,
+      map.overloadAlarm,
+      map.excessivePositionDeviationAlarm,
+      map.overloadWarning,
+      map.excessivePositionDeviationWarning,
       map.positionNo0,
       map.speedNo0,
       map.operationModeNo0,

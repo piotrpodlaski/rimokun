@@ -1,6 +1,7 @@
 #include "RobotControlPolicy.hpp"
 
 #include <Config.hpp>
+#include <ExceptionUtils.hpp>
 #include <Logger.hpp>
 
 #include <algorithm>
@@ -20,7 +21,7 @@ IRobotControlPolicy::ControlDecision DefaultRobotControlPolicy::decide(
     return {.outputs = std::nullopt, .setToolChangerErrorBlinking = true};
   }
   if (!inputs->contains("button1") || !inputs->contains("button2")) {
-    throw std::runtime_error(
+    utl::throwRuntimeError(
         "Missing required input signals 'button1'/'button2' for control policy.");
   }
 
@@ -130,6 +131,9 @@ RimoKunControlPolicy::RimoKunControlPolicy() {
       }
       if (const auto stepsPerMm = axisNode["stepsPerMm"]; stepsPerMm) {
         axis.stepsPerMm = stepsPerMm.as<double>();
+      }
+      if (const auto invertAxis = axisNode["invertAxis"]; invertAxis) {
+        axis.invertAxis = invertAxis.as<bool>();
       }
       if (const auto acceleration = axisNode["acceleration001MsPerKHz"];
           acceleration) {
@@ -254,7 +258,7 @@ IRobotControlPolicy::ControlDecision RimoKunControlPolicy::decide(
                                      const AxisConfig& axisCfg) {
     std::lock_guard<std::mutex> runtimeLock(_runtimeMutex);
     auto& runtime = _motorRuntime[motorId];
-    const auto clampedAxis = clampAxis(axisValue);
+    const auto clampedAxis = clampAxis(axisCfg.invertAxis ? -axisValue : axisValue);
     const auto active =
         std::abs(clampedAxis) >= axisCfg.neutralAxisActivationThreshold;
 

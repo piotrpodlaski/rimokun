@@ -77,6 +77,7 @@ class MotorControl final : public MachineComponent {
   [[nodiscard]] MotorFlagStatus readInputStatus(utl::EMotor motorId);
   [[nodiscard]] MotorFlagStatus readOutputStatus(utl::EMotor motorId);
   [[nodiscard]] MotorDirectIoStatus readDirectIoStatus(utl::EMotor motorId);
+  [[nodiscard]] MotorMonitorSnapshot readMonitorSnapshot(utl::EMotor motorId);
   [[nodiscard]] MotorRemoteIoStatus readRemoteIoStatus(utl::EMotor motorId);
   [[nodiscard]] bool hasAnyWarningOrAlarm();
   void setWarningState(bool warningActive);
@@ -98,8 +99,14 @@ class MotorControl final : public MachineComponent {
 
   struct MotorConfig {
     int address{1};
+    std::optional<std::int32_t> groupId;
     std::int32_t runCurrent{1000};
     std::int32_t stopCurrent{500};
+    std::optional<std::int32_t> startingSpeed;
+    std::optional<std::int32_t> overloadWarning;
+    std::optional<std::int32_t> overloadAlarm;
+    std::optional<std::int32_t> excessivePositionDeviationWarning;
+    std::optional<std::int32_t> excessivePositionDeviationAlarm;
   };
 
   TransportType _transportType{TransportType::RawTcpRtu};

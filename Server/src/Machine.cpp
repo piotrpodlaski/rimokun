@@ -106,9 +106,9 @@ nlohmann::json makeDefaultIoAssignmentResponse(const utl::EMotor motor) {
   return response;
 }
 
-std::array<std::string, 8> buildContecChannelNames(
-    const std::map<std::string, unsigned int>& mapping) {
-  std::array<std::string, 8> names{};
+std::vector<std::string> buildContecChannelNames(
+    const std::map<std::string, unsigned int>& mapping, const std::size_t count) {
+  std::vector<std::string> names(count);
   for (const auto& [signal, index] : mapping) {
     if (index < names.size() && names[index].empty()) {
       names[index] = signal;
@@ -541,8 +541,10 @@ nlohmann::json Machine::handleContecDiagnosticsCommand(
       {"inputs", nlohmann::json::array()},
       {"outputs", nlohmann::json::array()},
   };
-  const auto inputNames = buildContecChannelNames(_inputMapping);
-  const auto outputNames = buildContecChannelNames(_outputMapping);
+  const auto inputCount = static_cast<std::size_t>(_contec.getNInputs());
+  const auto outputCount = static_cast<std::size_t>(_contec.getNOutputs());
+  const auto inputNames = buildContecChannelNames(_inputMapping, inputCount);
+  const auto outputNames = buildContecChannelNames(_outputMapping, outputCount);
 
   for (std::size_t i = 0; i < inputNames.size(); ++i) {
     response["inputsRaw"].push_back(false);
@@ -562,12 +564,12 @@ nlohmann::json Machine::handleContecDiagnosticsCommand(
   try {
     const auto inputs = _contec.readInputs();
     const auto outputs = _contec.readOutputs();
-    for (std::size_t i = 0; i < 8 && i < inputs.size(); ++i) {
+    for (std::size_t i = 0; i < inputCount && i < inputs.size(); ++i) {
       const auto active = static_cast<bool>(inputs[i]);
       response["inputsRaw"][i] = active;
       response["inputs"][i]["active"] = active;
     }
-    for (std::size_t i = 0; i < 8 && i < outputs.size(); ++i) {
+    for (std::size_t i = 0; i < outputCount && i < outputs.size(); ++i) {
       const auto active = static_cast<bool>(outputs[i]);
       response["outputsRaw"][i] = active;
       response["outputs"][i]["active"] = active;

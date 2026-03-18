@@ -13,6 +13,7 @@ using signal_map_t = std::map<std::string, bool>;
 
 class MachineStatusBuilder {
  public:
+  MachineStatusBuilder();
   using ComponentsMap = std::map<utl::ERobotComponent, MachineComponent*>;
   using SnapshotFn = std::function<ControlPanel::Snapshot()>;
   using ReadSignalsFn = std::function<std::optional<signal_map_t>()>;
@@ -26,5 +27,13 @@ class MachineStatusBuilder {
                         const PublishFn& publish) const;
 
  private:
+  [[nodiscard]] double stepsPerMm(utl::EMotor motorId) const;
+  [[nodiscard]] double positionMmFromSteps(utl::EMotor motorId,
+                                           std::int32_t steps) const;
+  [[nodiscard]] double speedMmPerSecFromRpm(utl::EMotor motorId,
+                                            std::int32_t rpm) const;
   static utl::ELEDState stateToLed(MachineComponent::State state);
+
+  double _stepsPerRevolution{1000.0};
+  std::map<utl::EMotor, double> _stepsPerMmByMotor;
 };

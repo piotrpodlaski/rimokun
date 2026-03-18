@@ -2,6 +2,7 @@
 
 struct MotorRegisterMap {
   // 16-bit control/status
+  int groupId{0x0030};
   int driverInputCommandLower{0x007d};
   int driverOutputCommandLower{0x007f};
 
@@ -25,6 +26,11 @@ struct MotorRegisterMap {
   int actualSpeed{0x00CE};
   int runCurrent{0x0240};
   int stopCurrent{0x0242};
+  int startingSpeed{0x0284};
+  int overloadAlarm{0x0300};
+  int excessivePositionDeviationAlarm{0x0302};
+  int overloadWarning{0x0342};
+  int excessivePositionDeviationWarning{0x034A};
 
   // Operation data No.0 base addresses (each entry is 32-bit, upper/lower).
   int positionNo0{0x0400};

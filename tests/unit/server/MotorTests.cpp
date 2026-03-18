@@ -123,6 +123,43 @@ TEST(MotorTests, DecodeDirectIoAndBrakeStatusDecodesExpectedFlagNames) {
   EXPECT_EQ(status.activeFlags, expected);
 }
 
+TEST(MotorTests, ReadMonitorSnapshotMapsCommandActualPositionAndDirectIo) {
+  fake_modbus::reset();
+  auto map = makeArKd2RegisterMap();
+  auto bus = makeBus();
+  Motor motor(utl::EMotor::XLeft, 7, map);
+
+  const std::int32_t commandPosition = -1234567;
+  const std::int32_t actualSpeed = -2345;
+  const std::int32_t actualPosition = 7654321;
+  const auto commandRaw = static_cast<std::uint32_t>(commandPosition);
+  const auto actualSpeedRaw = static_cast<std::uint32_t>(actualSpeed);
+  const auto actualRaw = static_cast<std::uint32_t>(actualPosition);
+
+  fake_modbus::setHoldingRegister(7, map.commandPosition,
+                                  static_cast<std::uint16_t>(commandRaw >> 16));
+  fake_modbus::setHoldingRegister(
+      7, map.commandPosition + 1, static_cast<std::uint16_t>(commandRaw & 0xFFFFu));
+  fake_modbus::setHoldingRegister(7, map.actualPosition,
+                                  static_cast<std::uint16_t>(actualRaw >> 16));
+  fake_modbus::setHoldingRegister(
+      7, map.actualPosition + 1, static_cast<std::uint16_t>(actualRaw & 0xFFFFu));
+  fake_modbus::setHoldingRegister(7, map.actualSpeed,
+                                  static_cast<std::uint16_t>(actualSpeedRaw >> 16));
+  fake_modbus::setHoldingRegister(
+      7, map.actualSpeed + 1, static_cast<std::uint16_t>(actualSpeedRaw & 0xFFFFu));
+  fake_modbus::setHoldingRegister(7, map.directIoAndBrakeStatus, 0x0121u);
+  fake_modbus::setHoldingRegister(7, map.directIoAndBrakeStatus + 1, 0x2C42u);
+
+  const auto snapshot = motor.readMonitorSnapshot(bus);
+
+  EXPECT_EQ(snapshot.commandPosition, commandPosition);
+  EXPECT_EQ(snapshot.actualSpeed, actualSpeed);
+  EXPECT_EQ(snapshot.actualPosition, actualPosition);
+  EXPECT_EQ(snapshot.reg00D4, 0x0121u);
+  EXPECT_EQ(snapshot.reg00D5, 0x2C42u);
+}
+
 TEST(MotorTests, ResetAlarmDoesNothingWhenNoAlarmIsActive) {
   fake_modbus::reset();
   auto map = makeArKd2RegisterMap();

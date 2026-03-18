@@ -109,6 +109,14 @@ struct MotorRemoteIoStatus {
   std::vector<AssignedSignal> inputAssignments;
 };
 
+struct MotorMonitorSnapshot {
+  std::int32_t commandPosition{0};
+  std::int32_t actualSpeed{0};
+  std::int32_t actualPosition{0};
+  std::uint16_t reg00D4{0};
+  std::uint16_t reg00D5{0};
+};
+
 enum class MotorOperationMode : std::int32_t {
   Incremental = 0,
   Absolute = 1,
@@ -145,6 +153,7 @@ class Motor {
   [[nodiscard]] std::uint16_t readDriverOutputStatusRaw(ModbusClient& bus) const;
   [[nodiscard]] std::uint32_t readDirectIoAndBrakeStatusRaw(
       ModbusClient& bus) const;
+  [[nodiscard]] MotorMonitorSnapshot readMonitorSnapshot(ModbusClient& bus) const;
   // AR-KD2 motion command hooks via driver input command (007Dh).
   // START/HOME/STOP are exposed as pulses; direction and JOG as level signals.
   void writeDriverInputCommandRaw(ModbusClient& bus, std::uint16_t raw) const;
@@ -181,6 +190,14 @@ class Motor {
                                 std::int32_t deceleration) const;
   void setRunCurrent(ModbusClient& bus, std::int32_t current) const;
   void setStopCurrent(ModbusClient& bus, std::int32_t current) const;
+  void setStartingSpeed(ModbusClient& bus, std::int32_t speed) const;
+  void setOverloadAlarm(ModbusClient& bus, std::int32_t value) const;
+  void setExcessivePositionDeviationAlarm(ModbusClient& bus,
+                                          std::int32_t value) const;
+  void setOverloadWarning(ModbusClient& bus, std::int32_t value) const;
+  void setExcessivePositionDeviationWarning(ModbusClient& bus,
+                                            std::int32_t value) const;
+  void setGroupId(ModbusClient& bus, std::int32_t value) const;
   void configureConstantSpeedPair(ModbusClient& bus, std::int32_t speedOp0,
                                   std::int32_t speedOp1, std::int32_t acceleration,
                                   std::int32_t deceleration) const;

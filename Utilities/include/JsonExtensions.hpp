@@ -120,6 +120,7 @@ struct adl_serializer<utl::SingleMotorStatus> {
         {"currentPosition", v.currentPosition},
         {"targetPosition", v.targetPosition},
         {"speed", v.speed},
+        {"speedRpm", v.speedRpm},
         {"torque", v.torque},
         {"state", v.state},
         {"warningDescription", v.warningDescription},
@@ -132,6 +133,7 @@ struct adl_serializer<utl::SingleMotorStatus> {
     v.currentPosition = j.at("currentPosition").get<double>();
     v.targetPosition = j.at("targetPosition").get<double>();
     v.speed = j.at("speed").get<double>();
+    v.speedRpm = j.contains("speedRpm") ? j.at("speedRpm").get<double>() : 0.0;
     v.torque = j.at("torque").get<int>();
     v.state = j.contains("state") ? j.at("state").get<utl::ELEDState>()
                                    : utl::ELEDState::Off;

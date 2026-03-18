@@ -27,6 +27,7 @@ struct SingleMotorStatus {
   double currentPosition{0};
   double targetPosition{0};
   double speed{0};
+  double speedRpm{0};
   int torque{0};
   ELEDState state{ELEDState::Off};
   std::string warningDescription;

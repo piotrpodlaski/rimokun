@@ -2,7 +2,7 @@
 
 #include <QDialog>
 
-#include <array>
+#include <vector>
 
 #include "GuiCommand.hpp"
 #include "ResponseConsumer.hpp"
@@ -37,13 +37,14 @@ class ContecPanelWindow final : public QDialog, public ResponseConsumer {
 
   void requestDiagnostics();
   void updateFromPayload(const nlohmann::json& payload);
-  static std::array<ChannelRow, 8> createRows(QWidget* parent, QGridLayout* layout);
+  static std::vector<ChannelRow> createRows(QWidget* parent, QGridLayout* layout,
+                                            int count, int columns);
 
   LedIndicator* _stateLamp{nullptr};
   QPushButton* _refreshButton{nullptr};
   QCheckBox* _autoRefreshCheck{nullptr};
   QLabel* _errorLabel{nullptr};
   QTimer* _refreshTimer{nullptr};
-  std::array<ChannelRow, 8> _inputRows{};
-  std::array<ChannelRow, 8> _outputRows{};
+  std::vector<ChannelRow> _inputRows{};
+  std::vector<ChannelRow> _outputRows{};
 };

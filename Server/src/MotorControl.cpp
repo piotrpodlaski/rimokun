@@ -101,7 +101,7 @@ MotorControl::MotorControl() {
   const auto motorsNode = motorCfg["motors"];
   if (!motorsNode || !motorsNode.IsMap()) {
     utl::throwRuntimeError(
-        "MotorControl.motors map is required (per motor: address, runCurrent, stopCurrent).");
+        "MotorControl.motors map is required (per motor: address, optional groupId, runCurrent, stopCurrent, and optional startup thresholds).");
   }
   for (const auto& kv : motorsNode) {
     const auto motorId = kv.first.as<utl::EMotor>();
@@ -117,15 +117,57 @@ MotorControl::MotorControl() {
           "MotorControl.motors.{}.address must be in range 0..247 (got {})",
           magic_enum::enum_name(motorId), address));
     }
+    const auto groupIdNode = entry["groupId"];
     const auto runCurrent =
         entry["runCurrent"].as<std::int32_t>(kDefaultRunCurrent);
     const auto stopCurrent =
         entry["stopCurrent"].as<std::int32_t>(kDefaultStopCurrent);
+    const auto startingSpeedNode = entry["startingSpeed"];
+    const auto overloadWarningNode = entry["overloadWarning"];
+    const auto overloadAlarmNode = entry["overloadAlarm"];
+    const auto excessivePositionDeviationWarningNode =
+        entry["excessivePositionDeviationWarning"];
+    const auto excessivePositionDeviationAlarmNode =
+        entry["excessivePositionDeviationAlarm"];
     validateCurrentRange(runCurrent, "runCurrent", magic_enum::enum_name(motorId));
     validateCurrentRange(stopCurrent, "stopCurrent",
                          magic_enum::enum_name(motorId));
+    std::optional<std::int32_t> groupId;
+    if (groupIdNode) {
+      groupId = groupIdNode.as<std::int32_t>();
+    }
+    std::optional<std::int32_t> startingSpeed;
+    std::optional<std::int32_t> overloadWarning;
+    std::optional<std::int32_t> overloadAlarm;
+    std::optional<std::int32_t> excessivePositionDeviationWarning;
+    std::optional<std::int32_t> excessivePositionDeviationAlarm;
+    if (startingSpeedNode) {
+      startingSpeed = startingSpeedNode.as<std::int32_t>();
+    }
+    if (overloadWarningNode) {
+      overloadWarning = overloadWarningNode.as<std::int32_t>();
+    }
+    if (overloadAlarmNode) {
+      overloadAlarm = overloadAlarmNode.as<std::int32_t>();
+    }
+    if (excessivePositionDeviationWarningNode) {
+      excessivePositionDeviationWarning =
+          excessivePositionDeviationWarningNode.as<std::int32_t>();
+    }
+    if (excessivePositionDeviationAlarmNode) {
+      excessivePositionDeviationAlarm =
+          excessivePositionDeviationAlarmNode.as<std::int32_t>();
+    }
     _motorConfigs[motorId] = MotorConfig{
-        .address = address, .runCurrent = runCurrent, .stopCurrent = stopCurrent};
+        .address = address,
+        .groupId = groupId,
+        .runCurrent = runCurrent,
+        .stopCurrent = stopCurrent,
+        .startingSpeed = startingSpeed,
+        .overloadWarning = overloadWarning,
+        .overloadAlarm = overloadAlarm,
+        .excessivePositionDeviationWarning = excessivePositionDeviationWarning,
+        .excessivePositionDeviationAlarm = excessivePositionDeviationAlarm};
   }
 }
 
@@ -203,8 +245,28 @@ void MotorControl::initialize() {
       {
         std::lock_guard<std::mutex> lock(_busMutex);
         it->second.initialize(*_bus);
+        if (motorCfg.groupId.has_value()) {
+          it->second.setGroupId(*_bus, *motorCfg.groupId);
+        }
         it->second.setRunCurrent(*_bus, motorCfg.runCurrent);
         it->second.setStopCurrent(*_bus, motorCfg.stopCurrent);
+        if (motorCfg.startingSpeed.has_value()) {
+          it->second.setStartingSpeed(*_bus, *motorCfg.startingSpeed);
+        }
+        if (motorCfg.overloadWarning.has_value()) {
+          it->second.setOverloadWarning(*_bus, *motorCfg.overloadWarning);
+        }
+        if (motorCfg.overloadAlarm.has_value()) {
+          it->second.setOverloadAlarm(*_bus, *motorCfg.overloadAlarm);
+        }
+        if (motorCfg.excessivePositionDeviationWarning.has_value()) {
+          it->second.setExcessivePositionDeviationWarning(
+              *_bus, *motorCfg.excessivePositionDeviationWarning);
+        }
+        if (motorCfg.excessivePositionDeviationAlarm.has_value()) {
+          it->second.setExcessivePositionDeviationAlarm(
+              *_bus, *motorCfg.excessivePositionDeviationAlarm);
+        }
         const auto inputRaw = it->second.readDriverInputCommandRaw(*_bus);
         const auto outputRaw = it->second.readDriverOutputStatusRaw(*_bus);
         const bool hasAlarm =
@@ -767,6 +829,13 @@ MotorDirectIoStatus MotorControl::readDirectIoStatus(const utl::EMotor motorId) 
   if (!_bus) utl::throwRuntimeError("MotorControl bus is not initialized");
   return motor.decodeDirectIoAndBrakeStatus(
       motor.readDirectIoAndBrakeStatusRaw(*_bus));
+}
+
+MotorMonitorSnapshot MotorControl::readMonitorSnapshot(const utl::EMotor motorId) {
+  const auto& motor = requireMotor(_motors, motorId);
+  std::lock_guard<std::mutex> lock(_busMutex);
+  if (!_bus) utl::throwRuntimeError("MotorControl bus is not initialized");
+  return motor.readMonitorSnapshot(*_bus);
 }
 
 MotorRemoteIoStatus MotorControl::readRemoteIoStatus(const utl::EMotor motorId) {

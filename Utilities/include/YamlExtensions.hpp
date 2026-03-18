@@ -91,6 +91,7 @@ struct convert<utl::SingleMotorStatus> {
     node["currentPosition"] = rhs.currentPosition;
     node["targetPosition"] = rhs.targetPosition;
     node["speed"] = rhs.speed;
+    node["speedRpm"] = rhs.speedRpm;
     node["torque"] = rhs.torque;
     node["state"] = rhs.state;
     node["warningDescription"] = rhs.warningDescription;
@@ -104,6 +105,7 @@ struct convert<utl::SingleMotorStatus> {
     rhs.currentPosition = node["currentPosition"].as<double>();
     rhs.targetPosition = node["targetPosition"].as<double>();
     rhs.speed = node["speed"].as<double>();
+    rhs.speedRpm = node["speedRpm"] ? node["speedRpm"].as<double>() : 0.0;
     rhs.torque = node["torque"].as<int>();
     rhs.state = node["state"] ? node["state"].as<utl::ELEDState>()
                               : utl::ELEDState::Off;

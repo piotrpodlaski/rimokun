@@ -67,58 +67,98 @@ classes:
         address: 1
         runCurrent: 500
         stopCurrent: 100
+        startingSpeed: 100
+        overloadWarning: 10
+        overloadAlarm: 300
+        excessivePositionDeviationWarning: 500
+        excessivePositionDeviationAlarm: 700
 #      XRight:
 #        address: 2
+#        groupId: 1
 #        runCurrent: 1000
 #        stopCurrent: 500
+#        startingSpeed: 100
+#        overloadWarning: 1000
+#        overloadAlarm: 1200
+#        excessivePositionDeviationWarning: 500
+#        excessivePositionDeviationAlarm: 700
       YLeft:
         address: 2
         runCurrent: 500
         stopCurrent: 0
+        startingSpeed: 100
+        overloadWarning: 10
+        overloadAlarm: 300
+        excessivePositionDeviationWarning: 500
+        excessivePositionDeviationAlarm: 700
 #      YRight:
 #        address: 4
+#        groupId: 1
 #        runCurrent: 1000
 #        stopCurrent: 500
+#        startingSpeed: 100
+#        overloadWarning: 1000
+#        overloadAlarm: 1200
+#        excessivePositionDeviationWarning: 500
+#        excessivePositionDeviationAlarm: 700
 #      ZLeft:
 #        address: 5
+#        groupId: 1
 #        runCurrent: 1000
 #        stopCurrent: 500
+#        startingSpeed: 100
+#        overloadWarning: 1000
+#        overloadAlarm: 1200
+#        excessivePositionDeviationWarning: 500
+#        excessivePositionDeviationAlarm: 700
 #      ZRight:
 #        address: 6
+#        groupId: 1
 #        runCurrent: 1000
 #        stopCurrent: 500
+#        startingSpeed: 100
+#        overloadWarning: 1000
+#        overloadAlarm: 1200
+#        excessivePositionDeviationWarning: 500
+#        excessivePositionDeviationAlarm: 700
   Machine:
     loopIntervalMS: 60
     updateIntervalMS: 200
     motion:
+      stepsPerRevolution: 1000
       neutralAxisActivationThreshold: 0.05
       speedUpdateAxisDeltaThreshold: 0.02
       axes:
         leftArmX:
+          invertAxis: false
           speedUpdateAxisDeltaThreshold: 0.02
-          maxLinearSpeedMmPerSec: 100.0
-          stepsPerMm: 100.0
+          maxLinearSpeedMmPerSec: 150.0
+          stepsPerMm: 14.15
           acceleration001MsPerKHz: 50000
           deceleration001MsPerKHz: 50000
         leftArmY:
+          invertAxis: false
           speedUpdateAxisDeltaThreshold: 0.02
-          maxLinearSpeedMmPerSec: 100.0
-          stepsPerMm: 100.0
+          maxLinearSpeedMmPerSec: 150.0
+          stepsPerMm: 20
           acceleration001MsPerKHz: 50000
           deceleration001MsPerKHz: 50000
         rightArmX:
+          invertAxis: false
           speedUpdateAxisDeltaThreshold: 0.02
           maxLinearSpeedMmPerSec: 80.0
           stepsPerMm: 100.0
           acceleration001MsPerKHz: 24575
           deceleration001MsPerKHz: 24575
         rightArmY:
+          invertAxis: false
           speedUpdateAxisDeltaThreshold: 0.02
           maxLinearSpeedMmPerSec: 80.0
           stepsPerMm: 100.0
           acceleration001MsPerKHz: 24575
           deceleration001MsPerKHz: 24575
         gantryZ:
+          invertAxis: false
           speedUpdateAxisDeltaThreshold: 0.02
           maxLinearSpeedMmPerSec: 80.0
           stepsPerMm: 100.0

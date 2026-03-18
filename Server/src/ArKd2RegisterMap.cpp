@@ -3,6 +3,8 @@
 MotorRegisterMap makeArKd2RegisterMap() {
   MotorRegisterMap map;
 
+  map.groupId = 0x0030;
+
   // 0x007D: driver input command (16-bit)
   map.driverInputCommandLower = 0x007D;
   map.driverOutputCommandLower = 0x007F;
@@ -27,6 +29,11 @@ MotorRegisterMap makeArKd2RegisterMap() {
   map.actualSpeed = 0x00CE;
   map.runCurrent = 0x0240;
   map.stopCurrent = 0x0242;
+  map.startingSpeed = 0x0284;
+  map.overloadAlarm = 0x0300;
+  map.excessivePositionDeviationAlarm = 0x0302;
+  map.overloadWarning = 0x0342;
+  map.excessivePositionDeviationWarning = 0x034A;
 
   // Operation data No.0 registers (32-bit)
   map.positionNo0 = 0x0400;

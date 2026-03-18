@@ -41,6 +41,9 @@ void MotorStats::setTorque(const int value) const {
 void MotorStats::setSpeed(const double value) const {
   _ui->speedCms->display(formatNumber(value));
 }
+void MotorStats::setSpeedRpm(const double value) const {
+  _ui->speedRpm->display(formatNumber(value));
+}
 void MotorStats::setCurrentPosition(const double value) const {
   _ui->curentPosition->display(formatNumber(value));
 }

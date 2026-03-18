@@ -1,14 +1,104 @@
 #include "MachineStatusBuilder.hpp"
 
+#include <Config.hpp>
 #include <array>
+#include <algorithm>
 #include <exception>
 #include <format>
-#include <algorithm>
 
 #include <Logger.hpp>
 #include <Motor.hpp>
 #include <MotorControl.hpp>
 #include <magic_enum/magic_enum.hpp>
+
+namespace {
+void setAxisStepsPerMmIfPresent(const YAML::Node& axesCfg, const char* axisKey,
+                                const std::initializer_list<utl::EMotor> motors,
+                                std::map<utl::EMotor, double>& out) {
+  const auto axisNode = axesCfg[axisKey];
+  if (!axisNode || !axisNode.IsMap()) {
+    return;
+  }
+  const auto stepsPerMmNode = axisNode["stepsPerMm"];
+  if (!stepsPerMmNode) {
+    return;
+  }
+  const auto value = stepsPerMmNode.as<double>();
+  if (value <= 0.0) {
+    return;
+  }
+  for (const auto motorId : motors) {
+    out[motorId] = value;
+  }
+}
+}  // namespace
+
+MachineStatusBuilder::MachineStatusBuilder() {
+  // Safe defaults keep legacy raw position scaling (steps->mm factor 1.0) and
+  // apply a reasonable motor-step default for rpm conversion if config is absent.
+  for (const auto motorId : {utl::EMotor::XLeft, utl::EMotor::XRight,
+                             utl::EMotor::YLeft, utl::EMotor::YRight,
+                             utl::EMotor::ZLeft, utl::EMotor::ZRight}) {
+    _stepsPerMmByMotor[motorId] = 1.0;
+  }
+
+  try {
+    const auto machineCfg = utl::Config::instance().getClassConfig("Machine");
+    const auto motionCfg = machineCfg["motion"];
+    if (!motionCfg || !motionCfg.IsMap()) {
+      return;
+    }
+
+    if (const auto stepsPerRevNode = motionCfg["stepsPerRevolution"];
+        stepsPerRevNode) {
+      const auto value = stepsPerRevNode.as<double>();
+      if (value > 0.0) {
+        _stepsPerRevolution = value;
+      }
+    }
+
+    const auto axesCfg = motionCfg["axes"];
+    if (!axesCfg || !axesCfg.IsMap()) {
+      return;
+    }
+
+    setAxisStepsPerMmIfPresent(axesCfg, "leftArmX", {utl::EMotor::XLeft},
+                               _stepsPerMmByMotor);
+    setAxisStepsPerMmIfPresent(axesCfg, "rightArmX", {utl::EMotor::XRight},
+                               _stepsPerMmByMotor);
+    setAxisStepsPerMmIfPresent(axesCfg, "leftArmY", {utl::EMotor::YLeft},
+                               _stepsPerMmByMotor);
+    setAxisStepsPerMmIfPresent(axesCfg, "rightArmY", {utl::EMotor::YRight},
+                               _stepsPerMmByMotor);
+    setAxisStepsPerMmIfPresent(axesCfg, "gantryZ",
+                               {utl::EMotor::ZLeft, utl::EMotor::ZRight},
+                               _stepsPerMmByMotor);
+    setAxisStepsPerMmIfPresent(axesCfg, "gantryY",
+                               {utl::EMotor::ZLeft, utl::EMotor::ZRight},
+                               _stepsPerMmByMotor);
+  } catch (const std::exception&) {
+    // Keep defaults when config is unavailable in unit-test contexts.
+  }
+}
+
+double MachineStatusBuilder::stepsPerMm(const utl::EMotor motorId) const {
+  const auto it = _stepsPerMmByMotor.find(motorId);
+  if (it == _stepsPerMmByMotor.end() || it->second <= 0.0) {
+    return 1.0;
+  }
+  return it->second;
+}
+
+double MachineStatusBuilder::positionMmFromSteps(const utl::EMotor motorId,
+                                                 const std::int32_t steps) const {
+  return static_cast<double>(steps) / stepsPerMm(motorId);
+}
+
+double MachineStatusBuilder::speedMmPerSecFromRpm(const utl::EMotor motorId,
+                                                  const std::int32_t rpm) const {
+  return (static_cast<double>(rpm) * _stepsPerRevolution) /
+         (60.0 * stepsPerMm(motorId));
+}
 
 void MachineStatusBuilder::updateAndPublish(
     utl::RobotStatus& status, const ComponentsMap& components,
@@ -56,7 +146,18 @@ void MachineStatusBuilder::updateAndPublish(
 
         try {
           const auto outputStatus = motorControl->readOutputStatus(motorId);
-          const auto directIoStatus = motorControl->readDirectIoStatus(motorId);
+          const auto monitor = motorControl->readMonitorSnapshot(motorId);
+          motorStatus.targetPosition =
+              positionMmFromSteps(motorId, monitor.commandPosition);
+          motorStatus.currentPosition =
+              positionMmFromSteps(motorId, monitor.actualPosition);
+          motorStatus.speed = speedMmPerSecFromRpm(motorId, monitor.actualSpeed);
+          motorStatus.speedRpm = static_cast<double>(monitor.actualSpeed);
+          const std::uint32_t directIoRaw =
+              (static_cast<std::uint32_t>(monitor.reg00D4) << 16) |
+              static_cast<std::uint32_t>(monitor.reg00D5);
+          const auto directIoStatus =
+              motorControl->motors().at(motorId).decodeDirectIoAndBrakeStatus(directIoRaw);
           const auto mbIt = std::find_if(
               directIoStatus.outputAssignments.begin(),
               directIoStatus.outputAssignments.end(),

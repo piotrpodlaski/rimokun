@@ -16,6 +16,7 @@ TEST(YamlExtensionsTests, RobotStatusRoundTripWorks) {
       .currentPosition = 10.5,
       .targetPosition = 20.5,
       .speed = 5.0,
+      .speedRpm = 120.0,
       .torque = 9,
       .flags = {{utl::EMotorStatusFlags::BrakeApplied, utl::ELEDState::On},
                 {utl::EMotorStatusFlags::Enabled, utl::ELEDState::Error}}};
@@ -30,6 +31,7 @@ TEST(YamlExtensionsTests, RobotStatusRoundTripWorks) {
 
   ASSERT_TRUE(decoded.motors.contains(utl::EMotor::XLeft));
   EXPECT_DOUBLE_EQ(decoded.motors.at(utl::EMotor::XLeft).currentPosition, 10.5);
+  EXPECT_DOUBLE_EQ(decoded.motors.at(utl::EMotor::XLeft).speedRpm, 120.0);
   EXPECT_EQ(decoded.motors.at(utl::EMotor::XLeft).torque, 9);
   EXPECT_EQ(decoded.robotComponents.at(utl::ERobotComponent::ControlPanel),
             utl::ELEDState::Off);

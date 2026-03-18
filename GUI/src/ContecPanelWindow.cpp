@@ -10,6 +10,7 @@
 #include <QTimer>
 #include <QVBoxLayout>
 
+#include <Config.hpp>
 #include "LedIndicator.hpp"
 
 ContecPanelWindow::ContecPanelWindow(QWidget* parent) : QDialog(parent) {
@@ -40,8 +41,10 @@ ContecPanelWindow::ContecPanelWindow(QWidget* parent) : QDialog(parent) {
   auto* outputGroup = new QGroupBox("Outputs", mapGroup);
   auto* inputLayout = new QGridLayout(inputGroup);
   auto* outputLayout = new QGridLayout(outputGroup);
-  _inputRows = createRows(this, inputLayout);
-  _outputRows = createRows(this, outputLayout);
+  const auto inputCount = utl::Config::instance().getRequired<unsigned>("Contec", "nDI");
+  const auto outputCount = utl::Config::instance().getRequired<unsigned>("Contec", "nDO");
+  _inputRows = createRows(this, inputLayout, static_cast<int>(inputCount), 2);
+  _outputRows = createRows(this, outputLayout, static_cast<int>(outputCount), 1);
   mapLayout->addWidget(inputGroup, 0, 0);
   mapLayout->addWidget(outputGroup, 0, 1);
   root->addWidget(mapGroup, 1);
@@ -111,7 +114,7 @@ void ContecPanelWindow::updateFromPayload(const nlohmann::json& payload) {
     row.led->setState(utl::ELEDState::Off);
   }
 
-  auto updateRows = [](const nlohmann::json& nodes, std::array<ChannelRow, 8>& rows) {
+  auto updateRows = [](const nlohmann::json& nodes, std::vector<ChannelRow>& rows) {
     if (!nodes.is_array()) {
       return;
     }
@@ -131,20 +134,27 @@ void ContecPanelWindow::updateFromPayload(const nlohmann::json& payload) {
              _outputRows);
 }
 
-std::array<ContecPanelWindow::ChannelRow, 8> ContecPanelWindow::createRows(
-    QWidget* parent, QGridLayout* layout) {
-  std::array<ChannelRow, 8> rows{};
-  for (int i = 0; i < 8; ++i) {
+std::vector<ContecPanelWindow::ChannelRow> ContecPanelWindow::createRows(
+    QWidget* parent, QGridLayout* layout, const int count, const int columns) {
+  std::vector<ChannelRow> rows(static_cast<std::size_t>(count));
+  const int safeColumns = std::max(1, columns);
+  const int rowsPerColumn = (count + safeColumns - 1) / safeColumns;
+  for (int i = 0; i < count; ++i) {
     auto* mappingLabel = new QLabel("-", parent);
     auto* led = new LedIndicator(parent);
     led->setState(utl::ELEDState::Off);
-    layout->addWidget(mappingLabel, i, 0);
-    layout->addWidget(led, i, 1);
+    const int columnGroup = i / rowsPerColumn;
+    const int row = i % rowsPerColumn;
+    const int baseColumn = columnGroup * 2;
+    layout->addWidget(mappingLabel, row, baseColumn);
+    layout->addWidget(led, row, baseColumn + 1);
     rows[static_cast<std::size_t>(i)] = ChannelRow{
         .signalLabel = mappingLabel,
         .led = led,
     };
   }
-  layout->setColumnStretch(0, 1);
+  for (int column = 0; column < safeColumns; ++column) {
+    layout->setColumnStretch(column * 2, 1);
+  }
   return rows;
 }

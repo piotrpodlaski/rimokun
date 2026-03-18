@@ -21,7 +21,7 @@ set(FETCHCONTENT_UPDATES_DISCONNECTED ON)
 FetchContent_Declare(
         yaml-cpp
         GIT_REPOSITORY https://github.com/jbeder/yaml-cpp.git
-        GIT_TAG master
+        GIT_TAG 8a666a0c1e9d4f5662f780efc1689c9ff9c634e2  # yaml-cpp 0.9.0-dev (HEAD at time of pin)
 )
 FetchContent_Declare(
         magic_enum
@@ -111,7 +111,10 @@ endif ()
 
 
 add_subdirectory(Utilities)
-add_subdirectory(GUI)
+option(BUILD_GUI "Build Qt GUI" ON)
+if (BUILD_GUI)
+    add_subdirectory(GUI)
+endif()
 add_subdirectory(Server)
 if (BUILD_TESTING)
     add_subdirectory(tests)

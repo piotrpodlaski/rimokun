@@ -1,4 +1,5 @@
 #include <Config.hpp>
+#include <ExceptionUtils.hpp>
 #include <Contec.hpp>
 #include <Logger.hpp>
 #include <TimingMetrics.hpp>
@@ -25,7 +26,7 @@ void Contec::initialize() {
                              0, _nDO, outputs.error().message);
       SPDLOG_ERROR(msg);
       setState(State::Error);
-      throw std::runtime_error(msg);
+      utl::throwRuntimeError(msg);
     }
     setState(State::Normal);
   } catch (const std::exception& e) {
@@ -49,7 +50,7 @@ ModbusClient& Contec::ensureModbusClient() {
                            cli_res.error().message);
     SPDLOG_CRITICAL(msg);
     setState(State::Error);
-    throw std::runtime_error(msg);
+    utl::throwRuntimeError(msg);
   }
 
   _modbus.emplace(std::move(*cli_res));
@@ -62,7 +63,7 @@ ModbusClient& Contec::ensureModbusClient() {
                            _ipAddress, _port, _slaveId, err.message);
     SPDLOG_CRITICAL(msg);
     setState(State::Error);
-    throw std::runtime_error(msg);
+    utl::throwRuntimeError(msg);
   }
 
   // Timeout
@@ -75,7 +76,7 @@ ModbusClient& Contec::ensureModbusClient() {
         std::format("Failed to set response timeout: {}", err.message);
     SPDLOG_CRITICAL(msg);
     setState(State::Error);
-    throw std::runtime_error(msg);
+    utl::throwRuntimeError(msg);
   }
 
   setState(State::Normal);
@@ -97,7 +98,7 @@ Contec::bitVector Contec::readInputs() {
                            regs.error().message);
     SPDLOG_CRITICAL(msg);
     setState(State::Error);
-    throw std::runtime_error(msg);
+    utl::throwRuntimeError(msg);
   }
   setState(State::Normal);
   return *regs;
@@ -112,7 +113,7 @@ Contec::bitVector Contec::readOutputs() {
                            regs.error().message);
     SPDLOG_CRITICAL(msg);
     setState(State::Error);
-    throw std::runtime_error(msg);
+    utl::throwRuntimeError(msg);
   }
   setState(State::Normal);
   return *regs;
@@ -125,7 +126,7 @@ void Contec::setOutputs(const bitVector& outputs) {
         std::format("Invalid number of outputs provided! {} instead of {}",
                     outputs.size(), _nDO);
     SPDLOG_CRITICAL(msg);
-    throw std::runtime_error(msg);
+    utl::throwRuntimeError(msg);
   }
   auto& client = ensureModbusClient();
   auto ret = client.write_bits(0, outputs);
@@ -134,7 +135,7 @@ void Contec::setOutputs(const bitVector& outputs) {
                            ret.error().message);
     SPDLOG_CRITICAL(msg);
     setState(State::Error);
-    throw std::runtime_error(msg);
+    utl::throwRuntimeError(msg);
   }
   setState(State::Normal);
 }

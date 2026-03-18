@@ -1,6 +1,7 @@
 #include "SerialControlPanelComm.hpp"
 
 #include <Logger.hpp>
+#include <ExceptionUtils.hpp>
 #include <YamlExtensions.hpp>
 
 #include <algorithm>
@@ -13,14 +14,14 @@
 SerialControlPanelComm::SerialControlPanelComm(const YAML::Node& commConfig) {
   const auto serialNode = commConfig["serial"];
   if (!serialNode || !serialNode.IsMap()) {
-    throw std::runtime_error(
+    utl::throwRuntimeError(
         "ControlPanel comm.type='serial' requires map 'comm.serial'.");
   }
 
   auto requireNode = [&](const std::string& key) -> YAML::Node {
     const auto node = serialNode[key];
     if (!node || !node.IsDefined()) {
-      throw std::runtime_error(
+      utl::throwRuntimeError(
           std::format("Missing required ControlPanel comm.serial.{}", key));
     }
     return node;
@@ -111,16 +112,16 @@ std::optional<std::string> SerialControlPanelComm::readLine() {
   } catch (const LibSerial::ReadTimeout&) {
     try {
       if (!_serial->IsOpen()) {
-        throw std::runtime_error("ControlPanel serial port is no longer open.");
+        utl::throwRuntimeError("ControlPanel serial port is no longer open.");
       }
       (void)_serial->GetNumberOfBytesAvailable();
     } catch (const std::exception& e) {
-      throw std::runtime_error(std::format(
+      utl::throwRuntimeError(std::format(
           "ControlPanel serial health check failed: {}", e.what()));
     }
     return std::nullopt;
   } catch (const std::exception& e) {
-    throw std::runtime_error(
+    utl::throwRuntimeError(
         std::format("ControlPanel serial read failed: {}", e.what()));
   }
 }

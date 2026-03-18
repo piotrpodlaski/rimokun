@@ -1,6 +1,7 @@
 #include "ControlPanelCommFactory.hpp"
 
 #include <algorithm>
+#include <ExceptionUtils.hpp>
 #include <cctype>
 #include <format>
 #include <stdexcept>
@@ -19,7 +20,7 @@ std::unique_ptr<IControlPanelComm> makeControlPanelComm(
     const YAML::Node& commConfig) {
   const auto transportNode = commConfig["type"];
   if (!transportNode || !transportNode.IsScalar()) {
-    throw std::runtime_error(
+    utl::throwRuntimeError(
         "ControlPanel comm config must define scalar 'type'.");
   }
   const auto transport = transportNode.as<std::string>();
@@ -29,9 +30,9 @@ std::unique_ptr<IControlPanelComm> makeControlPanelComm(
   }
   if (normalized == "tcp" || normalized == "socket" ||
       normalized == "tcpsocket") {
-    throw std::runtime_error(
+    utl::throwRuntimeError(
         "ControlPanel transport 'tcp' is not implemented yet.");
   }
-  throw std::runtime_error(
+  utl::throwRuntimeError(
       std::format("Unsupported ControlPanel transport '{}'", transport));
 }

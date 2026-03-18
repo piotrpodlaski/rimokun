@@ -45,7 +45,7 @@ class MachineController {
                     utl::RobotStatus& robotStatus,
                     std::unique_ptr<IRobotControlPolicy> controlPolicy);
 
-  void runControlLoopTasks() const;
+  void runControlLoopTasks();
   void handleToolChangerCommand(const cmd::ToolChangerCommand& command) const;
 
  private:
@@ -64,5 +64,5 @@ class MachineController {
   IsMotorConfiguredFn _isMotorConfigured;
   utl::RobotStatus& _robotStatus;
   std::unique_ptr<IRobotControlPolicy> _controlPolicy;
-  mutable std::map<utl::EMotor, bool> _missingMotorWarned;
+  std::map<utl::EMotor, bool> _missingMotorWarned;
 };

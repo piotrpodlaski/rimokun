@@ -12,16 +12,16 @@ class FakeControlPolicy final : public IRobotControlPolicy {
   ControlDecision decide(const std::optional<SignalMap>& inputs,
                          const std::optional<SignalMap>&,
                          const MachineComponent::State contecState,
-                         const utl::RobotStatus&) const override {
+                         const utl::RobotStatus&) override {
     ++decideCalls;
     seenInputs = inputs;
     seenState = contecState;
     return decisionToReturn;
   }
 
-  mutable int decideCalls{0};
-  mutable std::optional<SignalMap> seenInputs;
-  mutable MachineComponent::State seenState{MachineComponent::State::Error};
+  int decideCalls{0};
+  std::optional<SignalMap> seenInputs;
+  MachineComponent::State seenState{MachineComponent::State::Error};
   ControlDecision decisionToReturn;
 };
 }  // namespace

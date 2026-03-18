@@ -2,7 +2,6 @@
 
 #include <map>
 #include <cstdint>
-#include <mutex>
 #include <optional>
 #include <string>
 #include <vector>
@@ -38,7 +37,7 @@ class IRobotControlPolicy {
   virtual ControlDecision decide(const std::optional<SignalMap>& inputs,
                                  const std::optional<SignalMap>& outputs,
                                  MachineComponent::State contecState,
-                                 const utl::RobotStatus& robotStatus) const = 0;
+                                 const utl::RobotStatus& robotStatus) = 0;
 };
 
 class DefaultRobotControlPolicy final : public IRobotControlPolicy {
@@ -46,7 +45,7 @@ class DefaultRobotControlPolicy final : public IRobotControlPolicy {
   ControlDecision decide(const std::optional<SignalMap>& inputs,
                          const std::optional<SignalMap>& outputs,
                          MachineComponent::State contecState,
-                         const utl::RobotStatus& robotStatus) const override;
+                         const utl::RobotStatus& robotStatus) override;
 };
 
 class RimoKunControlPolicy final : public IRobotControlPolicy {
@@ -56,7 +55,7 @@ class RimoKunControlPolicy final : public IRobotControlPolicy {
   ControlDecision decide(const std::optional<SignalMap>& inputs,
                          const std::optional<SignalMap>& outputs,
                          MachineComponent::State contecState,
-                         const utl::RobotStatus& robotStatus) const override;
+                         const utl::RobotStatus& robotStatus) override;
 
  private:
   struct AxisConfig {
@@ -95,12 +94,10 @@ class RimoKunControlPolicy final : public IRobotControlPolicy {
     std::optional<MotorControlDirection> lastDirection;
   };
 
-  void warnOnce(bool& flag, const std::string& message) const;
-  void setWarningFlag(bool& flag, bool value) const;
+  void warnOnce(bool& flag, const std::string& message);
+  void setWarningFlag(bool& flag, bool value);
 
   MotionConfig _motion;
-  mutable WarningState _warningState;
-  mutable std::mutex _warningMutex;
-  mutable std::map<utl::EMotor, MotorRuntimeState> _motorRuntime;
-  mutable std::mutex _runtimeMutex;
+  WarningState _warningState;
+  std::map<utl::EMotor, MotorRuntimeState> _motorRuntime;
 };

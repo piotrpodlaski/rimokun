@@ -4,6 +4,8 @@
 #include <Machine.hpp>
 #include <TimingMetrics.hpp>
 
+#include <magic_enum/magic_enum.hpp>
+
 #include <chrono>
 #include <array>
 #include <future>
@@ -20,6 +22,23 @@ unsigned int requireMappingIndex(
         std::format("Missing required signal mapping key '{}'", key));
   }
   return it->second;
+}
+
+template <typename ESignal>
+void validateSignalMappingKeys(const std::map<std::string, unsigned int>& mapping,
+                                std::string_view mappingName) {
+  for (const auto& [key, index] : mapping) {
+    if (!magic_enum::enum_cast<ESignal>(key).has_value()) {
+      std::string known;
+      for (const auto name : magic_enum::enum_names<ESignal>()) {
+        if (!known.empty()) known += ", ";
+        known += name;
+      }
+      utl::throwRuntimeError(std::format(
+          "Unknown {} signal '{}' in config. Known values: [{}]",
+          mappingName, key, known));
+    }
+  }
 }
 
 nlohmann::json makeDefaultIoAssignmentResponse(const utl::EMotor motor) {
@@ -130,6 +149,8 @@ Machine::Machine(std::shared_ptr<IClock> clock) : _clock(std::move(clock)) {
       "Machine", "inputMapping");
   _outputMapping = cfg.getRequired<std::map<std::string, unsigned int>>(
       "Machine", "outputMapping");
+  validateSignalMappingKeys<utl::EInputSignal>(_inputMapping, "input");
+  validateSignalMappingKeys<utl::EOutputSignal>(_outputMapping, "output");
   const auto loopIntervalMS = cfg.getOptional<int>(
       "Machine", "loopIntervalMS",
       cfg.getOptional<int>("Machine", "loopSleepTimeMS", 10));
@@ -141,6 +162,9 @@ Machine::Machine(std::shared_ptr<IClock> clock) : _clock(std::move(clock)) {
 
   _loopInterval = std::chrono::milliseconds{std::max(1, loopIntervalMS)};
   _updateInterval = std::chrono::milliseconds{std::max(1, updateIntervalMS)};
+  const auto commandQueueMaxSize =
+      cfg.getOptional<std::size_t>("Machine", "commandQueueMaxSize", 16u);
+  _commandQueue.setMaxSize(commandQueueMaxSize);
 
   _components.emplace(_contec.componentType(), &_contec);
   _components.emplace(_controlPanel.componentType(), &_controlPanel);
@@ -366,6 +390,10 @@ std::string Machine::dispatchCommandAndWait(cmd::Command command,
                                             const std::chrono::milliseconds timeout) {
   auto future = command.reply.get_future();
   if (!submitCommand(std::move(command))) {
+    if (_isRunning.load(std::memory_order_acquire)) {
+      SPDLOG_WARN("Command queue is full. Command rejected.");
+      return "Command queue is full";
+    }
     return "Machine is shutting down";
   }
   if (future.wait_for(timeout) != std::future_status::ready) {

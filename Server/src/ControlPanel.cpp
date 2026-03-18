@@ -1,10 +1,10 @@
 #include <ControlPanel.hpp>
+#include <ExceptionUtils.hpp>
 #include <ControlPanelCommFactory.hpp>
 #include <Config.hpp>
 #include <Logger.hpp>
 #include <TimingMetrics.hpp>
 
-#include <algorithm>
 #include <sstream>
 #include <stdexcept>
 #include <utility>
@@ -18,7 +18,7 @@ ControlPanel::ControlPanel(std::unique_ptr<IControlPanelComm> comm,
       _baselineSamples(std::max<std::size_t>(1u, baselineSamples)),
       _buttonDebounceSamples(std::max<std::size_t>(1u, buttonDebounceSamples)) {
   if (!_comm) {
-    throw std::runtime_error("ControlPanel communication backend is null.");
+    utl::throwRuntimeError("ControlPanel communication backend is null.");
   }
   resetSignalProcessingState();
 }
@@ -72,7 +72,7 @@ ControlPanel::ControlPanel() {
   _buttonDebounceSamples = std::max<std::size_t>(
       1u, getProcessingOrLegacy("buttonDebounceSamples", 3u));
   if (!_comm) {
-    throw std::runtime_error("ControlPanel communication backend is null.");
+    utl::throwRuntimeError("ControlPanel communication backend is null.");
   }
   resetSignalProcessingState();
 }
@@ -162,10 +162,10 @@ void ControlPanel::processLine(const std::string& line) {
     }
   }
 
+  // Parse all 9 values first — only update processors if the whole line is valid.
   std::array<double, 3> xRaw{};
   std::array<double, 3> yRaw{};
-  std::array<bool, 3> b{};
-
+  std::array<bool, 3> bRaw{};
   try {
     for (std::size_t i = 0; i < 3; ++i) {
       const int xv = std::stoi(tokens[3 * i]);
@@ -177,79 +177,23 @@ void ControlPanel::processLine(const std::string& line) {
       }
       xRaw[i] = static_cast<double>(xv);
       yRaw[i] = static_cast<double>(yv);
-      b[i] = (bv == 1);
+      bRaw[i] = (bv == 1);
     }
   } catch (const std::exception&) {
     SPDLOG_WARN("ControlPanel invalid numeric format in line: '{}'", line);
     return;
   }
 
-  if (!_baselineReady) {
-    for (std::size_t i = 0; i < 3; ++i) {
-      _baselineXAcc[i] += xRaw[i];
-      _baselineYAcc[i] += yRaw[i];
-    }
-    ++_baselineCount;
-    if (_baselineCount >= _baselineSamples) {
-      for (std::size_t i = 0; i < 3; ++i) {
-        _baselineX[i] = _baselineXAcc[i] / static_cast<double>(_baselineCount);
-        _baselineY[i] = _baselineYAcc[i] / static_cast<double>(_baselineCount);
-      }
-      _baselineReady = true;
-      SPDLOG_INFO(
-          "ControlPanel baseline ready after {} samples. "
-          "X:[{:.3f}, {:.3f}, {:.3f}] Y:[{:.3f}, {:.3f}, {:.3f}]",
-          _baselineCount, _baselineX[0], _baselineX[1], _baselineX[2],
-          _baselineY[0], _baselineY[1], _baselineY[2]);
-    }
-  }
-
-  std::array<double, 3> xFiltered{};
-  std::array<double, 3> yFiltered{};
   for (std::size_t i = 0; i < 3; ++i) {
-    _xWindow[i].push_back(xRaw[i]);
-    _xWindowSum[i] += xRaw[i];
-    if (_xWindow[i].size() > _movingAverageDepth) {
-      _xWindowSum[i] -= _xWindow[i].front();
-      _xWindow[i].pop_front();
+    const bool wasReady = _processors[i].isBaselineReady();
+    const auto out = _processors[i].process(xRaw[i], yRaw[i], bRaw[i]);
+    if (!wasReady && _processors[i].isBaselineReady()) {
+      SPDLOG_INFO("ControlPanel joystick[{}] baseline ready. x={:.3f} y={:.3f}",
+                  i, out.x, out.y);
     }
-
-    _yWindow[i].push_back(yRaw[i]);
-    _yWindowSum[i] += yRaw[i];
-    if (_yWindow[i].size() > _movingAverageDepth) {
-      _yWindowSum[i] -= _yWindow[i].front();
-      _yWindow[i].pop_front();
-    }
-
-    xFiltered[i] = _xWindowSum[i] / static_cast<double>(_xWindow[i].size());
-    yFiltered[i] = _yWindowSum[i] / static_cast<double>(_yWindow[i].size());
-
-    double xOut = 0.0;
-    double yOut = 0.0;
-    if (_baselineReady) {
-      xOut = clipToUnitRange((xFiltered[i] - _baselineX[i]) / 512.0);
-      yOut = clipToUnitRange((yFiltered[i] - _baselineY[i]) / 512.0);
-    }
-
-    _x[i].store(xOut, std::memory_order_release);
-    _y[i].store(yOut, std::memory_order_release);
-
-    if (b[i] == _bStable[i]) {
-      _bPending[i] = _bStable[i];
-      _bPendingCount[i] = 0;
-    } else {
-      if (b[i] == _bPending[i]) {
-        ++_bPendingCount[i];
-      } else {
-        _bPending[i] = b[i];
-        _bPendingCount[i] = 1;
-      }
-      if (_bPendingCount[i] >= _buttonDebounceSamples) {
-        _bStable[i] = _bPending[i];
-        _bPendingCount[i] = 0;
-      }
-    }
-    _b[i].store(_bStable[i], std::memory_order_release);
+    _x[i].store(out.x, std::memory_order_release);
+    _y[i].store(out.y, std::memory_order_release);
+    _b[i].store(out.button, std::memory_order_release);
   }
 }
 
@@ -268,22 +212,7 @@ void ControlPanel::resetSignalProcessingState() {
     _x[i].store(0.0, std::memory_order_release);
     _y[i].store(0.0, std::memory_order_release);
     _b[i].store(false, std::memory_order_release);
-    _xWindow[i].clear();
-    _yWindow[i].clear();
-    _xWindowSum[i] = 0.0;
-    _yWindowSum[i] = 0.0;
-    _baselineX[i] = 512.0;
-    _baselineY[i] = 512.0;
-    _baselineXAcc[i] = 0.0;
-    _baselineYAcc[i] = 0.0;
-    _bStable[i] = false;
-    _bPending[i] = false;
-    _bPendingCount[i] = 0;
+    _processors[i].reconfigure(_movingAverageDepth, _baselineSamples, _buttonDebounceSamples);
   }
-  _baselineCount = 0;
-  _baselineReady = false;
 }
 
-double ControlPanel::clipToUnitRange(double value) {
-  return std::clamp(value, -1.0, 1.0);
-}

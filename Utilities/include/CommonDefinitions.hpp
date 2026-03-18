@@ -20,6 +20,29 @@ enum class EToolChangerAction { Open, Close };
 
 enum class ERobotComponent {Contec, MotorControl, ControlPanel};
 
+// Known Contec digital input signal names.  All keys in Machine.inputMapping
+// must correspond to one of these values (validated at startup).
+enum class EInputSignal {
+  safetyON,
+  button1,
+  button2,
+  tclProx,
+  tclOpen,
+  tclClose,
+  tcrProx,
+  tcrOpen,
+  tcrClose,
+};
+
+// Known Contec digital output signal names.  All keys in Machine.outputMapping
+// must correspond to one of these values (validated at startup).
+enum class EOutputSignal {
+  toolChangerLeft,
+  toolChangerRight,
+  light1,
+  light2,
+};
+
 std::string getMotorName(EMotor em);
 EMotor getMotorType(std::string name);
 

@@ -14,7 +14,7 @@ IRobotControlPolicy::ControlDecision DefaultRobotControlPolicy::decide(
     const std::optional<SignalMap>& inputs,
     const std::optional<SignalMap>& currentOutputs,
     const MachineComponent::State contecState,
-    const utl::RobotStatus& robotStatus) const {
+    const utl::RobotStatus& robotStatus) {
   (void)currentOutputs;
   (void)robotStatus;
   if (!inputs || contecState == MachineComponent::State::Error) {
@@ -162,7 +162,7 @@ RimoKunControlPolicy::RimoKunControlPolicy() {
 IRobotControlPolicy::ControlDecision RimoKunControlPolicy::decide(
     const std::optional<SignalMap>& inputs, const std::optional<SignalMap>& outputs,
     const MachineComponent::State contecState,
-    const utl::RobotStatus& robotStatus) const {
+    const utl::RobotStatus& robotStatus) {
   (void)outputs;
 
   const auto contecStatus =
@@ -256,7 +256,6 @@ IRobotControlPolicy::ControlDecision RimoKunControlPolicy::decide(
   const auto appendSpeedIntent = [&](const utl::EMotor motorId,
                                      const double axisValue,
                                      const AxisConfig& axisCfg) {
-    std::lock_guard<std::mutex> runtimeLock(_runtimeMutex);
     auto& runtime = _motorRuntime[motorId];
     const auto clampedAxis = clampAxis(axisCfg.invertAxis ? -axisValue : axisValue);
     const auto active =
@@ -336,8 +335,7 @@ IRobotControlPolicy::ControlDecision RimoKunControlPolicy::decide(
           .setToolChangerErrorBlinking = false};
 }
 
-void RimoKunControlPolicy::warnOnce(bool& flag, const std::string& message) const {
-  std::lock_guard<std::mutex> lock(_warningMutex);
+void RimoKunControlPolicy::warnOnce(bool& flag, const std::string& message) {
   if (flag) {
     return;
   }
@@ -345,7 +343,6 @@ void RimoKunControlPolicy::warnOnce(bool& flag, const std::string& message) cons
   SPDLOG_WARN("{}", message);
 }
 
-void RimoKunControlPolicy::setWarningFlag(bool& flag, const bool value) const {
-  std::lock_guard<std::mutex> lock(_warningMutex);
+void RimoKunControlPolicy::setWarningFlag(bool& flag, const bool value) {
   flag = value;
 }

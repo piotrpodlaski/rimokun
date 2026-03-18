@@ -124,6 +124,7 @@ classes:
   Machine:
     loopIntervalMS: 60
     updateIntervalMS: 200
+    commandQueueMaxSize: 16  # max pending commands; excess are rejected with an error response
     motion:
       stepsPerRevolution: 1000
       neutralAxisActivationThreshold: 0.05

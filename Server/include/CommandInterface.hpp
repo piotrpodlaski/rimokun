@@ -61,9 +61,14 @@ struct Command {
 
 class CommandQueue {
 public:
+  explicit CommandQueue(std::size_t maxSize = 0) : _maxSize(maxSize) {}
+
   bool push(Command cmd) {
     std::lock_guard<std::mutex> lock(_m);
     if (_shutdown) {
+      return false;
+    }
+    if (_maxSize > 0 && _q.size() >= _maxSize) {
       return false;
     }
     _q.push(std::move(cmd));
@@ -90,6 +95,11 @@ public:
     return c;
   }
 
+  void setMaxSize(std::size_t maxSize) {
+    std::lock_guard<std::mutex> lock(_m);
+    _maxSize = maxSize;
+  }
+
   void shutdown() {
     std::lock_guard<std::mutex> lock(_m);
     _shutdown = true;
@@ -100,6 +110,7 @@ private:
   std::mutex _m;
   std::condition_variable _cv;
   std::queue<Command> _q;
+  std::size_t _maxSize{0};
   bool _shutdown{false};
 };
 }

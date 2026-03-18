@@ -1,6 +1,7 @@
 #include "MachineController.hpp"
 
 #include <Logger.hpp>
+#include <ExceptionUtils.hpp>
 #include <TimingMetrics.hpp>
 #include <magic_enum/magic_enum.hpp>
 #include <stdexcept>
@@ -36,14 +37,14 @@ MachineController::MachineController(ReadSignalsFn readInputs,
       _robotStatus(robotStatus),
       _controlPolicy(std::move(controlPolicy)) {
   if (!_controlPolicy) {
-    throw std::runtime_error("MachineController requires a non-null control policy.");
+    utl::throwRuntimeError("MachineController requires a non-null control policy.");
   }
   if (!_isMotorConfigured) {
-    throw std::runtime_error("MachineController requires motor availability callback.");
+    utl::throwRuntimeError("MachineController requires motor availability callback.");
   }
 }
 
-void MachineController::runControlLoopTasks() const {
+void MachineController::runControlLoopTasks() {
   RIMO_TIMED_SCOPE("MachineController::runControlLoopTasks");
   const auto decision =
       _controlPolicy->decide(_readInputs(), _readOutputs(), _contecState(),
@@ -101,7 +102,7 @@ void MachineController::handleToolChangerCommand(
               magic_enum::enum_name(command.arm),
               magic_enum::enum_name(command.action));
   if (_contecState() == MachineComponent::State::Error) {
-    throw std::runtime_error(
+    utl::throwRuntimeError(
         "Contec is in error state. Not possible to alter tool changer state!");
   }
   signal_map_t outputSignals;
@@ -114,7 +115,7 @@ void MachineController::handleToolChangerCommand(
   }
   _setOutputs(outputSignals);
   if (!_readOutputs()) {
-    throw std::runtime_error(
+    utl::throwRuntimeError(
         "Unable to read status of output signals, tool changer status update "
         "failed!");
   }

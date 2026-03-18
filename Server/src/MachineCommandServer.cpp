@@ -1,4 +1,5 @@
 #include "MachineCommandServer.hpp"
+#include "MachineCommandProcessor.hpp"
 
 #include <Logger.hpp>
 
@@ -14,19 +15,16 @@ void RimoServerCommandChannel::sendResponse(const nlohmann::json& response) {
   _server.sendResponse(response);
 }
 
-MachineCommandServer::MachineCommandServer(
-    MachineCommandProcessor& processor, utl::RimoServer<utl::RobotStatus>& server)
-    : _processor(processor),
-      _ownedChannel(std::make_unique<RimoServerCommandChannel>(server)),
+MachineCommandServer::MachineCommandServer(utl::RimoServer<utl::RobotStatus>& server)
+    : _ownedChannel(std::make_unique<RimoServerCommandChannel>(server)),
       _channel(_ownedChannel.get()) {}
 
-MachineCommandServer::MachineCommandServer(MachineCommandProcessor& processor,
-                                           ICommandChannel& channel)
-    : _processor(processor), _channel(&channel) {}
+MachineCommandServer::MachineCommandServer(ICommandChannel& channel)
+    : _channel(&channel) {}
 
 void MachineCommandServer::runLoop(
     const std::atomic<bool>& running,
-    const MachineCommandProcessor::DispatchFn& dispatch) const {
+    const cmd::DispatchFn& dispatch) const {
   SPDLOG_INFO("Command Server Thread Started!");
   while (running.load(std::memory_order_acquire)) {
     auto command = _channel->receiveCommand();
@@ -34,7 +32,7 @@ void MachineCommandServer::runLoop(
       continue;
     }
     SPDLOG_INFO("Received command: {}", command->dump());
-    const auto response = _processor.processCommand(*command, dispatch);
+    const auto response = cmd::processCommand(*command, dispatch);
     _channel->sendResponse(response);
   }
   SPDLOG_INFO("Command Server thread finished!");

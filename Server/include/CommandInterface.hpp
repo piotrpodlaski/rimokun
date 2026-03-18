@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <condition_variable>
+#include <functional>
 #include <future>
 #include <mutex>
 #include <optional>
@@ -46,11 +47,6 @@ struct SetAllMotorsEnabledCommand {
 
 struct ContecDiagnosticsCommand {};
 
-struct AuxCommand {
-  utl::ERobotComponent robotComponent;
-};
-
-
 struct Command {
   std::variant<ToolChangerCommand, ReconnectCommand, MotorDiagnosticsCommand,
                ResetMotorAlarmCommand, SetMotorEnabledCommand,
@@ -58,6 +54,8 @@ struct Command {
       payload;
   std::promise<std::string> reply;
 };
+
+using DispatchFn = std::function<std::string(Command, std::chrono::milliseconds)>;
 
 class CommandQueue {
 public:

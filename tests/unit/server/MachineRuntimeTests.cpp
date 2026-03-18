@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <Config.hpp>
-#include <MachineRuntime.hpp>
+#include <Machine.hpp>
 
 #include <chrono>
 #include <filesystem>
@@ -79,16 +79,16 @@ TEST(MachineRuntimeTests, InitializeAndShutdownCompleteWithinDeadline) {
   const auto configPath = writeTempConfig();
   utl::Config::instance().setConfigPath(configPath.string());
 
-  MachineRuntime runtime;
+  Machine machine;
   const auto initStart = std::chrono::steady_clock::now();
-  ASSERT_NO_THROW(runtime.initialize());
+  ASSERT_NO_THROW({ machine.wire(); machine.initialize(); });
   const auto initElapsed = std::chrono::steady_clock::now() - initStart;
   EXPECT_LT(initElapsed, 2s);
 
   std::this_thread::sleep_for(50ms);
 
   const auto shutdownStart = std::chrono::steady_clock::now();
-  EXPECT_NO_THROW(runtime.shutdown());
+  EXPECT_NO_THROW(machine.shutdown());
   const auto shutdownElapsed = std::chrono::steady_clock::now() - shutdownStart;
   EXPECT_LT(shutdownElapsed, 2s);
 
@@ -99,20 +99,20 @@ TEST(MachineRuntimeTests, ShutdownIsSafeWithoutInitializeAndWhenRepeated) {
   const auto configPath = writeTempConfig();
   utl::Config::instance().setConfigPath(configPath.string());
 
-  MachineRuntime runtime;
+  Machine machine;
 
   const auto firstShutdownStart = std::chrono::steady_clock::now();
-  EXPECT_NO_THROW(runtime.shutdown());
+  EXPECT_NO_THROW(machine.shutdown());
   const auto firstShutdownElapsed =
       std::chrono::steady_clock::now() - firstShutdownStart;
   EXPECT_LT(firstShutdownElapsed, 500ms);
 
-  ASSERT_NO_THROW(runtime.initialize());
+  ASSERT_NO_THROW({ machine.wire(); machine.initialize(); });
   std::this_thread::sleep_for(20ms);
-  EXPECT_NO_THROW(runtime.shutdown());
+  EXPECT_NO_THROW(machine.shutdown());
 
   const auto secondShutdownStart = std::chrono::steady_clock::now();
-  EXPECT_NO_THROW(runtime.shutdown());
+  EXPECT_NO_THROW(machine.shutdown());
   const auto secondShutdownElapsed =
       std::chrono::steady_clock::now() - secondShutdownStart;
   EXPECT_LT(secondShutdownElapsed, 500ms);
@@ -124,10 +124,10 @@ TEST(MachineRuntimeTests, DoubleInitializeIsRejected) {
   const auto configPath = writeTempConfig();
   utl::Config::instance().setConfigPath(configPath.string());
 
-  MachineRuntime runtime;
-  ASSERT_NO_THROW(runtime.initialize());
-  EXPECT_THROW((void)runtime.initialize(), std::runtime_error);
-  EXPECT_NO_THROW(runtime.shutdown());
+  Machine machine;
+  ASSERT_NO_THROW({ machine.wire(); machine.initialize(); });
+  EXPECT_THROW((void)machine.initialize(), std::runtime_error);
+  EXPECT_NO_THROW(machine.shutdown());
 
   std::filesystem::remove(configPath);
 }
@@ -136,13 +136,13 @@ TEST(MachineRuntimeTests, ConcurrentShutdownCallsCompleteWithoutDeadlock) {
   const auto configPath = writeTempConfig();
   utl::Config::instance().setConfigPath(configPath.string());
 
-  MachineRuntime runtime;
-  ASSERT_NO_THROW(runtime.initialize());
+  Machine machine;
+  ASSERT_NO_THROW({ machine.wire(); machine.initialize(); });
   std::this_thread::sleep_for(20ms);
 
   const auto start = std::chrono::steady_clock::now();
-  std::thread t1([&]() { EXPECT_NO_THROW(runtime.shutdown()); });
-  std::thread t2([&]() { EXPECT_NO_THROW(runtime.shutdown()); });
+  std::thread t1([&]() { EXPECT_NO_THROW(machine.shutdown()); });
+  std::thread t2([&]() { EXPECT_NO_THROW(machine.shutdown()); });
   t1.join();
   t2.join();
   const auto elapsed = std::chrono::steady_clock::now() - start;

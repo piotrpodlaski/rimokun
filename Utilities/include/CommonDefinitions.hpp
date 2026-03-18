@@ -43,6 +43,8 @@ enum class EOutputSignal {
   light2,
 };
 
+using SignalMap = std::map<std::string, bool>;
+
 std::string getMotorName(EMotor em);
 EMotor getMotorType(std::string name);
 

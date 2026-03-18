@@ -2,7 +2,6 @@
 
 #include <Config.hpp>
 #include <Machine.hpp>
-#include <MachineRuntime.hpp>
 
 #include <chrono>
 #include <filesystem>
@@ -246,7 +245,7 @@ TEST(MachineLoopTests, RunOneCycleAtConfiguredCadence) {
 
   auto fakeClock = std::make_shared<FakeClock>();
   TestMachine machine(fakeClock);
-  MachineRuntime::wireMachine(machine);
+  machine.wire();
   auto state = machine.makeInitialLoopState();
 
   for (int i = 0; i < 12; ++i) {
@@ -267,7 +266,7 @@ TEST(MachineLoopTests, OverrunResynchronizesToFutureTick) {
 
   auto fakeClock = std::make_shared<FakeClock>();
   SlowTestMachine machine(fakeClock, std::chrono::milliseconds{25});
-  MachineRuntime::wireMachine(machine);
+  machine.wire();
   auto state = machine.makeInitialLoopState();
 
   machine.runOneCycle(state);
@@ -323,8 +322,8 @@ TEST(MachineLoopTests, WireMachineIsIdempotentAndAllowsLoopExecution) {
   auto fakeClock = std::make_shared<FakeClock>();
   TestMachine machine(fakeClock);
 
-  MachineRuntime::wireMachine(machine);
-  MachineRuntime::wireMachine(machine);
+  machine.wire();
+  machine.wire();
 
   auto state = machine.makeInitialLoopState();
   EXPECT_NO_THROW((void)machine.runOneCycle(state));
@@ -339,7 +338,7 @@ TEST(MachineLoopTests, LegacyTimingKeysAreUsedWhenNewKeysAreMissing) {
 
   auto fakeClock = std::make_shared<FakeClock>();
   TestMachine machine(fakeClock);
-  MachineRuntime::wireMachine(machine);
+  machine.wire();
   auto state = machine.makeInitialLoopState();
 
   for (int i = 0; i < 5; ++i) {
@@ -359,7 +358,7 @@ TEST(MachineLoopTests, NonPositiveIntervalsAreClampedToOneMillisecond) {
 
   auto fakeClock = std::make_shared<FakeClock>();
   TestMachine machine(fakeClock);
-  MachineRuntime::wireMachine(machine);
+  machine.wire();
   auto state = machine.makeInitialLoopState();
 
   for (int i = 0; i < 5; ++i) {
@@ -379,7 +378,7 @@ TEST(MachineLoopTests, ControlStepExceptionDoesNotEscapeRunOneCycle) {
 
   auto fakeClock = std::make_shared<FakeClock>();
   ThrowingControlMachine machine(fakeClock);
-  MachineRuntime::wireMachine(machine);
+  machine.wire();
   auto state = machine.makeInitialLoopState();
 
   EXPECT_NO_THROW((void)machine.runOneCycle(state));

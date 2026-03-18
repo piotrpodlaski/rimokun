@@ -12,7 +12,7 @@
 
 class IRobotControlPolicy {
  public:
-  using SignalMap = std::map<std::string, bool>;
+  using SignalMap = utl::SignalMap;
 
   struct MotorIntent {
     utl::EMotor motorId;
@@ -38,14 +38,6 @@ class IRobotControlPolicy {
                                  const std::optional<SignalMap>& outputs,
                                  MachineComponent::State contecState,
                                  const utl::RobotStatus& robotStatus) = 0;
-};
-
-class DefaultRobotControlPolicy final : public IRobotControlPolicy {
- public:
-  ControlDecision decide(const std::optional<SignalMap>& inputs,
-                         const std::optional<SignalMap>& outputs,
-                         MachineComponent::State contecState,
-                         const utl::RobotStatus& robotStatus) override;
 };
 
 class RimoKunControlPolicy final : public IRobotControlPolicy {

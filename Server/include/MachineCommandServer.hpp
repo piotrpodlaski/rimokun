@@ -4,7 +4,7 @@
 #include <memory>
 #include <optional>
 
-#include "MachineCommandProcessor.hpp"
+#include "CommandInterface.hpp"
 #include "RimoServer.hpp"
 
 class ICommandChannel {
@@ -27,15 +27,13 @@ class RimoServerCommandChannel final : public ICommandChannel {
 
 class MachineCommandServer {
  public:
-  MachineCommandServer(MachineCommandProcessor& processor,
-                       utl::RimoServer<utl::RobotStatus>& server);
-  MachineCommandServer(MachineCommandProcessor& processor, ICommandChannel& channel);
+  explicit MachineCommandServer(utl::RimoServer<utl::RobotStatus>& server);
+  explicit MachineCommandServer(ICommandChannel& channel);
 
   void runLoop(const std::atomic<bool>& running,
-               const MachineCommandProcessor::DispatchFn& dispatch) const;
+               const cmd::DispatchFn& dispatch) const;
 
  private:
-  MachineCommandProcessor& _processor;
   std::unique_ptr<ICommandChannel> _ownedChannel;
   ICommandChannel* _channel{nullptr};
 };

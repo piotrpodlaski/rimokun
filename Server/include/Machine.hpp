@@ -4,7 +4,6 @@
 #include <ControlLoopRunner.hpp>
 #include <IClock.hpp>
 #include <MachineComponent.hpp>
-#include <MachineCommandProcessor.hpp>
 #include <MachineCommandServer.hpp>
 #include <MachineComponentService.hpp>
 #include <MachineController.hpp>
@@ -24,10 +23,7 @@
 #include <RimoServer.hpp>
 #include <nlohmann/json.hpp>
 
-typedef std::map<std::string, bool> signalMap_t;
-
 class Machine {
-  friend class MachineRuntime;
  public:
   using LoopState = ControlLoopRunner::State;
 
@@ -35,9 +31,11 @@ class Machine {
   explicit Machine(std::shared_ptr<IClock> clock);
   ~Machine() = default;
 
-  std::optional<signalMap_t> readInputSignals();
-  void setOutputs(const signalMap_t& signals);
-  std::optional<signalMap_t> readOutputSignals();
+  void wire();
+
+  std::optional<signal_map_t> readInputSignals();
+  void setOutputs(const signal_map_t& signals);
+  std::optional<signal_map_t> readOutputSignals();
   [[nodiscard]] LoopState makeInitialLoopState() const;
   void runOneCycle(LoopState& state);
   bool submitCommand(cmd::Command command);
@@ -70,11 +68,11 @@ class Machine {
   struct IoSignalCache {
     std::uint64_t cycle{0};
     bool valid{false};
-    std::optional<signalMap_t> value;
+    std::optional<signal_map_t> value;
   };
 
-  void cacheInputSignals(std::optional<signalMap_t> value);
-  void cacheOutputSignals(std::optional<signalMap_t> value);
+  void cacheInputSignals(std::optional<signal_map_t> value);
+  void cacheOutputSignals(std::optional<signal_map_t> value);
 
   void makeDummyStatus();
 
@@ -102,6 +100,5 @@ class Machine {
   std::unique_ptr<MachineController> _controller;
   std::unique_ptr<MachineComponentService> _componentService;
   std::unique_ptr<MachineStatusBuilder> _statusBuilder;
-  std::unique_ptr<MachineCommandProcessor> _commandProcessor;
   std::unique_ptr<MachineCommandServer> _commandServer;
 };

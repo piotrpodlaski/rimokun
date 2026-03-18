@@ -1,6 +1,5 @@
 #include <gtest/gtest.h>
 
-#include <MachineCommandProcessor.hpp>
 #include <MachineCommandServer.hpp>
 
 #include <atomic>
@@ -70,9 +69,8 @@ class FakeCommandChannel final : public ICommandChannel {
 }  // namespace
 
 TEST(MachineCommandServerTests, RespondsToCommandWithinDeadline) {
-  MachineCommandProcessor processor;
   FakeCommandChannel channel(20ms);
-  MachineCommandServer commandServer(processor, channel);
+  MachineCommandServer commandServer(channel);
   std::atomic<bool> running{true};
 
   bool dispatched = false;
@@ -108,9 +106,8 @@ TEST(MachineCommandServerTests, RespondsToCommandWithinDeadline) {
 }
 
 TEST(MachineCommandServerTests, ShutdownWhileBlockedOnReceiveExitsPromptlyWhenWoken) {
-  MachineCommandProcessor processor;
   FakeCommandChannel channel(1s);
-  MachineCommandServer commandServer(processor, channel);
+  MachineCommandServer commandServer(channel);
   std::atomic<bool> running{true};
 
   std::thread serverThread([&]() {
@@ -140,9 +137,8 @@ TEST(MachineCommandServerTests, ShutdownWhileBlockedOnReceiveExitsPromptlyWhenWo
 }
 
 TEST(MachineCommandServerTests, MalformedCommandsReturnErrorsAndLoopKeepsServing) {
-  MachineCommandProcessor processor;
   FakeCommandChannel channel(20ms);
-  MachineCommandServer commandServer(processor, channel);
+  MachineCommandServer commandServer(channel);
   std::atomic<bool> running{true};
 
   int dispatchCalls = 0;

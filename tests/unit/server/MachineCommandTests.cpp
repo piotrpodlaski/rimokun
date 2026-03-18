@@ -2,7 +2,6 @@
 
 #include <Config.hpp>
 #include <Machine.hpp>
-#include <MachineRuntime.hpp>
 
 #include <chrono>
 #include <filesystem>
@@ -139,7 +138,7 @@ TEST(MachineCommandTests, ValidCommandReturnsOkResponse) {
 
   auto fakeClock = std::make_shared<FakeClock>();
   CommandTestMachine machine(fakeClock);
-  MachineRuntime::wireMachine(machine);
+  machine.wire();
   auto state = machine.makeInitialLoopState();
 
   cmd::Command command;
@@ -178,7 +177,7 @@ TEST(MachineCommandTests, CommandFailureIsReturnedAndSubsequentCommandSucceeds) 
 
   auto fakeClock = std::make_shared<FakeClock>();
   FlakyCommandTestMachine machine(fakeClock);
-  MachineRuntime::wireMachine(machine);
+  machine.wire();
   auto state = machine.makeInitialLoopState();
 
   cmd::Command failingCommand;
@@ -261,7 +260,7 @@ TEST(MachineCommandTests, CommandsAreProcessedInFifoOrderOnePerCycle) {
 
   auto fakeClock = std::make_shared<FakeClock>();
   OrderedCommandTestMachine machine(fakeClock);
-  MachineRuntime::wireMachine(machine);
+  machine.wire();
   auto state = machine.makeInitialLoopState();
 
   std::vector<std::future<std::string>> futures;
@@ -298,7 +297,7 @@ TEST(MachineCommandTests,
 
   auto fakeClock = std::make_shared<FakeClock>();
   CommandTestMachine machine(fakeClock);
-  MachineRuntime::wireMachine(machine);
+  machine.wire();
   auto state = machine.makeInitialLoopState();
 
   cmd::Command timedOutCommand;

@@ -10,28 +10,6 @@
 #include <stdexcept>
 #include <utility>
 
-IRobotControlPolicy::ControlDecision DefaultRobotControlPolicy::decide(
-    const std::optional<SignalMap>& inputs,
-    const std::optional<SignalMap>& currentOutputs,
-    const MachineComponent::State contecState,
-    const utl::RobotStatus& robotStatus) {
-  (void)currentOutputs;
-  (void)robotStatus;
-  if (!inputs || contecState == MachineComponent::State::Error) {
-    return {.outputs = std::nullopt, .setToolChangerErrorBlinking = true};
-  }
-  if (!inputs->contains("button1") || !inputs->contains("button2")) {
-    utl::throwRuntimeError(
-        "Missing required input signals 'button1'/'button2' for control policy.");
-  }
-
-  SignalMap desiredOutputs;
-  desiredOutputs["light1"] = inputs->at("button1");
-  desiredOutputs["light2"] = inputs->at("button2");
-  return {.outputs = std::move(desiredOutputs),
-          .setToolChangerErrorBlinking = false};
-}
-
 namespace {
 double clampAxis(const double value) {
   return std::clamp(value, -1.0, 1.0);

@@ -179,7 +179,7 @@ Machine::Machine(std::shared_ptr<IClock> clock) : _clock(std::move(clock)) {
   (void)requireMappingIndex(_outputMapping, "light2");
 }
 
-std::optional<signalMap_t> Machine::readInputSignals() {
+std::optional<signal_map_t> Machine::readInputSignals() {
   if (_inputSignalsCache.valid && _inputSignalsCache.cycle == _ioCacheCycle) {
     return _inputSignalsCache.value;
   }
@@ -187,7 +187,7 @@ std::optional<signalMap_t> Machine::readInputSignals() {
     cacheInputSignals(std::nullopt);
     return std::nullopt;
   }
-  signalMap_t inputSignals;
+  signal_map_t inputSignals;
   try {
     auto inputs = _contec.readInputs();
     for (const auto& [signal, index] : _inputMapping) {
@@ -203,7 +203,7 @@ std::optional<signalMap_t> Machine::readInputSignals() {
   return inputSignals;
 }
 
-void Machine::setOutputs(const signalMap_t& signals) {
+void Machine::setOutputs(const signal_map_t& signals) {
   if (_contec.state() == MachineComponent::State::Error) {
     return;
   }
@@ -220,7 +220,7 @@ void Machine::setOutputs(const signalMap_t& signals) {
     }
     _contec.setOutputs(outputs);
 
-    signalMap_t outputSignals;
+    signal_map_t outputSignals;
     for (const auto& [signal, index] : _outputMapping) {
       validateMappedIndex(signal, index, outputs.size(), "output");
       outputSignals[signal] = outputs[index];
@@ -232,7 +232,7 @@ void Machine::setOutputs(const signalMap_t& signals) {
   }
 }
 
-std::optional<signalMap_t> Machine::readOutputSignals() {
+std::optional<signal_map_t> Machine::readOutputSignals() {
   if (_outputSignalsCache.valid && _outputSignalsCache.cycle == _ioCacheCycle) {
     return _outputSignalsCache.value;
   }
@@ -242,7 +242,7 @@ std::optional<signalMap_t> Machine::readOutputSignals() {
   }
   try {
     auto output = _contec.readOutputs();
-    signalMap_t outputSignals;
+    signal_map_t outputSignals;
     for (auto& [signal, index] : _outputMapping) {
       validateMappedIndex(signal, index, output.size(), "output");
       outputSignals[signal] = output[index];
@@ -277,7 +277,7 @@ void Machine::processThread() {
 
 Machine::LoopState Machine::makeInitialLoopState() const {
   if (!_loopRunner) {
-    utl::throwRuntimeError("Machine is not wired. Call MachineRuntime::wireMachine first.");
+    utl::throwRuntimeError("Machine is not wired. Call wire() first.");
   }
   return _loopRunner->makeInitialState();
 }
@@ -285,7 +285,7 @@ Machine::LoopState Machine::makeInitialLoopState() const {
 void Machine::runOneCycle(LoopState& state) {
   RIMO_TIMED_SCOPE("Machine::runOneCycle");
   if (!_loopRunner) {
-    utl::throwRuntimeError("Machine is not wired. Call MachineRuntime::wireMachine first.");
+    utl::throwRuntimeError("Machine is not wired. Call wire() first.");
   }
   try {
     ++_ioCacheCycle;
@@ -370,13 +370,13 @@ void Machine::runOneCycle(LoopState& state) {
   }
 }
 
-void Machine::cacheInputSignals(std::optional<signalMap_t> value) {
+void Machine::cacheInputSignals(std::optional<signal_map_t> value) {
   _inputSignalsCache.cycle = _ioCacheCycle;
   _inputSignalsCache.valid = true;
   _inputSignalsCache.value = std::move(value);
 }
 
-void Machine::cacheOutputSignals(std::optional<signalMap_t> value) {
+void Machine::cacheOutputSignals(std::optional<signal_map_t> value) {
   _outputSignalsCache.cycle = _ioCacheCycle;
   _outputSignalsCache.valid = true;
   _outputSignalsCache.value = std::move(value);
@@ -426,13 +426,49 @@ void Machine::controlLoopTasks() {
   }
 }
 
+void Machine::wire() {
+  if (!_loopRunner) {
+    _loopRunner = std::make_unique<ControlLoopRunner>(
+        *_clock, _loopInterval, _updateInterval);
+  }
+  if (!_controller) {
+    _controller = std::make_unique<MachineController>(
+        MachineController::IoOps{
+            .readInputs = [this]() { return readInputSignals(); },
+            .setOutputs = [this](const signal_map_t& outputs) { setOutputs(outputs); },
+            .readOutputs = [this]() { return readOutputSignals(); },
+            .contecState = [this]() { return _contec.state(); },
+        },
+        MachineController::MotorOps{
+            .setMode = [this](utl::EMotor id, MotorControlMode m) { _motorControl.setMode(id, m); },
+            .setSpeed = [this](utl::EMotor id, std::int32_t v) { _motorControl.setSpeed(id, v); },
+            .setAcceleration = [this](utl::EMotor id, std::int32_t v) { _motorControl.setAcceleration(id, v); },
+            .setDeceleration = [this](utl::EMotor id, std::int32_t v) { _motorControl.setDeceleration(id, v); },
+            .setPosition = [this](utl::EMotor id, std::int32_t v) { _motorControl.setPosition(id, v); },
+            .setDirection = [this](utl::EMotor id, MotorControlDirection d) { _motorControl.setDirection(id, d); },
+            .start = [this](utl::EMotor id) { _motorControl.startMovement(id); },
+            .stop = [this](utl::EMotor id) { _motorControl.stopMovement(id); },
+            .isConfigured = [this](utl::EMotor id) { return _motorControl.motors().contains(id); },
+        },
+        _robotStatus, std::make_unique<RimoKunControlPolicy>());
+  }
+  if (!_componentService) {
+    _componentService = std::make_unique<MachineComponentService>(_components);
+  }
+  if (!_statusBuilder) {
+    _statusBuilder = std::make_unique<MachineStatusBuilder>();
+  }
+  if (!_commandServer) {
+    _commandServer = std::make_unique<MachineCommandServer>(_robotServer);
+  }
+}
+
 void Machine::initialize() {
   std::lock_guard<std::mutex> lock(_lifecycleMutex);
   if (!_loopRunner || !_controller || !_componentService || !_statusBuilder ||
-      !_commandProcessor || !_commandServer) {
+      !_commandServer) {
     utl::throwRuntimeError(
-        "Machine collaborators are not wired. Use MachineRuntime::wireMachine "
-        "before initialize().");
+        "Machine collaborators are not wired. Call wire() before initialize().");
   }
   bool expected = false;
   if (!_isRunning.compare_exchange_strong(expected, true,

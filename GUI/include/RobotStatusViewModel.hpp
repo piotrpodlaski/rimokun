@@ -19,6 +19,7 @@ struct ResetControlsViewModel {
   utl::ELEDState contec{utl::ELEDState::Off};
   utl::ELEDState motor{utl::ELEDState::Off};
   utl::ELEDState controlPanel{utl::ELEDState::Off};
+  utl::ELEDState motorPower{utl::ELEDState::Off};
   bool resetContecEnabled{false};
   bool resetMotorEnabled{false};
   bool resetControlPanelEnabled{false};

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <map>
+#include <optional>
 #include <string>
 
 namespace utl {
@@ -76,6 +77,7 @@ struct RobotStatus {
   std::map<EArm, ToolChangerStatus> toolChangers;
   std::map<ERobotComponent, ELEDState> robotComponents;
   std::map<EArm, JoystickStatus> joystics;
+  std::optional<bool> safetyOn;
 };
 
 }  // namespace utl

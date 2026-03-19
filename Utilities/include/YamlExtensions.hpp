@@ -172,6 +172,9 @@ struct convert<utl::RobotStatus> {
     for (const auto& [cmp, tc] : rhs.robotComponents) {
       node["robotComponents"][convert<utl::ERobotComponent>::encode(cmp)] = tc;
     }
+    if (rhs.safetyOn.has_value()) {
+      node["safetyOn"] = *rhs.safetyOn;
+    }
     for (const auto& [arm, js] : rhs.joystics) {
       node["joystics"][convert<utl::EArm>::encode(arm)] = js;
     }
@@ -196,6 +199,9 @@ struct convert<utl::RobotStatus> {
       utl::ERobotComponent cmp;
       if (!convert<utl::ERobotComponent>::decode(kv.first, cmp)) return false;
       rhs.robotComponents[cmp] = kv.second.as<utl::ELEDState>();
+    }
+    if (const auto safetyOnNode = node["safetyOn"]; safetyOnNode) {
+      rhs.safetyOn = safetyOnNode.as<bool>();
     }
     const auto joysticsNode = node["joystics"];
     if (joysticsNode && joysticsNode.IsMap()) {

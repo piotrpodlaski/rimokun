@@ -283,6 +283,12 @@ void MachineStatusBuilder::updateAndPublish(
   auto inputs = readInputSignals();
   auto outputs = readOutputSignals();
 
+  if (inputs && inputs->contains("safetyON")) {
+    status.safetyOn = inputs->at("safetyON");
+  } else {
+    status.safetyOn = std::nullopt;
+  }
+
   if (inputs && inputs->contains("button1") && inputs->contains("button2")) {
     status.toolChangers[utl::EArm::Left].flags[utl::EToolChangerStatusFlags::ProxSen] =
         inputs->at("button1") ? utl::ELEDState::On : utl::ELEDState::Off;

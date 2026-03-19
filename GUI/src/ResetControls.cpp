@@ -17,6 +17,8 @@ ResetControls::ResetControls(QWidget* parent) : QWidget(parent), _ui(new Ui::Res
   _lContecLed = _ui->ledContec;
   _lMotorLed = _ui->ledMotors;
   _lControlPanelLed = _ui->ledControlPanel;
+  _lMotorPowerLed = _ui->ledMotorPower;
+  _bEmergencyStop = _ui->emergencyStop;
 
   _lServerLed->setState(ELEDState::Error);
   _bResetContec->setEnabled(false);
@@ -32,6 +34,8 @@ ResetControls::ResetControls(QWidget* parent) : QWidget(parent), _ui(new Ui::Res
           &ResetControls::handleButtons);
   connect(_bDisableAllMotors, &QPushButton::clicked, this,
           &ResetControls::handleButtons);
+  connect(_bEmergencyStop, &QPushButton::clicked, this,
+          &ResetControls::handleButtons);
 }
 
 void ResetControls::applyViewModel(const ResetControlsViewModel& vm) const {
@@ -39,6 +43,7 @@ void ResetControls::applyViewModel(const ResetControlsViewModel& vm) const {
   _lContecLed->setState(vm.contec);
   _lMotorLed->setState(vm.motor);
   _lControlPanelLed->setState(vm.controlPanel);
+  _lMotorPowerLed->setState(vm.motorPower);
   _bResetContec->setEnabled(vm.resetContecEnabled);
   _bResetMotors->setEnabled(vm.resetMotorEnabled);
   _bResetControlPanel->setEnabled(vm.resetControlPanelEnabled);
@@ -65,6 +70,9 @@ void ResetControls::handleButtons() {
   }
   else if (sender == _ui->disableAllMotors) {
     command.payload = GuiSetAllMotorsEnabledCommand{.enabled = false};
+  }
+  else if (sender == _ui->emergencyStop) {
+    command.payload = GuiEmergencyStopCommand{};
   }
   else
     return;

@@ -33,4 +33,6 @@ class ResetControls : public QWidget {
   LedIndicator* _lContecLed;
   LedIndicator* _lMotorLed;
   LedIndicator* _lControlPanelLed;
+  LedIndicator* _lMotorPowerLed;
+  QPushButton* _bEmergencyStop;
 };

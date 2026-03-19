@@ -556,6 +556,10 @@ void Motor::setEnabled(ModbusClient& bus, const bool enabled) const {
   writeDriverInputCommandRaw(bus, raw);
 }
 
+void Motor::invalidateDriverInputCommandCache() const noexcept {
+  _driverInputCommandRawCache.reset();
+}
+
 std::uint8_t Motor::decodeOperationIdFromInputRaw(const std::uint16_t raw) {
   std::uint8_t opId = 0;
   if ((raw & static_cast<std::uint16_t>(MotorInputFlag::M0)) != 0) opId |= 1u;

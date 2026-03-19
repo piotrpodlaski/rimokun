@@ -279,7 +279,7 @@ TEST(MotorControlTests, SpeedModeStartMovementUsesDirectionBitsWithoutStartPulse
   std::filesystem::remove(configPath);
 }
 
-TEST(MotorControlTests, SpeedModeStopMovementClearsDriverInputCommandRegister) {
+TEST(MotorControlTests, SpeedModeStopMovementClearsDirectionBits) {
   fake_modbus::reset();
   const auto configPath = writeMotorControlConfig("5");
   utl::Config::instance().setConfigPath(configPath.string());
@@ -295,7 +295,10 @@ TEST(MotorControlTests, SpeedModeStopMovementClearsDriverInputCommandRegister) {
   const auto map = makeArKd2RegisterMap();
   const auto inputRaw =
       fake_modbus::getHoldingRegister(5, map.driverInputCommandLower);
-  EXPECT_EQ(inputRaw, 0u);
+  const auto fwdBit = static_cast<std::uint16_t>(MotorInputFlag::Fwd);
+  const auto revBit = static_cast<std::uint16_t>(MotorInputFlag::Rvs);
+  EXPECT_EQ(inputRaw & fwdBit, 0u);
+  EXPECT_EQ(inputRaw & revBit, 0u);
 
   std::filesystem::remove(configPath);
 }

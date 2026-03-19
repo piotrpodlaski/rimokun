@@ -33,6 +33,7 @@ class MachineController {
     std::function<void(utl::EMotor)> start;
     std::function<void(utl::EMotor)> stop;
     std::function<bool(utl::EMotor)> isConfigured;
+    std::function<void(utl::EMotor)> onAlarmCleared;
   };
 
   MachineController(IoOps io,
@@ -49,4 +50,5 @@ class MachineController {
   utl::RobotStatus& _robotStatus;
   std::unique_ptr<IRobotControlPolicy> _controlPolicy;
   std::map<utl::EMotor, bool> _missingMotorWarned;
+  std::map<utl::EMotor, bool> _motorWasInAlarm;
 };

@@ -172,6 +172,7 @@ class Motor {
   void setJogPlus(ModbusClient& bus, bool enabled) const;
   void setJogMinus(ModbusClient& bus, bool enabled) const;
   void setEnabled(ModbusClient& bus, bool enabled) const;
+  void invalidateDriverInputCommandCache() const noexcept;
   [[nodiscard]] static std::uint8_t decodeOperationIdFromInputRaw(
       std::uint16_t raw);
   [[nodiscard]] std::uint8_t readSelectedOperationId(ModbusClient& bus) const;

@@ -442,6 +442,7 @@ void Machine::wire() {
             .start = [this](utl::EMotor id) { _motorControl.startMovement(id); },
             .stop = [this](utl::EMotor id) { _motorControl.stopMovement(id); },
             .isConfigured = [this](utl::EMotor id) { return _motorControl.motors().contains(id); },
+            .onAlarmCleared = [this](utl::EMotor id) { _motorControl.onAlarmCleared(id); },
         },
         _robotStatus, std::make_unique<RimoKunControlPolicy>());
   }

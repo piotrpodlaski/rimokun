@@ -24,6 +24,20 @@ MachineController::MachineController(IoOps io,
 
 void MachineController::runControlLoopTasks() {
   RIMO_TIMED_SCOPE("MachineController::runControlLoopTasks");
+
+  if (_motorOps.onAlarmCleared) {
+    for (const auto& [motorId, motorStatus] : _robotStatus.motors) {
+      const auto alarmIt = motorStatus.flags.find(utl::EMotorStatusFlags::Alarm);
+      const bool isInAlarm = alarmIt != motorStatus.flags.end() &&
+                             alarmIt->second == utl::ELEDState::Error;
+      const bool wasInAlarm = _motorWasInAlarm[motorId];
+      if (wasInAlarm && !isInAlarm) {
+        _motorOps.onAlarmCleared(motorId);
+      }
+      _motorWasInAlarm[motorId] = isInAlarm;
+    }
+  }
+
   const auto decision =
       _controlPolicy->decide(_io.readInputs(), _io.readOutputs(), _io.contecState(),
                              _robotStatus);

@@ -724,6 +724,24 @@ void MotorControl::setAllEnabled(const bool enabled) {
   }
 }
 
+void MotorControl::onAlarmCleared(const utl::EMotor motorId) {
+  const auto& motor = requireMotor(_motors, motorId);
+  auto rtIt = _runtime.find(motorId);
+  if (rtIt == _runtime.end()) {
+    return;
+  }
+  SPDLOG_INFO("Motor {} alarm cleared — forcing C-ON=0 for safe recovery",
+              magic_enum::enum_name(motorId));
+  motor.invalidateDriverInputCommandCache();
+  std::lock_guard<std::mutex> lock(_busMutex);
+  if (!_bus) {
+    rtIt->second.enabled = false;
+    return;
+  }
+  motor.setEnabled(*_bus, false);
+  rtIt->second.enabled = false;
+}
+
 bool MotorControl::isEnabled(const utl::EMotor motorId) const {
   const auto it = _runtime.find(motorId);
   if (it == _runtime.end()) {

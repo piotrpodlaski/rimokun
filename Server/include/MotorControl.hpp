@@ -51,6 +51,9 @@ class MotorControl final : public MachineComponent {
   void setJogMinus(utl::EMotor motorId, bool enabled);
   void setEnabled(utl::EMotor motorId, bool enabled);
   void setAllEnabled(bool enabled);
+  // Call when a motor transitions out of alarm state. Forces C-ON=0 on hardware
+  // and invalidates the driver input command cache so recovery is safe.
+  void onAlarmCleared(utl::EMotor motorId);
   [[nodiscard]] bool isEnabled(utl::EMotor motorId) const;
   [[nodiscard]] bool isEnableControllable(utl::EMotor motorId) const;
   [[nodiscard]] std::uint8_t readSelectedOperationId(utl::EMotor motorId);
@@ -127,6 +130,7 @@ class MotorControl final : public MachineComponent {
     bool positionPrepared{false};
     bool enabled{true};
     bool enableControllable{false};
+    bool wasInAlarm{false};
   };
   std::map<utl::EMotor, MotorRuntimeState> _runtime;
 

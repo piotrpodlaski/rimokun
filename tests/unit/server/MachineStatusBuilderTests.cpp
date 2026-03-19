@@ -36,11 +36,11 @@ TEST(MachineStatusBuilderTests, BuildsAndPublishesExpectedStatus) {
         s.b = {true, false, true};
         return s;
       },
-      []() -> std::optional<signal_map_t> {
-        return signal_map_t{{"button1", true}, {"button2", false}};
+      []() -> std::optional<utl::SignalMap> {
+        return utl::SignalMap{{"button1", true}, {"button2", false}};
       },
-      []() -> std::optional<signal_map_t> {
-        return signal_map_t{{"toolChangerLeft", true},
+      []() -> std::optional<utl::SignalMap> {
+        return utl::SignalMap{{"toolChangerLeft", true},
                             {"toolChangerRight", false}};
       },
       [&](const utl::RobotStatus& s) {
@@ -82,9 +82,9 @@ TEST(MachineStatusBuilderTests, MissingInputSnapshotSetsProximityFlagsToError) {
         s.b = {false, false, false};
         return s;
       },
-      []() -> std::optional<signal_map_t> { return std::nullopt; },
-      []() -> std::optional<signal_map_t> {
-        return signal_map_t{{"toolChangerLeft", true},
+      []() -> std::optional<utl::SignalMap> { return std::nullopt; },
+      []() -> std::optional<utl::SignalMap> {
+        return utl::SignalMap{{"toolChangerLeft", true},
                             {"toolChangerRight", true}};
       },
       [&](const utl::RobotStatus&) { published = true; });
@@ -116,11 +116,11 @@ TEST(MachineStatusBuilderTests, WarningComponentMapsToWarningLed) {
         s.b = {false, false, false};
         return s;
       },
-      []() -> std::optional<signal_map_t> {
-        return signal_map_t{{"button1", false}, {"button2", false}};
+      []() -> std::optional<utl::SignalMap> {
+        return utl::SignalMap{{"button1", false}, {"button2", false}};
       },
-      []() -> std::optional<signal_map_t> {
-        return signal_map_t{{"toolChangerLeft", false},
+      []() -> std::optional<utl::SignalMap> {
+        return utl::SignalMap{{"toolChangerLeft", false},
                             {"toolChangerRight", false}};
       },
       [&](const utl::RobotStatus&) { published = true; });
@@ -169,11 +169,11 @@ TEST(MachineStatusBuilderTests, ContecErrorSetsAllToolChangerFlagsToError) {
         s.b = {false, false, false};
         return s;
       },
-      []() -> std::optional<signal_map_t> {
-        return signal_map_t{{"button1", true}, {"button2", true}};
+      []() -> std::optional<utl::SignalMap> {
+        return utl::SignalMap{{"button1", true}, {"button2", true}};
       },
-      []() -> std::optional<signal_map_t> {
-        return signal_map_t{{"toolChangerLeft", true},
+      []() -> std::optional<utl::SignalMap> {
+        return utl::SignalMap{{"toolChangerLeft", true},
                             {"toolChangerRight", false}};
       },
       [&](const utl::RobotStatus&) { published = true; });
@@ -219,11 +219,11 @@ TEST(MachineStatusBuilderTests, PartialOutputSnapshotSetsValveFlagsToError) {
         s.b = {false, false, false};
         return s;
       },
-      []() -> std::optional<signal_map_t> {
-        return signal_map_t{{"button1", false}, {"button2", true}};
+      []() -> std::optional<utl::SignalMap> {
+        return utl::SignalMap{{"button1", false}, {"button2", true}};
       },
-      []() -> std::optional<signal_map_t> {
-        return signal_map_t{{"toolChangerLeft", true}};
+      []() -> std::optional<utl::SignalMap> {
+        return utl::SignalMap{{"toolChangerLeft", true}};
       },
       [&](const utl::RobotStatus&) { published = true; });
 
@@ -258,11 +258,11 @@ TEST(MachineStatusBuilderTests, MissingSnapshotAfterValidUpdateDoesNotLeaveStale
         s.b = {false, false, false};
         return s;
       },
-      []() -> std::optional<signal_map_t> {
-        return signal_map_t{{"button1", true}, {"button2", true}};
+      []() -> std::optional<utl::SignalMap> {
+        return utl::SignalMap{{"button1", true}, {"button2", true}};
       },
-      []() -> std::optional<signal_map_t> {
-        return signal_map_t{{"toolChangerLeft", true},
+      []() -> std::optional<utl::SignalMap> {
+        return utl::SignalMap{{"toolChangerLeft", true},
                             {"toolChangerRight", false}};
       },
       [](const utl::RobotStatus&) {});
@@ -283,8 +283,8 @@ TEST(MachineStatusBuilderTests, MissingSnapshotAfterValidUpdateDoesNotLeaveStale
         s.b = {false, false, false};
         return s;
       },
-      []() -> std::optional<signal_map_t> { return std::nullopt; },
-      []() -> std::optional<signal_map_t> { return std::nullopt; },
+      []() -> std::optional<utl::SignalMap> { return std::nullopt; },
+      []() -> std::optional<utl::SignalMap> { return std::nullopt; },
       [](const utl::RobotStatus&) {});
 
   EXPECT_EQ(status.toolChangers.at(utl::EArm::Left)

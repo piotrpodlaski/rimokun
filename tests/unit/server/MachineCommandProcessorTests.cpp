@@ -10,8 +10,8 @@
 using namespace std::chrono_literals;
 
 TEST(MachineCommandProcessorTests, RejectsNonMapCommand) {
-  MachineCommandProcessor processor;
-  const auto response = processor.processCommand(
+  
+  const auto response = cmd::processCommand(
       "not-a-map", [](cmd::Command, std::chrono::milliseconds) {
         return std::string{};
       });
@@ -20,10 +20,10 @@ TEST(MachineCommandProcessorTests, RejectsNonMapCommand) {
 }
 
 TEST(MachineCommandProcessorTests, UnknownTypeReturnsError) {
-  MachineCommandProcessor processor;
+  
   nlohmann::json command{{"type", "unknown"}};
 
-  const auto response = processor.processCommand(
+  const auto response = cmd::processCommand(
       command, [](cmd::Command, std::chrono::milliseconds) {
         return std::string{};
       });
@@ -34,7 +34,7 @@ TEST(MachineCommandProcessorTests, UnknownTypeReturnsError) {
 }
 
 TEST(MachineCommandProcessorTests, MissingOrNonScalarTypeReturnsErrorWithoutDispatch) {
-  MachineCommandProcessor processor;
+  
   std::vector<nlohmann::json> cases;
   cases.emplace_back(nlohmann::json::object());
   {
@@ -45,7 +45,7 @@ TEST(MachineCommandProcessorTests, MissingOrNonScalarTypeReturnsErrorWithoutDisp
 
   for (const auto& command : cases) {
     bool dispatched = false;
-    const auto response = processor.processCommand(
+    const auto response = cmd::processCommand(
         command, [&](cmd::Command, std::chrono::milliseconds) {
           dispatched = true;
           return std::string{};
@@ -58,7 +58,7 @@ TEST(MachineCommandProcessorTests, MissingOrNonScalarTypeReturnsErrorWithoutDisp
 }
 
 TEST(MachineCommandProcessorTests, ToolChangerDispatchesWithTwoSecondTimeout) {
-  MachineCommandProcessor processor;
+  
   nlohmann::json command{
       {"type", "toolChanger"},
       {"position", "Left"},
@@ -68,7 +68,7 @@ TEST(MachineCommandProcessorTests, ToolChangerDispatchesWithTwoSecondTimeout) {
   bool dispatched = false;
   std::chrono::milliseconds seenTimeout{0};
 
-  const auto response = processor.processCommand(
+  const auto response = cmd::processCommand(
       command, [&](cmd::Command c, const std::chrono::milliseconds timeout) {
         dispatched = true;
         seenTimeout = timeout;
@@ -83,13 +83,13 @@ TEST(MachineCommandProcessorTests, ToolChangerDispatchesWithTwoSecondTimeout) {
 }
 
 TEST(MachineCommandProcessorTests, ResetDispatchErrorPropagates) {
-  MachineCommandProcessor processor;
+  
   nlohmann::json command{
       {"type", "reset"},
       {"system", "ControlPanel"},
   };
 
-  const auto response = processor.processCommand(
+  const auto response = cmd::processCommand(
       command, [](cmd::Command c, std::chrono::milliseconds) {
         EXPECT_TRUE(std::holds_alternative<cmd::ReconnectCommand>(c.payload));
         return std::string{"boom"};
@@ -100,14 +100,14 @@ TEST(MachineCommandProcessorTests, ResetDispatchErrorPropagates) {
 }
 
 TEST(MachineCommandProcessorTests, ToolChangerMissingFieldsReturnsErrorWithoutDispatch) {
-  MachineCommandProcessor processor;
+  
   nlohmann::json command{
       {"type", "toolChanger"},
       {"position", "Left"},
   };
 
   bool dispatched = false;
-  const auto response = processor.processCommand(
+  const auto response = cmd::processCommand(
       command, [&](cmd::Command, std::chrono::milliseconds) {
         dispatched = true;
         return std::string{};
@@ -121,13 +121,13 @@ TEST(MachineCommandProcessorTests, ToolChangerMissingFieldsReturnsErrorWithoutDi
 }
 
 TEST(MachineCommandProcessorTests, ResetMissingSystemReturnsErrorWithoutDispatch) {
-  MachineCommandProcessor processor;
+  
   nlohmann::json command{
       {"type", "reset"},
   };
 
   bool dispatched = false;
-  const auto response = processor.processCommand(
+  const auto response = cmd::processCommand(
       command, [&](cmd::Command, std::chrono::milliseconds) {
         dispatched = true;
         return std::string{};
@@ -140,7 +140,7 @@ TEST(MachineCommandProcessorTests, ResetMissingSystemReturnsErrorWithoutDispatch
 }
 
 TEST(MachineCommandProcessorTests, ToolChangerInvalidEnumReturnsError) {
-  MachineCommandProcessor processor;
+  
   nlohmann::json command{
       {"type", "toolChanger"},
       {"position", "invalid-arm"},
@@ -148,7 +148,7 @@ TEST(MachineCommandProcessorTests, ToolChangerInvalidEnumReturnsError) {
   };
 
   bool dispatched = false;
-  const auto response = processor.processCommand(
+  const auto response = cmd::processCommand(
       command, [&](cmd::Command, std::chrono::milliseconds) {
         dispatched = true;
         return std::string{};
@@ -162,14 +162,14 @@ TEST(MachineCommandProcessorTests, ToolChangerInvalidEnumReturnsError) {
 }
 
 TEST(MachineCommandProcessorTests, ResetInvalidEnumReturnsError) {
-  MachineCommandProcessor processor;
+  
   nlohmann::json command{
       {"type", "reset"},
       {"system", "not-a-component"},
   };
 
   bool dispatched = false;
-  const auto response = processor.processCommand(
+  const auto response = cmd::processCommand(
       command, [&](cmd::Command, std::chrono::milliseconds) {
         dispatched = true;
         return std::string{};
@@ -183,7 +183,7 @@ TEST(MachineCommandProcessorTests, ResetInvalidEnumReturnsError) {
 
 TEST(MachineCommandProcessorTests,
      ToolChangerInvalidPayloadMatrixReturnsErrorWithoutDispatch) {
-  MachineCommandProcessor processor;
+  
   std::vector<nlohmann::json> cases;
   {
     nlohmann::json n;
@@ -209,7 +209,7 @@ TEST(MachineCommandProcessorTests,
 
   for (const auto& command : cases) {
     bool dispatched = false;
-    const auto response = processor.processCommand(
+    const auto response = cmd::processCommand(
         command, [&](cmd::Command, std::chrono::milliseconds) {
           dispatched = true;
           return std::string{};
@@ -224,7 +224,7 @@ TEST(MachineCommandProcessorTests,
 
 TEST(MachineCommandProcessorTests,
      ResetInvalidPayloadMatrixReturnsErrorWithoutDispatch) {
-  MachineCommandProcessor processor;
+  
   std::vector<nlohmann::json> cases;
   {
     nlohmann::json n;
@@ -241,7 +241,7 @@ TEST(MachineCommandProcessorTests,
 
   for (const auto& command : cases) {
     bool dispatched = false;
-    const auto response = processor.processCommand(
+    const auto response = cmd::processCommand(
         command, [&](cmd::Command, std::chrono::milliseconds) {
           dispatched = true;
           return std::string{};
@@ -256,14 +256,14 @@ TEST(MachineCommandProcessorTests,
 
 TEST(MachineCommandProcessorTests,
      MotorDiagnosticsCommandParsesAndReturnsStructuredResponse) {
-  MachineCommandProcessor processor;
+  
   nlohmann::json command{
       {"type", "motorDiagnostics"},
       {"motor", "XLeft"},
   };
 
   bool dispatched = false;
-  const auto response = processor.processCommand(
+  const auto response = cmd::processCommand(
       command, [&](cmd::Command c, const std::chrono::milliseconds timeout) {
         dispatched = true;
         EXPECT_EQ(timeout, 2s);
@@ -280,13 +280,13 @@ TEST(MachineCommandProcessorTests,
 
 TEST(MachineCommandProcessorTests,
      MotorDiagnosticsMissingMotorReturnsErrorWithoutDispatch) {
-  MachineCommandProcessor processor;
+  
   nlohmann::json command{
       {"type", "motorDiagnostics"},
   };
 
   bool dispatched = false;
-  const auto response = processor.processCommand(
+  const auto response = cmd::processCommand(
       command, [&](cmd::Command, std::chrono::milliseconds) {
         dispatched = true;
         return std::string{};
@@ -300,14 +300,14 @@ TEST(MachineCommandProcessorTests,
 
 TEST(MachineCommandProcessorTests,
      ResetMotorAlarmCommandParsesAndDispatches) {
-  MachineCommandProcessor processor;
+  
   nlohmann::json command{
       {"type", "resetMotorAlarm"},
       {"motor", "YRight"},
   };
 
   bool dispatched = false;
-  const auto response = processor.processCommand(
+  const auto response = cmd::processCommand(
       command, [&](cmd::Command c, const std::chrono::milliseconds timeout) {
         dispatched = true;
         EXPECT_EQ(timeout, 2s);
@@ -321,13 +321,13 @@ TEST(MachineCommandProcessorTests,
 
 TEST(MachineCommandProcessorTests,
      ContecDiagnosticsCommandParsesAndReturnsStructuredResponse) {
-  MachineCommandProcessor processor;
+  
   nlohmann::json command{
       {"type", "contecDiagnostics"},
   };
 
   bool dispatched = false;
-  const auto response = processor.processCommand(
+  const auto response = cmd::processCommand(
       command, [&](cmd::Command c, const std::chrono::milliseconds timeout) {
         dispatched = true;
         EXPECT_EQ(timeout, 2s);
@@ -343,7 +343,7 @@ TEST(MachineCommandProcessorTests,
 }
 
 TEST(MachineCommandProcessorTests, SetMotorEnabledCommandParsesAndDispatches) {
-  MachineCommandProcessor processor;
+  
   nlohmann::json command{
       {"type", "setMotorEnabled"},
       {"motor", "ZRight"},
@@ -351,7 +351,7 @@ TEST(MachineCommandProcessorTests, SetMotorEnabledCommandParsesAndDispatches) {
   };
 
   bool dispatched = false;
-  const auto response = processor.processCommand(
+  const auto response = cmd::processCommand(
       command, [&](cmd::Command c, const std::chrono::milliseconds timeout) {
         dispatched = true;
         EXPECT_EQ(timeout, 2s);
@@ -369,14 +369,14 @@ TEST(MachineCommandProcessorTests, SetMotorEnabledCommandParsesAndDispatches) {
 }
 
 TEST(MachineCommandProcessorTests, SetAllMotorsEnabledCommandParsesAndDispatches) {
-  MachineCommandProcessor processor;
+  
   nlohmann::json command{
       {"type", "setAllMotorsEnabled"},
       {"enabled", true},
   };
 
   bool dispatched = false;
-  const auto response = processor.processCommand(
+  const auto response = cmd::processCommand(
       command, [&](cmd::Command c, const std::chrono::milliseconds timeout) {
         dispatched = true;
         EXPECT_EQ(timeout, 2s);

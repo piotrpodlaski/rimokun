@@ -6,8 +6,8 @@
 
 using namespace std::chrono_literals;
 
-nlohmann::json MachineCommandProcessor::processCommand(
-    const nlohmann::json& command, const DispatchFn& dispatch) const {
+nlohmann::json cmd::processCommand(
+    const nlohmann::json& command, const cmd::DispatchFn& dispatch) {
   nlohmann::json response{
       {"status", "OK"},
       {"message", ""},
@@ -199,9 +199,7 @@ nlohmann::json MachineCommandProcessor::processCommand(
     return response;
   }
 
-  const std::string msg = std::format("Unknown command type '{}'!", type);
   response["status"] = "Error";
-  response["message"] = msg;
-  response["response"] = "YAY!";
+  response["message"] = std::format("Unknown command type '{}'!", type);
   return response;
 }

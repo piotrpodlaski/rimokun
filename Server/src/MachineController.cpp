@@ -1,61 +1,40 @@
 #include "MachineController.hpp"
 
 #include <Logger.hpp>
+#include <ExceptionUtils.hpp>
 #include <TimingMetrics.hpp>
 #include <magic_enum/magic_enum.hpp>
 #include <stdexcept>
 
-MachineController::MachineController(ReadSignalsFn readInputs,
-                                     SetOutputsFn setOutputs,
-                                     ReadSignalsFn readOutputs,
-                                     ComponentStateFn contecState,
-                                     SetMotorModeFn setMotorMode,
-                                     SetMotorSpeedFn setMotorSpeed,
-                                     SetMotorAccelerationFn setMotorAcceleration,
-                                     SetMotorDecelerationFn setMotorDeceleration,
-                                     SetMotorPositionFn setMotorPosition,
-                                     SetMotorDirectionFn setMotorDirection,
-                                     MoveMotorFn startMotor,
-                                     MoveMotorFn stopMotor,
-                                     IsMotorConfiguredFn isMotorConfigured,
+MachineController::MachineController(IoOps io,
+                                     MotorOps motorOps,
                                      utl::RobotStatus& robotStatus,
                                      std::unique_ptr<IRobotControlPolicy> controlPolicy)
-    : _readInputs(std::move(readInputs)),
-      _setOutputs(std::move(setOutputs)),
-      _readOutputs(std::move(readOutputs)),
-      _contecState(std::move(contecState)),
-      _setMotorMode(std::move(setMotorMode)),
-      _setMotorSpeed(std::move(setMotorSpeed)),
-      _setMotorAcceleration(std::move(setMotorAcceleration)),
-      _setMotorDeceleration(std::move(setMotorDeceleration)),
-      _setMotorPosition(std::move(setMotorPosition)),
-      _setMotorDirection(std::move(setMotorDirection)),
-      _startMotor(std::move(startMotor)),
-      _stopMotor(std::move(stopMotor)),
-      _isMotorConfigured(std::move(isMotorConfigured)),
+    : _io(std::move(io)),
+      _motorOps(std::move(motorOps)),
       _robotStatus(robotStatus),
       _controlPolicy(std::move(controlPolicy)) {
   if (!_controlPolicy) {
-    throw std::runtime_error("MachineController requires a non-null control policy.");
+    utl::throwRuntimeError("MachineController requires a non-null control policy.");
   }
-  if (!_isMotorConfigured) {
-    throw std::runtime_error("MachineController requires motor availability callback.");
+  if (!_motorOps.isConfigured) {
+    utl::throwRuntimeError("MachineController requires motor availability callback.");
   }
 }
 
-void MachineController::runControlLoopTasks() const {
+void MachineController::runControlLoopTasks() {
   RIMO_TIMED_SCOPE("MachineController::runControlLoopTasks");
   const auto decision =
-      _controlPolicy->decide(_readInputs(), _readOutputs(), _contecState(),
+      _controlPolicy->decide(_io.readInputs(), _io.readOutputs(), _io.contecState(),
                              _robotStatus);
   if (decision.setToolChangerErrorBlinking) {
     return;
   }
   if (decision.outputs) {
-    _setOutputs(*decision.outputs);
+    _io.setOutputs(*decision.outputs);
   }
   for (const auto& intent : decision.motorIntents) {
-    if (!_isMotorConfigured(intent.motorId)) {
+    if (!_motorOps.isConfigured(intent.motorId)) {
       if (!_missingMotorWarned[intent.motorId]) {
         SPDLOG_WARN(
             "Control policy emitted command for motor {} which is not configured. "
@@ -66,30 +45,30 @@ void MachineController::runControlLoopTasks() const {
       continue;
     }
     _missingMotorWarned[intent.motorId] = false;
-    if (intent.mode) {
-      _setMotorMode(intent.motorId, *intent.mode);
+    if (intent.mode && _motorOps.setMode) {
+      _motorOps.setMode(intent.motorId, *intent.mode);
     }
-    if (intent.direction) {
-      _setMotorDirection(intent.motorId, *intent.direction);
+    if (intent.direction && _motorOps.setDirection) {
+      _motorOps.setDirection(intent.motorId, *intent.direction);
     }
-    if (intent.speed) {
-      _setMotorSpeed(intent.motorId, *intent.speed);
+    if (intent.speed && _motorOps.setSpeed) {
+      _motorOps.setSpeed(intent.motorId, *intent.speed);
     }
-    if (intent.acceleration) {
-      _setMotorAcceleration(intent.motorId, *intent.acceleration);
+    if (intent.acceleration && _motorOps.setAcceleration) {
+      _motorOps.setAcceleration(intent.motorId, *intent.acceleration);
     }
-    if (intent.deceleration) {
-      _setMotorDeceleration(intent.motorId, *intent.deceleration);
+    if (intent.deceleration && _motorOps.setDeceleration) {
+      _motorOps.setDeceleration(intent.motorId, *intent.deceleration);
     }
-    if (intent.position) {
-      _setMotorPosition(intent.motorId, *intent.position);
+    if (intent.position && _motorOps.setPosition) {
+      _motorOps.setPosition(intent.motorId, *intent.position);
     }
     if (intent.stopMovement) {
-      _stopMotor(intent.motorId);
+      if (_motorOps.stop) _motorOps.stop(intent.motorId);
       continue;
     }
     if (intent.startMovement) {
-      _startMotor(intent.motorId);
+      if (_motorOps.start) _motorOps.start(intent.motorId);
     }
   }
 }
@@ -100,8 +79,8 @@ void MachineController::handleToolChangerCommand(
   SPDLOG_INFO("Changing status of '{}' tool changer to '{}'",
               magic_enum::enum_name(command.arm),
               magic_enum::enum_name(command.action));
-  if (_contecState() == MachineComponent::State::Error) {
-    throw std::runtime_error(
+  if (_io.contecState() == MachineComponent::State::Error) {
+    utl::throwRuntimeError(
         "Contec is in error state. Not possible to alter tool changer state!");
   }
   signal_map_t outputSignals;
@@ -112,9 +91,9 @@ void MachineController::handleToolChangerCommand(
     outputSignals["toolChangerRight"] =
         (command.action == utl::EToolChangerAction::Open);
   }
-  _setOutputs(outputSignals);
-  if (!_readOutputs()) {
-    throw std::runtime_error(
+  _io.setOutputs(outputSignals);
+  if (!_io.readOutputs()) {
+    utl::throwRuntimeError(
         "Unable to read status of output signals, tool changer status update "
         "failed!");
   }

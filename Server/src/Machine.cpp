@@ -4,6 +4,8 @@
 #include <Machine.hpp>
 #include <TimingMetrics.hpp>
 
+#include <magic_enum/magic_enum.hpp>
+
 #include <chrono>
 #include <array>
 #include <future>
@@ -20,6 +22,23 @@ unsigned int requireMappingIndex(
         std::format("Missing required signal mapping key '{}'", key));
   }
   return it->second;
+}
+
+template <typename ESignal>
+void validateSignalMappingKeys(const std::map<std::string, unsigned int>& mapping,
+                                std::string_view mappingName) {
+  for (const auto& [key, index] : mapping) {
+    if (!magic_enum::enum_cast<ESignal>(key).has_value()) {
+      std::string known;
+      for (const auto name : magic_enum::enum_names<ESignal>()) {
+        if (!known.empty()) known += ", ";
+        known += name;
+      }
+      utl::throwRuntimeError(std::format(
+          "Unknown {} signal '{}' in config. Known values: [{}]",
+          mappingName, key, known));
+    }
+  }
 }
 
 nlohmann::json makeDefaultIoAssignmentResponse(const utl::EMotor motor) {
@@ -130,6 +149,8 @@ Machine::Machine(std::shared_ptr<IClock> clock) : _clock(std::move(clock)) {
       "Machine", "inputMapping");
   _outputMapping = cfg.getRequired<std::map<std::string, unsigned int>>(
       "Machine", "outputMapping");
+  validateSignalMappingKeys<utl::EInputSignal>(_inputMapping, "input");
+  validateSignalMappingKeys<utl::EOutputSignal>(_outputMapping, "output");
   const auto loopIntervalMS = cfg.getOptional<int>(
       "Machine", "loopIntervalMS",
       cfg.getOptional<int>("Machine", "loopSleepTimeMS", 10));
@@ -141,6 +162,9 @@ Machine::Machine(std::shared_ptr<IClock> clock) : _clock(std::move(clock)) {
 
   _loopInterval = std::chrono::milliseconds{std::max(1, loopIntervalMS)};
   _updateInterval = std::chrono::milliseconds{std::max(1, updateIntervalMS)};
+  const auto commandQueueMaxSize =
+      cfg.getOptional<std::size_t>("Machine", "commandQueueMaxSize", 16u);
+  _commandQueue.setMaxSize(commandQueueMaxSize);
 
   _components.emplace(_contec.componentType(), &_contec);
   _components.emplace(_controlPanel.componentType(), &_controlPanel);
@@ -155,7 +179,7 @@ Machine::Machine(std::shared_ptr<IClock> clock) : _clock(std::move(clock)) {
   (void)requireMappingIndex(_outputMapping, "light2");
 }
 
-std::optional<signalMap_t> Machine::readInputSignals() {
+std::optional<signal_map_t> Machine::readInputSignals() {
   if (_inputSignalsCache.valid && _inputSignalsCache.cycle == _ioCacheCycle) {
     return _inputSignalsCache.value;
   }
@@ -163,7 +187,7 @@ std::optional<signalMap_t> Machine::readInputSignals() {
     cacheInputSignals(std::nullopt);
     return std::nullopt;
   }
-  signalMap_t inputSignals;
+  signal_map_t inputSignals;
   try {
     auto inputs = _contec.readInputs();
     for (const auto& [signal, index] : _inputMapping) {
@@ -179,7 +203,7 @@ std::optional<signalMap_t> Machine::readInputSignals() {
   return inputSignals;
 }
 
-void Machine::setOutputs(const signalMap_t& signals) {
+void Machine::setOutputs(const signal_map_t& signals) {
   if (_contec.state() == MachineComponent::State::Error) {
     return;
   }
@@ -196,7 +220,7 @@ void Machine::setOutputs(const signalMap_t& signals) {
     }
     _contec.setOutputs(outputs);
 
-    signalMap_t outputSignals;
+    signal_map_t outputSignals;
     for (const auto& [signal, index] : _outputMapping) {
       validateMappedIndex(signal, index, outputs.size(), "output");
       outputSignals[signal] = outputs[index];
@@ -208,7 +232,7 @@ void Machine::setOutputs(const signalMap_t& signals) {
   }
 }
 
-std::optional<signalMap_t> Machine::readOutputSignals() {
+std::optional<signal_map_t> Machine::readOutputSignals() {
   if (_outputSignalsCache.valid && _outputSignalsCache.cycle == _ioCacheCycle) {
     return _outputSignalsCache.value;
   }
@@ -218,7 +242,7 @@ std::optional<signalMap_t> Machine::readOutputSignals() {
   }
   try {
     auto output = _contec.readOutputs();
-    signalMap_t outputSignals;
+    signal_map_t outputSignals;
     for (auto& [signal, index] : _outputMapping) {
       validateMappedIndex(signal, index, output.size(), "output");
       outputSignals[signal] = output[index];
@@ -244,24 +268,17 @@ void Machine::validateMappedIndex(const std::string_view signal,
 }
 void Machine::processThread() {
   SPDLOG_INFO("Processing thread started");
-  auto loopState = makeInitialLoopState();
+  ControlLoopRunner::State loopState;
   while (_isRunning.load(std::memory_order_acquire)) {
     runOneCycle(loopState);
   }
   SPDLOG_INFO("Processing thread finished!");
 }
 
-Machine::LoopState Machine::makeInitialLoopState() const {
-  if (!_loopRunner) {
-    utl::throwRuntimeError("Machine is not wired. Call MachineRuntime::wireMachine first.");
-  }
-  return _loopRunner->makeInitialState();
-}
-
 void Machine::runOneCycle(LoopState& state) {
   RIMO_TIMED_SCOPE("Machine::runOneCycle");
   if (!_loopRunner) {
-    utl::throwRuntimeError("Machine is not wired. Call MachineRuntime::wireMachine first.");
+    utl::throwRuntimeError("Machine is not wired. Call wire() first.");
   }
   try {
     ++_ioCacheCycle;
@@ -346,13 +363,13 @@ void Machine::runOneCycle(LoopState& state) {
   }
 }
 
-void Machine::cacheInputSignals(std::optional<signalMap_t> value) {
+void Machine::cacheInputSignals(std::optional<signal_map_t> value) {
   _inputSignalsCache.cycle = _ioCacheCycle;
   _inputSignalsCache.valid = true;
   _inputSignalsCache.value = std::move(value);
 }
 
-void Machine::cacheOutputSignals(std::optional<signalMap_t> value) {
+void Machine::cacheOutputSignals(std::optional<signal_map_t> value) {
   _outputSignalsCache.cycle = _ioCacheCycle;
   _outputSignalsCache.valid = true;
   _outputSignalsCache.value = std::move(value);
@@ -366,6 +383,10 @@ std::string Machine::dispatchCommandAndWait(cmd::Command command,
                                             const std::chrono::milliseconds timeout) {
   auto future = command.reply.get_future();
   if (!submitCommand(std::move(command))) {
+    if (_isRunning.load(std::memory_order_acquire)) {
+      SPDLOG_WARN("Command queue is full. Command rejected.");
+      return "Command queue is full";
+    }
     return "Machine is shutting down";
   }
   if (future.wait_for(timeout) != std::future_status::ready) {
@@ -398,13 +419,45 @@ void Machine::controlLoopTasks() {
   }
 }
 
+void Machine::wire() {
+  if (!_loopRunner) {
+    _loopRunner = std::make_unique<ControlLoopRunner>(
+        *_clock, _loopInterval, _updateInterval);
+  }
+  if (!_controller) {
+    _controller = std::make_unique<MachineController>(
+        MachineController::IoOps{
+            .readInputs = [this]() { return readInputSignals(); },
+            .setOutputs = [this](const signal_map_t& outputs) { setOutputs(outputs); },
+            .readOutputs = [this]() { return readOutputSignals(); },
+            .contecState = [this]() { return _contec.state(); },
+        },
+        MachineController::MotorOps{
+            .setMode = [this](utl::EMotor id, MotorControlMode m) { _motorControl.setMode(id, m); },
+            .setSpeed = [this](utl::EMotor id, std::int32_t v) { _motorControl.setSpeed(id, v); },
+            .setAcceleration = [this](utl::EMotor id, std::int32_t v) { _motorControl.setAcceleration(id, v); },
+            .setDeceleration = [this](utl::EMotor id, std::int32_t v) { _motorControl.setDeceleration(id, v); },
+            .setPosition = [this](utl::EMotor id, std::int32_t v) { _motorControl.setPosition(id, v); },
+            .setDirection = [this](utl::EMotor id, MotorControlDirection d) { _motorControl.setDirection(id, d); },
+            .start = [this](utl::EMotor id) { _motorControl.startMovement(id); },
+            .stop = [this](utl::EMotor id) { _motorControl.stopMovement(id); },
+            .isConfigured = [this](utl::EMotor id) { return _motorControl.motors().contains(id); },
+        },
+        _robotStatus, std::make_unique<RimoKunControlPolicy>());
+  }
+  if (!_statusBuilder) {
+    _statusBuilder = std::make_unique<MachineStatusBuilder>();
+  }
+  if (!_commandServer) {
+    _commandServer = std::make_unique<MachineCommandServer>(_robotServer);
+  }
+}
+
 void Machine::initialize() {
   std::lock_guard<std::mutex> lock(_lifecycleMutex);
-  if (!_loopRunner || !_controller || !_componentService || !_statusBuilder ||
-      !_commandProcessor || !_commandServer) {
+  if (!_loopRunner || !_controller || !_statusBuilder || !_commandServer) {
     utl::throwRuntimeError(
-        "Machine collaborators are not wired. Use MachineRuntime::wireMachine "
-        "before initialize().");
+        "Machine collaborators are not wired. Call wire() before initialize().");
   }
   bool expected = false;
   if (!_isRunning.compare_exchange_strong(expected, true,
@@ -412,7 +465,7 @@ void Machine::initialize() {
     utl::throwRuntimeError("Machine is already running.");
   }
   makeDummyStatus();
-  _componentService->initializeAll();
+  initializeComponents();
   try {
     _commandServerThread = std::thread(&Machine::commandServerThread, this);
     _processThread = std::thread(&Machine::processThread, this);
@@ -432,11 +485,47 @@ void Machine::handleToolChangerCommand(const cmd::ToolChangerCommand& c) {
   _controller->handleToolChangerCommand(c);
 }
 void Machine::handleReconnectCommand(const cmd::ReconnectCommand& c) {
-  const auto result = _componentService->reconnect(c.robotComponent);
+  const auto result = reconnectComponent(c.robotComponent);
   if (!result.empty()) {
     utl::throwRuntimeError(result);
   }
   makeDummyStatus();
+}
+
+void Machine::initializeComponents() {
+  for (const auto& [componentType, component] : _components) {
+    if (!component) {
+      continue;
+    }
+    try {
+      component->initialize();
+    } catch (const std::exception& e) {
+      SPDLOG_ERROR("{} initialization failed: {}",
+                   magic_enum::enum_name(componentType), e.what());
+    }
+  }
+}
+
+std::string Machine::reconnectComponent(const utl::ERobotComponent component) {
+  const auto it = _components.find(component);
+  if (it == _components.end() || !it->second) {
+    return std::format("Resetting of '{}' is not implemented!",
+                       magic_enum::enum_name(component));
+  }
+  auto* comp = it->second;
+  SPDLOG_INFO("Reconnecting {}...", magic_enum::enum_name(component));
+  comp->reset();
+  try {
+    comp->initialize();
+  } catch (const std::exception& e) {
+    return std::format("Resetting '{}' failed: {}",
+                       magic_enum::enum_name(component), e.what());
+  }
+  if (comp->state() == MachineComponent::State::Error) {
+    return std::format("Resetting '{}' was unsuccessful!",
+                       magic_enum::enum_name(component));
+  }
+  return "";
 }
 
 nlohmann::json Machine::handleMotorDiagnosticsCommand(

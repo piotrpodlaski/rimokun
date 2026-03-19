@@ -12,16 +12,16 @@ class FakeControlPolicy final : public IRobotControlPolicy {
   ControlDecision decide(const std::optional<SignalMap>& inputs,
                          const std::optional<SignalMap>&,
                          const MachineComponent::State contecState,
-                         const utl::RobotStatus&) const override {
+                         const utl::RobotStatus&) override {
     ++decideCalls;
     seenInputs = inputs;
     seenState = contecState;
     return decisionToReturn;
   }
 
-  mutable int decideCalls{0};
-  mutable std::optional<SignalMap> seenInputs;
-  mutable MachineComponent::State seenState{MachineComponent::State::Error};
+  int decideCalls{0};
+  std::optional<SignalMap> seenInputs;
+  MachineComponent::State seenState{MachineComponent::State::Error};
   ControlDecision decisionToReturn;
 };
 }  // namespace
@@ -38,19 +38,13 @@ TEST(MachineControllerTests, ErrorDecisionDoesNotMutateToolChangerStatusInContro
 
   bool outputsCalled = false;
   MachineController controller(
-      []() -> std::optional<signal_map_t> { return signal_map_t{{"button1", true}}; },
-      [&](const signal_map_t&) { outputsCalled = true; },
-      []() -> std::optional<signal_map_t> { return std::nullopt; },
-      []() { return MachineComponent::State::Error; },
-      [](utl::EMotor, MotorControlMode) {},
-      [](utl::EMotor, std::int32_t) {},
-      [](utl::EMotor, std::int32_t) {},
-      [](utl::EMotor, std::int32_t) {},
-      [](utl::EMotor, std::int32_t) {},
-      [](utl::EMotor, MotorControlDirection) {},
-      [](utl::EMotor) {},
-      [](utl::EMotor) {},
-      [](utl::EMotor) { return true; },
+      MachineController::IoOps{
+          .readInputs = []() -> std::optional<signal_map_t> { return signal_map_t{{"button1", true}}; },
+          .setOutputs = [&](const signal_map_t&) { outputsCalled = true; },
+          .readOutputs = []() -> std::optional<signal_map_t> { return std::nullopt; },
+          .contecState = []() { return MachineComponent::State::Error; },
+      },
+      MachineController::MotorOps{.isConfigured = [](utl::EMotor) { return true; }},
       status, std::move(policy));
 
   controller.runControlLoopTasks();
@@ -71,21 +65,15 @@ TEST(MachineControllerTests, ToolChangerCommandSetsExpectedOutputSignal) {
   auto policy = std::make_unique<FakeControlPolicy>();
 
   MachineController controller(
-      []() -> std::optional<signal_map_t> { return signal_map_t{}; },
-      [&](const signal_map_t& outputs) { seenOutputs = outputs; },
-      []() -> std::optional<signal_map_t> {
-        return signal_map_t{{"toolChangerLeft", true}};
+      MachineController::IoOps{
+          .readInputs = []() -> std::optional<signal_map_t> { return signal_map_t{}; },
+          .setOutputs = [&](const signal_map_t& outputs) { seenOutputs = outputs; },
+          .readOutputs = []() -> std::optional<signal_map_t> {
+              return signal_map_t{{"toolChangerLeft", true}};
+          },
+          .contecState = []() { return MachineComponent::State::Normal; },
       },
-      []() { return MachineComponent::State::Normal; },
-      [](utl::EMotor, MotorControlMode) {},
-      [](utl::EMotor, std::int32_t) {},
-      [](utl::EMotor, std::int32_t) {},
-      [](utl::EMotor, std::int32_t) {},
-      [](utl::EMotor, std::int32_t) {},
-      [](utl::EMotor, MotorControlDirection) {},
-      [](utl::EMotor) {},
-      [](utl::EMotor) {},
-      [](utl::EMotor) { return true; },
+      MachineController::MotorOps{.isConfigured = [](utl::EMotor) { return true; }},
       status, std::move(policy));
 
   controller.handleToolChangerCommand(
@@ -102,19 +90,13 @@ TEST(MachineControllerTests, PolicyOutputsAreForwardedToOutputsWriter) {
   policy->decisionToReturn.outputs = signal_map_t{{"light1", true}, {"light2", false}};
 
   MachineController controller(
-      []() -> std::optional<signal_map_t> { return signal_map_t{{"button1", true}}; },
-      [&](const signal_map_t& outputs) { seenOutputs = outputs; },
-      []() -> std::optional<signal_map_t> { return std::nullopt; },
-      []() { return MachineComponent::State::Normal; },
-      [](utl::EMotor, MotorControlMode) {},
-      [](utl::EMotor, std::int32_t) {},
-      [](utl::EMotor, std::int32_t) {},
-      [](utl::EMotor, std::int32_t) {},
-      [](utl::EMotor, std::int32_t) {},
-      [](utl::EMotor, MotorControlDirection) {},
-      [](utl::EMotor) {},
-      [](utl::EMotor) {},
-      [](utl::EMotor) { return true; },
+      MachineController::IoOps{
+          .readInputs = []() -> std::optional<signal_map_t> { return signal_map_t{{"button1", true}}; },
+          .setOutputs = [&](const signal_map_t& outputs) { seenOutputs = outputs; },
+          .readOutputs = []() -> std::optional<signal_map_t> { return std::nullopt; },
+          .contecState = []() { return MachineComponent::State::Normal; },
+      },
+      MachineController::MotorOps{.isConfigured = [](utl::EMotor) { return true; }},
       status, std::move(policy));
 
   controller.runControlLoopTasks();
@@ -131,19 +113,13 @@ TEST(MachineControllerTests, ToolChangerCommandThrowsWhenContecIsInErrorState) {
   auto policy = std::make_unique<FakeControlPolicy>();
 
   MachineController controller(
-      []() -> std::optional<signal_map_t> { return signal_map_t{}; },
-      [&](const signal_map_t&) { outputsCalled = true; },
-      []() -> std::optional<signal_map_t> { return signal_map_t{}; },
-      []() { return MachineComponent::State::Error; },
-      [](utl::EMotor, MotorControlMode) {},
-      [](utl::EMotor, std::int32_t) {},
-      [](utl::EMotor, std::int32_t) {},
-      [](utl::EMotor, std::int32_t) {},
-      [](utl::EMotor, std::int32_t) {},
-      [](utl::EMotor, MotorControlDirection) {},
-      [](utl::EMotor) {},
-      [](utl::EMotor) {},
-      [](utl::EMotor) { return true; },
+      MachineController::IoOps{
+          .readInputs = []() -> std::optional<signal_map_t> { return signal_map_t{}; },
+          .setOutputs = [&](const signal_map_t&) { outputsCalled = true; },
+          .readOutputs = []() -> std::optional<signal_map_t> { return signal_map_t{}; },
+          .contecState = []() { return MachineComponent::State::Error; },
+      },
+      MachineController::MotorOps{.isConfigured = [](utl::EMotor) { return true; }},
       status, std::move(policy));
 
   EXPECT_THROW((void)controller.handleToolChangerCommand(
@@ -159,19 +135,13 @@ TEST(MachineControllerTests, ToolChangerCommandThrowsWhenOutputReadbackFails) {
   auto policy = std::make_unique<FakeControlPolicy>();
 
   MachineController controller(
-      []() -> std::optional<signal_map_t> { return signal_map_t{}; },
-      [&](const signal_map_t&) { outputsCalled = true; },
-      []() -> std::optional<signal_map_t> { return std::nullopt; },
-      []() { return MachineComponent::State::Normal; },
-      [](utl::EMotor, MotorControlMode) {},
-      [](utl::EMotor, std::int32_t) {},
-      [](utl::EMotor, std::int32_t) {},
-      [](utl::EMotor, std::int32_t) {},
-      [](utl::EMotor, std::int32_t) {},
-      [](utl::EMotor, MotorControlDirection) {},
-      [](utl::EMotor) {},
-      [](utl::EMotor) {},
-      [](utl::EMotor) { return true; },
+      MachineController::IoOps{
+          .readInputs = []() -> std::optional<signal_map_t> { return signal_map_t{}; },
+          .setOutputs = [&](const signal_map_t&) { outputsCalled = true; },
+          .readOutputs = []() -> std::optional<signal_map_t> { return std::nullopt; },
+          .contecState = []() { return MachineComponent::State::Normal; },
+      },
+      MachineController::MotorOps{.isConfigured = [](utl::EMotor) { return true; }},
       status, std::move(policy));
 
   EXPECT_THROW((void)controller.handleToolChangerCommand(
@@ -193,19 +163,23 @@ TEST(MachineControllerTests, PolicyMotorIntentsAreAppliedInExpectedOrder) {
 
   std::vector<std::string> applied;
   MachineController controller(
-      []() -> std::optional<signal_map_t> { return signal_map_t{{"button1", true}}; },
-      [](const signal_map_t&) {},
-      []() -> std::optional<signal_map_t> { return signal_map_t{}; },
-      []() { return MachineComponent::State::Normal; },
-      [&](utl::EMotor, MotorControlMode) { applied.emplace_back("mode"); },
-      [&](utl::EMotor, std::int32_t) { applied.emplace_back("speed"); },
-      [&](utl::EMotor, std::int32_t) { applied.emplace_back("acceleration"); },
-      [&](utl::EMotor, std::int32_t) { applied.emplace_back("deceleration"); },
-      [&](utl::EMotor, std::int32_t) { applied.emplace_back("position"); },
-      [&](utl::EMotor, MotorControlDirection) { applied.emplace_back("direction"); },
-      [&](utl::EMotor) { applied.emplace_back("start"); },
-      [&](utl::EMotor) { applied.emplace_back("stop"); },
-      [](utl::EMotor) { return true; },
+      MachineController::IoOps{
+          .readInputs = []() -> std::optional<signal_map_t> { return signal_map_t{{"button1", true}}; },
+          .setOutputs = [](const signal_map_t&) {},
+          .readOutputs = []() -> std::optional<signal_map_t> { return signal_map_t{}; },
+          .contecState = []() { return MachineComponent::State::Normal; },
+      },
+      MachineController::MotorOps{
+          .setMode = [&](utl::EMotor, MotorControlMode) { applied.emplace_back("mode"); },
+          .setSpeed = [&](utl::EMotor, std::int32_t) { applied.emplace_back("speed"); },
+          .setAcceleration = [&](utl::EMotor, std::int32_t) { applied.emplace_back("acceleration"); },
+          .setDeceleration = [&](utl::EMotor, std::int32_t) { applied.emplace_back("deceleration"); },
+          .setPosition = [&](utl::EMotor, std::int32_t) { applied.emplace_back("position"); },
+          .setDirection = [&](utl::EMotor, MotorControlDirection) { applied.emplace_back("direction"); },
+          .start = [&](utl::EMotor) { applied.emplace_back("start"); },
+          .stop = [&](utl::EMotor) { applied.emplace_back("stop"); },
+          .isConfigured = [](utl::EMotor) { return true; },
+      },
       status, std::move(policy));
 
   controller.runControlLoopTasks();
@@ -229,19 +203,23 @@ TEST(MachineControllerTests, UnconfiguredMotorIntentsAreIgnored) {
 
   std::vector<std::string> applied;
   MachineController controller(
-      []() -> std::optional<signal_map_t> { return signal_map_t{{"button1", true}}; },
-      [](const signal_map_t&) {},
-      []() -> std::optional<signal_map_t> { return signal_map_t{}; },
-      []() { return MachineComponent::State::Normal; },
-      [&](utl::EMotor, MotorControlMode) { applied.emplace_back("mode"); },
-      [&](utl::EMotor, std::int32_t) { applied.emplace_back("speed"); },
-      [&](utl::EMotor, std::int32_t) { applied.emplace_back("acceleration"); },
-      [&](utl::EMotor, std::int32_t) { applied.emplace_back("deceleration"); },
-      [&](utl::EMotor, std::int32_t) { applied.emplace_back("position"); },
-      [&](utl::EMotor, MotorControlDirection) { applied.emplace_back("direction"); },
-      [&](utl::EMotor) { applied.emplace_back("start"); },
-      [&](utl::EMotor) { applied.emplace_back("stop"); },
-      [](const utl::EMotor motorId) { return motorId == utl::EMotor::XLeft; },
+      MachineController::IoOps{
+          .readInputs = []() -> std::optional<signal_map_t> { return signal_map_t{{"button1", true}}; },
+          .setOutputs = [](const signal_map_t&) {},
+          .readOutputs = []() -> std::optional<signal_map_t> { return signal_map_t{}; },
+          .contecState = []() { return MachineComponent::State::Normal; },
+      },
+      MachineController::MotorOps{
+          .setMode = [&](utl::EMotor, MotorControlMode) { applied.emplace_back("mode"); },
+          .setSpeed = [&](utl::EMotor, std::int32_t) { applied.emplace_back("speed"); },
+          .setAcceleration = [&](utl::EMotor, std::int32_t) { applied.emplace_back("acceleration"); },
+          .setDeceleration = [&](utl::EMotor, std::int32_t) { applied.emplace_back("deceleration"); },
+          .setPosition = [&](utl::EMotor, std::int32_t) { applied.emplace_back("position"); },
+          .setDirection = [&](utl::EMotor, MotorControlDirection) { applied.emplace_back("direction"); },
+          .start = [&](utl::EMotor) { applied.emplace_back("start"); },
+          .stop = [&](utl::EMotor) { applied.emplace_back("stop"); },
+          .isConfigured = [](const utl::EMotor motorId) { return motorId == utl::EMotor::XLeft; },
+      },
       status, std::move(policy));
 
   controller.runControlLoopTasks();
@@ -262,19 +240,23 @@ TEST(MachineControllerTests, AccelerationAndDecelerationIntentsAreApplied) {
 
   std::vector<std::string> applied;
   MachineController controller(
-      []() -> std::optional<signal_map_t> { return signal_map_t{{"button1", true}}; },
-      [](const signal_map_t&) {},
-      []() -> std::optional<signal_map_t> { return signal_map_t{}; },
-      []() { return MachineComponent::State::Normal; },
-      [&](utl::EMotor, MotorControlMode) { applied.emplace_back("mode"); },
-      [&](utl::EMotor, std::int32_t) { applied.emplace_back("speed"); },
-      [&](utl::EMotor, std::int32_t) { applied.emplace_back("acceleration"); },
-      [&](utl::EMotor, std::int32_t) { applied.emplace_back("deceleration"); },
-      [&](utl::EMotor, std::int32_t) { applied.emplace_back("position"); },
-      [&](utl::EMotor, MotorControlDirection) { applied.emplace_back("direction"); },
-      [&](utl::EMotor) { applied.emplace_back("start"); },
-      [&](utl::EMotor) { applied.emplace_back("stop"); },
-      [](utl::EMotor) { return true; },
+      MachineController::IoOps{
+          .readInputs = []() -> std::optional<signal_map_t> { return signal_map_t{{"button1", true}}; },
+          .setOutputs = [](const signal_map_t&) {},
+          .readOutputs = []() -> std::optional<signal_map_t> { return signal_map_t{}; },
+          .contecState = []() { return MachineComponent::State::Normal; },
+      },
+      MachineController::MotorOps{
+          .setMode = [&](utl::EMotor, MotorControlMode) { applied.emplace_back("mode"); },
+          .setSpeed = [&](utl::EMotor, std::int32_t) { applied.emplace_back("speed"); },
+          .setAcceleration = [&](utl::EMotor, std::int32_t) { applied.emplace_back("acceleration"); },
+          .setDeceleration = [&](utl::EMotor, std::int32_t) { applied.emplace_back("deceleration"); },
+          .setPosition = [&](utl::EMotor, std::int32_t) { applied.emplace_back("position"); },
+          .setDirection = [&](utl::EMotor, MotorControlDirection) { applied.emplace_back("direction"); },
+          .start = [&](utl::EMotor) { applied.emplace_back("start"); },
+          .stop = [&](utl::EMotor) { applied.emplace_back("stop"); },
+          .isConfigured = [](utl::EMotor) { return true; },
+      },
       status, std::move(policy));
 
   controller.runControlLoopTasks();

@@ -1,7 +1,7 @@
 
 #include "Config.hpp"
 #include "Logger.hpp"
-#include "MachineRuntime.hpp"
+#include "Machine.hpp"
 #include "argparse/argparse.hpp"
 #include <atomic>
 #include <csignal>
@@ -51,14 +51,15 @@ int main(int argc, char** argv) {
 
   Config::instance().setConfigPath(configPath);
 
-  MachineRuntime runtime;
-  runtime.initialize();
+  Machine machine;
+  machine.wire();
+  machine.initialize();
 
   while (running) {
     std::this_thread::sleep_for(100ms);
   }
 
-  runtime.shutdown();
+  machine.shutdown();
 
 
 }

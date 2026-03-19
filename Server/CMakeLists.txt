@@ -13,4 +13,17 @@ target_include_directories(rimoSrvlib
 
 target_link_libraries(rimoSrvlib PUBLIC utilities ${LIBMODBUS_LIBRARIES} ${SERIAL_LDFLAGS})
 
+target_precompile_headers(rimoSrvlib PRIVATE
+    <nlohmann/json.hpp>
+    <spdlog/spdlog.h>
+    <YamlExtensions.hpp>
+    <magic_enum/magic_enum.hpp>
+    <string>
+    <vector>
+    <map>
+    <optional>
+    <format>
+    <memory>
+)
+
 add_subdirectory(apps)

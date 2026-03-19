@@ -1,12 +1,12 @@
 #pragma once
 
+#include <JoystickAxisProcessor.hpp>
 #include <MachineComponent.hpp>
 #include <IControlPanelComm.hpp>
 
 #include <array>
 #include <atomic>
 #include <cstdint>
-#include <deque>
 #include <memory>
 #include <string>
 #include <thread>
@@ -37,7 +37,6 @@ class ControlPanel final : public MachineComponent {
   void readerLoop();
   void processLine(const std::string& line);
   void resetSignalProcessingState();
-  static double clipToUnitRange(double value);
 
   std::unique_ptr<IControlPanelComm> _comm;
   std::size_t _movingAverageDepth;
@@ -48,17 +47,6 @@ class ControlPanel final : public MachineComponent {
   std::array<std::atomic<double>, 3> _x{};
   std::array<std::atomic<double>, 3> _y{};
   std::array<std::atomic<bool>, 3> _b{};
-  std::array<std::deque<double>, 3> _xWindow;
-  std::array<std::deque<double>, 3> _yWindow;
-  std::array<double, 3> _xWindowSum{};
-  std::array<double, 3> _yWindowSum{};
-  std::array<double, 3> _baselineX{};
-  std::array<double, 3> _baselineY{};
-  std::array<double, 3> _baselineXAcc{};
-  std::array<double, 3> _baselineYAcc{};
-  std::array<bool, 3> _bStable{};
-  std::array<bool, 3> _bPending{};
-  std::array<std::size_t, 3> _bPendingCount{};
-  std::size_t _baselineCount{0};
-  bool _baselineReady{false};
+  // One processor per physical joystick; lazily constructed in resetSignalProcessingState().
+  std::array<JoystickAxisProcessor, 3> _processors;
 };

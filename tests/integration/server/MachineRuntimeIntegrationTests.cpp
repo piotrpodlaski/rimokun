@@ -2,7 +2,6 @@
 
 #include <Config.hpp>
 #include <Machine.hpp>
-#include <MachineRuntime.hpp>
 #include <JsonExtensions.hpp>
 
 #include <chrono>
@@ -207,7 +206,7 @@ TEST(MachineRuntimeIntegrationTests,
     utl::Config::instance().setConfigPath(scoped.path.string());
 
     Machine machine;
-    MachineRuntime::wireMachine(machine);
+    machine.wire();
     machine.initialize();
     std::this_thread::sleep_for(50ms);
 
@@ -239,7 +238,7 @@ TEST(MachineRuntimeIntegrationTests,
     utl::Config::instance().setConfigPath(scoped.path.string());
 
     Machine machine;
-    MachineRuntime::wireMachine(machine);
+    machine.wire();
     machine.initialize();
     std::this_thread::sleep_for(50ms);
 
@@ -262,7 +261,7 @@ TEST(MachineRuntimeIntegrationTests,
     utl::Config::instance().setConfigPath(scoped.path.string());
 
     Machine machine;
-    MachineRuntime::wireMachine(machine);
+    machine.wire();
 
     for (int i = 0; i < 3; ++i) {
       machine.initialize();
@@ -292,7 +291,7 @@ TEST(MachineRuntimeIntegrationTests,
     utl::Config::instance().setConfigPath(scoped.path.string());
 
     Machine machine;
-    MachineRuntime::wireMachine(machine);
+    machine.wire();
     machine.initialize();
     std::this_thread::sleep_for(50ms);
 
@@ -329,7 +328,7 @@ TEST(MachineRuntimeIntegrationTests,
     utl::Config::instance().setConfigPath(scoped.path.string());
 
     Machine machine;
-    MachineRuntime::wireMachine(machine);
+    machine.wire();
     StatusSubscriber subscriber(scoped.endpoints.statusAddress);
     machine.initialize();
 
@@ -376,7 +375,7 @@ TEST(MachineRuntimeIntegrationTests,
     utl::Config::instance().setConfigPath(scoped.path.string());
 
     Machine machine;
-    MachineRuntime::wireMachine(machine);
+    machine.wire();
     StatusSubscriber subscriber(scoped.endpoints.statusAddress);
     machine.initialize();
 
@@ -473,7 +472,7 @@ TEST(MachineRuntimeIntegrationTests,
     utl::Config::instance().setConfigPath(scoped.path.string());
 
     Machine machine;
-    MachineRuntime::wireMachine(machine);
+    machine.wire();
     machine.initialize();
     std::this_thread::sleep_for(40ms);
 

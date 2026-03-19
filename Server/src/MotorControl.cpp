@@ -132,6 +132,12 @@ MotorControl::MotorControl() {
     validateCurrentRange(runCurrent, "runCurrent", magic_enum::enum_name(motorId));
     validateCurrentRange(stopCurrent, "stopCurrent",
                          magic_enum::enum_name(motorId));
+    if (stopCurrent > runCurrent) {
+      SPDLOG_WARN(
+          "MotorControl.motors.{}: stopCurrent ({}) > runCurrent ({}). "
+          "Verify this is intentional.",
+          magic_enum::enum_name(motorId), stopCurrent, runCurrent);
+    }
     std::optional<std::int32_t> groupId;
     if (groupIdNode) {
       groupId = groupIdNode.as<std::int32_t>();
@@ -141,22 +147,61 @@ MotorControl::MotorControl() {
     std::optional<std::int32_t> overloadAlarm;
     std::optional<std::int32_t> excessivePositionDeviationWarning;
     std::optional<std::int32_t> excessivePositionDeviationAlarm;
+    const auto motorName = magic_enum::enum_name(motorId);
     if (startingSpeedNode) {
       startingSpeed = startingSpeedNode.as<std::int32_t>();
+      if (*startingSpeed < 0) {
+        utl::throwRuntimeError(std::format(
+            "MotorControl.motors.{}.startingSpeed must be >= 0 (got {})",
+            motorName, *startingSpeed));
+      }
     }
     if (overloadWarningNode) {
       overloadWarning = overloadWarningNode.as<std::int32_t>();
+      if (*overloadWarning < 0) {
+        utl::throwRuntimeError(std::format(
+            "MotorControl.motors.{}.overloadWarning must be >= 0 (got {})",
+            motorName, *overloadWarning));
+      }
     }
     if (overloadAlarmNode) {
       overloadAlarm = overloadAlarmNode.as<std::int32_t>();
+      if (*overloadAlarm < 0) {
+        utl::throwRuntimeError(std::format(
+            "MotorControl.motors.{}.overloadAlarm must be >= 0 (got {})",
+            motorName, *overloadAlarm));
+      }
+    }
+    if (overloadWarning && overloadAlarm && *overloadAlarm < *overloadWarning) {
+      utl::throwRuntimeError(std::format(
+          "MotorControl.motors.{}: overloadAlarm ({}) must be >= overloadWarning ({})",
+          motorName, *overloadAlarm, *overloadWarning));
     }
     if (excessivePositionDeviationWarningNode) {
       excessivePositionDeviationWarning =
           excessivePositionDeviationWarningNode.as<std::int32_t>();
+      if (*excessivePositionDeviationWarning < 0) {
+        utl::throwRuntimeError(std::format(
+            "MotorControl.motors.{}.excessivePositionDeviationWarning must be >= 0 (got {})",
+            motorName, *excessivePositionDeviationWarning));
+      }
     }
     if (excessivePositionDeviationAlarmNode) {
       excessivePositionDeviationAlarm =
           excessivePositionDeviationAlarmNode.as<std::int32_t>();
+      if (*excessivePositionDeviationAlarm < 0) {
+        utl::throwRuntimeError(std::format(
+            "MotorControl.motors.{}.excessivePositionDeviationAlarm must be >= 0 (got {})",
+            motorName, *excessivePositionDeviationAlarm));
+      }
+    }
+    if (excessivePositionDeviationWarning && excessivePositionDeviationAlarm &&
+        *excessivePositionDeviationAlarm < *excessivePositionDeviationWarning) {
+      utl::throwRuntimeError(std::format(
+          "MotorControl.motors.{}: excessivePositionDeviationAlarm ({}) must be >= "
+          "excessivePositionDeviationWarning ({})",
+          motorName, *excessivePositionDeviationAlarm,
+          *excessivePositionDeviationWarning));
     }
     _motorConfigs[motorId] = MotorConfig{
         .address = address,

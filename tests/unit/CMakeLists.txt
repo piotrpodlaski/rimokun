@@ -19,7 +19,6 @@ add_executable(server_unit_tests
         server/RobotControlPolicyTests.cpp
         server/MachineCommandProcessorTests.cpp
         server/MachineCommandServerTests.cpp
-        server/MachineComponentServiceTests.cpp
         server/MachineStatusBuilderTests.cpp
         server/CommandQueueTests.cpp
         server/MachineLoopTests.cpp
@@ -48,6 +47,8 @@ target_link_libraries(server_unit_tests
         GTest::gtest_main
 )
 
+target_precompile_headers(server_unit_tests REUSE_FROM rimoSrvlib)
+
 gtest_discover_tests(server_unit_tests PROPERTIES LABELS "unit")
 
 add_executable(motor_unit_tests
@@ -70,6 +71,8 @@ target_link_libraries(motor_unit_tests
         rimoSrvlib
         GTest::gtest_main
 )
+
+target_precompile_headers(motor_unit_tests REUSE_FROM rimoSrvlib)
 
 gtest_discover_tests(motor_unit_tests PROPERTIES LABELS "unit")
 

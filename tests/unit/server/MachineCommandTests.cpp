@@ -139,7 +139,7 @@ TEST(MachineCommandTests, ValidCommandReturnsOkResponse) {
   auto fakeClock = std::make_shared<FakeClock>();
   CommandTestMachine machine(fakeClock);
   machine.wire();
-  auto state = machine.makeInitialLoopState();
+  Machine::LoopState state{};
 
   cmd::Command command;
   command.payload = cmd::ReconnectCommand{utl::ERobotComponent::ControlPanel};
@@ -178,7 +178,7 @@ TEST(MachineCommandTests, CommandFailureIsReturnedAndSubsequentCommandSucceeds) 
   auto fakeClock = std::make_shared<FakeClock>();
   FlakyCommandTestMachine machine(fakeClock);
   machine.wire();
-  auto state = machine.makeInitialLoopState();
+  Machine::LoopState state{};
 
   cmd::Command failingCommand;
   failingCommand.payload =
@@ -261,7 +261,7 @@ TEST(MachineCommandTests, CommandsAreProcessedInFifoOrderOnePerCycle) {
   auto fakeClock = std::make_shared<FakeClock>();
   OrderedCommandTestMachine machine(fakeClock);
   machine.wire();
-  auto state = machine.makeInitialLoopState();
+  Machine::LoopState state{};
 
   std::vector<std::future<std::string>> futures;
   for (const auto component : {utl::ERobotComponent::ControlPanel,
@@ -298,7 +298,7 @@ TEST(MachineCommandTests,
   auto fakeClock = std::make_shared<FakeClock>();
   CommandTestMachine machine(fakeClock);
   machine.wire();
-  auto state = machine.makeInitialLoopState();
+  Machine::LoopState state{};
 
   cmd::Command timedOutCommand;
   timedOutCommand.payload =

@@ -3,17 +3,23 @@
 
 #include <Logger.hpp>
 
-RimoServerCommandChannel::RimoServerCommandChannel(
-    utl::RimoServer<utl::RobotStatus>& server)
-    : _server(server) {}
+namespace {
+class RimoServerCommandChannel final : public ICommandChannel {
+ public:
+  explicit RimoServerCommandChannel(utl::RimoServer<utl::RobotStatus>& server)
+      : _server(server) {}
 
-std::optional<nlohmann::json> RimoServerCommandChannel::receiveCommand() {
-  return _server.receiveCommand();
-}
+  std::optional<nlohmann::json> receiveCommand() override {
+    return _server.receiveCommand();
+  }
+  void sendResponse(const nlohmann::json& response) override {
+    _server.sendResponse(response);
+  }
 
-void RimoServerCommandChannel::sendResponse(const nlohmann::json& response) {
-  _server.sendResponse(response);
-}
+ private:
+  utl::RimoServer<utl::RobotStatus>& _server;
+};
+}  // namespace
 
 MachineCommandServer::MachineCommandServer(utl::RimoServer<utl::RobotStatus>& server)
     : _ownedChannel(std::make_unique<RimoServerCommandChannel>(server)),

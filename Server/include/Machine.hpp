@@ -5,7 +5,6 @@
 #include <IClock.hpp>
 #include <MachineComponent.hpp>
 #include <MachineCommandServer.hpp>
-#include <MachineComponentService.hpp>
 #include <MachineController.hpp>
 #include <MachineStatusBuilder.hpp>
 #include <MotorControl.hpp>
@@ -36,7 +35,6 @@ class Machine {
   std::optional<signal_map_t> readInputSignals();
   void setOutputs(const signal_map_t& signals);
   std::optional<signal_map_t> readOutputSignals();
-  [[nodiscard]] LoopState makeInitialLoopState() const;
   void runOneCycle(LoopState& state);
   bool submitCommand(cmd::Command command);
   std::string dispatchCommandAndWait(cmd::Command command,
@@ -74,6 +72,9 @@ class Machine {
   void cacheInputSignals(std::optional<signal_map_t> value);
   void cacheOutputSignals(std::optional<signal_map_t> value);
 
+  void initializeComponents();
+  std::string reconnectComponent(utl::ERobotComponent component);
+
   void makeDummyStatus();
 
   Contec _contec;
@@ -98,7 +99,6 @@ class Machine {
   IoSignalCache _outputSignalsCache;
   std::unique_ptr<ControlLoopRunner> _loopRunner;
   std::unique_ptr<MachineController> _controller;
-  std::unique_ptr<MachineComponentService> _componentService;
   std::unique_ptr<MachineStatusBuilder> _statusBuilder;
   std::unique_ptr<MachineCommandServer> _commandServer;
 };

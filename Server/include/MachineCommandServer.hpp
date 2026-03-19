@@ -14,17 +14,6 @@ class ICommandChannel {
   virtual void sendResponse(const nlohmann::json& response) = 0;
 };
 
-class RimoServerCommandChannel final : public ICommandChannel {
- public:
-  explicit RimoServerCommandChannel(utl::RimoServer<utl::RobotStatus>& server);
-
-  std::optional<nlohmann::json> receiveCommand() override;
-  void sendResponse(const nlohmann::json& response) override;
-
- private:
-  utl::RimoServer<utl::RobotStatus>& _server;
-};
-
 class MachineCommandServer {
  public:
   explicit MachineCommandServer(utl::RimoServer<utl::RobotStatus>& server);

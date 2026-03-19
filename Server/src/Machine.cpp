@@ -268,18 +268,11 @@ void Machine::validateMappedIndex(const std::string_view signal,
 }
 void Machine::processThread() {
   SPDLOG_INFO("Processing thread started");
-  auto loopState = makeInitialLoopState();
+  ControlLoopRunner::State loopState;
   while (_isRunning.load(std::memory_order_acquire)) {
     runOneCycle(loopState);
   }
   SPDLOG_INFO("Processing thread finished!");
-}
-
-Machine::LoopState Machine::makeInitialLoopState() const {
-  if (!_loopRunner) {
-    utl::throwRuntimeError("Machine is not wired. Call wire() first.");
-  }
-  return _loopRunner->makeInitialState();
 }
 
 void Machine::runOneCycle(LoopState& state) {
@@ -452,9 +445,6 @@ void Machine::wire() {
         },
         _robotStatus, std::make_unique<RimoKunControlPolicy>());
   }
-  if (!_componentService) {
-    _componentService = std::make_unique<MachineComponentService>(_components);
-  }
   if (!_statusBuilder) {
     _statusBuilder = std::make_unique<MachineStatusBuilder>();
   }
@@ -465,8 +455,7 @@ void Machine::wire() {
 
 void Machine::initialize() {
   std::lock_guard<std::mutex> lock(_lifecycleMutex);
-  if (!_loopRunner || !_controller || !_componentService || !_statusBuilder ||
-      !_commandServer) {
+  if (!_loopRunner || !_controller || !_statusBuilder || !_commandServer) {
     utl::throwRuntimeError(
         "Machine collaborators are not wired. Call wire() before initialize().");
   }
@@ -476,7 +465,7 @@ void Machine::initialize() {
     utl::throwRuntimeError("Machine is already running.");
   }
   makeDummyStatus();
-  _componentService->initializeAll();
+  initializeComponents();
   try {
     _commandServerThread = std::thread(&Machine::commandServerThread, this);
     _processThread = std::thread(&Machine::processThread, this);
@@ -496,11 +485,47 @@ void Machine::handleToolChangerCommand(const cmd::ToolChangerCommand& c) {
   _controller->handleToolChangerCommand(c);
 }
 void Machine::handleReconnectCommand(const cmd::ReconnectCommand& c) {
-  const auto result = _componentService->reconnect(c.robotComponent);
+  const auto result = reconnectComponent(c.robotComponent);
   if (!result.empty()) {
     utl::throwRuntimeError(result);
   }
   makeDummyStatus();
+}
+
+void Machine::initializeComponents() {
+  for (const auto& [componentType, component] : _components) {
+    if (!component) {
+      continue;
+    }
+    try {
+      component->initialize();
+    } catch (const std::exception& e) {
+      SPDLOG_ERROR("{} initialization failed: {}",
+                   magic_enum::enum_name(componentType), e.what());
+    }
+  }
+}
+
+std::string Machine::reconnectComponent(const utl::ERobotComponent component) {
+  const auto it = _components.find(component);
+  if (it == _components.end() || !it->second) {
+    return std::format("Resetting of '{}' is not implemented!",
+                       magic_enum::enum_name(component));
+  }
+  auto* comp = it->second;
+  SPDLOG_INFO("Reconnecting {}...", magic_enum::enum_name(component));
+  comp->reset();
+  try {
+    comp->initialize();
+  } catch (const std::exception& e) {
+    return std::format("Resetting '{}' failed: {}",
+                       magic_enum::enum_name(component), e.what());
+  }
+  if (comp->state() == MachineComponent::State::Error) {
+    return std::format("Resetting '{}' was unsuccessful!",
+                       magic_enum::enum_name(component));
+  }
+  return "";
 }
 
 nlohmann::json Machine::handleMotorDiagnosticsCommand(

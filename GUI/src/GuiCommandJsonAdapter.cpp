@@ -42,6 +42,10 @@ nlohmann::json GuiCommandJsonAdapter::toJson(const GuiCommand& command) {
           return nlohmann::json{
               {"type", "contecDiagnostics"},
           };
+        } else if constexpr (std::is_same_v<CmdT, GuiEmergencyStopCommand>) {
+          return nlohmann::json{
+              {"type", "emergencyStop"},
+          };
         } else {
           return cmd.node;
         }

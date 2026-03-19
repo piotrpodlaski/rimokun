@@ -36,6 +36,8 @@ struct GuiSetAllMotorsEnabledCommand {
 
 struct GuiContecDiagnosticsCommand {};
 
+struct GuiEmergencyStopCommand {};
+
 struct GuiRawCommand {
   nlohmann::json node;
 };
@@ -44,7 +46,8 @@ struct GuiCommand {
   std::variant<GuiToolChangerCommand, GuiReconnectCommand,
                GuiMotorDiagnosticsCommand, GuiResetMotorAlarmCommand,
                GuiSetMotorEnabledCommand, GuiSetAllMotorsEnabledCommand,
-               GuiContecDiagnosticsCommand, GuiRawCommand>
+               GuiContecDiagnosticsCommand, GuiRawCommand,
+               GuiEmergencyStopCommand>
       payload;
 };
 

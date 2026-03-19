@@ -315,6 +315,9 @@ void Machine::runOneCycle(LoopState& state) {
                                         const cmd::ContecDiagnosticsCommand& c) {
                                       responsePayload =
                                           handleContecDiagnosticsCommand(c).dump();
+                                    },
+                                    [this](const cmd::EmergencyStopCommand& c) {
+                                      handleEmergencyStopCommand(c);
                                     }},
                          command->payload);
               command->reply.set_value(std::move(responsePayload));
@@ -668,6 +671,10 @@ nlohmann::json Machine::handleContecDiagnosticsCommand(
     response["diagnosticsError"] = ex.what();
   }
   return response;
+}
+
+void Machine::handleEmergencyStopCommand(const cmd::EmergencyStopCommand&) {
+  SPDLOG_WARN("Emergency stop requested — not yet implemented.");
 }
 
 void Machine::shutdown() {

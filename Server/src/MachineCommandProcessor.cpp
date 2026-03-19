@@ -199,6 +199,22 @@ nlohmann::json cmd::processCommand(
     return response;
   }
 
+  if (type == "emergencyStop") {
+    try {
+      cmd::Command c;
+      c.payload = cmd::EmergencyStopCommand{};
+      const auto reply = dispatch(std::move(c), 2s);
+      if (!reply.empty()) {
+        response["status"] = "Error";
+        response["message"] = reply;
+      }
+    } catch (const std::exception& e) {
+      response["status"] = "Error";
+      response["message"] = std::format("emergencyStop command failed: {}", e.what());
+    }
+    return response;
+  }
+
   response["status"] = "Error";
   response["message"] = std::format("Unknown command type '{}'!", type);
   return response;

@@ -47,10 +47,13 @@ struct SetAllMotorsEnabledCommand {
 
 struct ContecDiagnosticsCommand {};
 
+struct EmergencyStopCommand {};
+
 struct Command {
   std::variant<ToolChangerCommand, ReconnectCommand, MotorDiagnosticsCommand,
                ResetMotorAlarmCommand, SetMotorEnabledCommand,
-               SetAllMotorsEnabledCommand, ContecDiagnosticsCommand>
+               SetAllMotorsEnabledCommand, ContecDiagnosticsCommand,
+               EmergencyStopCommand>
       payload;
   std::promise<std::string> reply;
 };

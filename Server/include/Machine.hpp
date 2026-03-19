@@ -62,6 +62,7 @@ class Machine {
       const cmd::SetAllMotorsEnabledCommand& c);
   virtual nlohmann::json handleContecDiagnosticsCommand(
       const cmd::ContecDiagnosticsCommand& c);
+  virtual void handleEmergencyStopCommand(const cmd::EmergencyStopCommand& c);
  private:
   struct IoSignalCache {
     std::uint64_t cycle{0};

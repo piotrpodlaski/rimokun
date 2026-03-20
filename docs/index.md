@@ -1,71 +1,85 @@
-# rimokun Documentation
+<div class="hero">
+  <h1>rimokun Documentation</h1>
+  <p><strong>Remote manipulator control for the J-PARC remote-ready primary beamline upgrade.</strong></p>
+  <p>`rimokun` coordinates a gantry-style handling system used where direct access is constrained, undesirable, or hazardous. Operators work through a GUI, the server owns command execution and state, and the whole control loop depends on credible feedback from motion, tooling, clamp, and safety subsystems.</p>
+  <div class="hero-badges">
+    <span class="hero-badge">J-PARC beamline upgrade</span>
+    <span class="hero-badge">Remote handling</span>
+    <span class="hero-badge">GUI + server architecture</span>
+    <span class="hero-badge">Command and status feedback</span>
+  </div>
+  <div class="cta-row">
+    <a class="primary" href="quickstart.md">Open quickstart</a>
+    <a class="secondary" href="architecture.md">Study architecture</a>
+    <a class="secondary" href="operation.md">Review operation</a>
+  </div>
+  <div class="brand-strip">
+    <img src="assets/images/jparc-logo.png" alt="J-PARC logo">
+    <img src="assets/images/kek-logo.png" alt="KEK logo">
+    <img src="assets/images/rimokun-logo.png" alt="rimokun logo">
+  </div>
+</div>
 
-`rimokun` is the control software for a gantry-style remote manipulator system developed for the J-PARC remote-ready primary beamline upgrade. It is intended for remote handling tasks in constrained or hazardous environments where operators must control motion, tooling, and beamline-adjacent equipment without relying on direct physical access.
+## Mission profile
 
-This documentation describes the system as it is operated in practice: a desktop GUI used by operators, a server backend that coordinates execution and state, and command/status interfaces that connect operator intent to machine behavior.
-
-## What this system does
-
-The manipulator system supports remote handling activities around the beamline upgrade by coordinating:
+The manipulator system supports remote work around the beamline upgrade by coordinating:
 
 - gantry motion and positioning
-- tool changing mechanisms associated with vacuum clamp tooling
-- interaction with remote vacuum clamps
-- sensor and safety signal monitoring
-- operator feedback through a live GUI
+- tool changing associated with vacuum clamp tooling
+- vacuum clamp interaction and related I/O
+- sensor, safety, and subsystem state monitoring
+- operator feedback through a live control station
 
-The software is designed around the assumption that the controlled hardware may be difficult to access directly during operation or recovery. Feedback, clear state reporting, and predictable command handling are therefore central design concerns.
+<div class="metric-strip">
+  <div class="metric"><strong>Operators</strong>Use the GUI to command and verify manipulator behavior.</div>
+  <div class="metric"><strong>Engineers</strong>Integrate, commission, diagnose, and recover the control system.</div>
+  <div class="metric"><strong>Developers</strong>Maintain the GUI, server runtime, shared transport, and tests.</div>
+</div>
 
-## Who this documentation is for
+## System overview
 
-- Operators who use the GUI to position the manipulator, change tools, and monitor machine state
-- Engineers responsible for integration, commissioning, maintenance, and operational support
-- Developers working on the GUI, server runtime, shared transport, and tests
+<div class="diagram-frame">
+  <img src="assets/images/system-architecture.svg" alt="Diagram showing GUI, server runtime, and hardware layer">
+  <div class="figure-note">The system is built around a single authoritative server runtime. Operators act through the GUI, while hardware feedback flows back through the server so that published status reflects actual runtime state rather than optimistic UI assumptions.</div>
+</div>
 
-## System at a glance
+## Why this documentation is organized the way it is
 
-The deployed system is organized into three main parts:
+This is not an API-first project. For a beamline manipulator used remotely, the central questions are:
 
-- `rimokunControl`: the operator GUI
-- `rimoServer`: the server process that coordinates command execution, hardware interaction, and state publication
-- command/status interfaces: the communication layer between GUI and server
+- what state the machine is in now
+- whether a command was only accepted or actually completed
+- how tooling and clamp operations are confirmed
+- how operators recover when feedback is missing or contradictory
 
-At runtime, operators act through the GUI. The GUI sends commands to the server, the server validates and executes them against the machine and hardware-facing subsystems, and the resulting status is published back to the GUI so operators can confirm actual state rather than assumed state.
+Those concerns drive the documentation structure:
 
-## Why the architecture matters
-
-For a remote manipulator used in a beamline environment, the software cannot behave like a loose collection of independent tools. The control path and the feedback path must stay aligned:
-
-- motion and actuation commands must be routed through a single coordinating runtime
-- status must reflect the actual machine state as seen by the server and hardware layer
-- faults, communication loss, and stale feedback must be visible to operators quickly
-
-The details of that design are covered in [Architecture](architecture.md) and [Interfaces](interfaces.md).
-
-## Major capabilities
-
-- operator control through a dedicated desktop GUI
-- centralized server-side command handling and machine coordination
-- live publication of manipulator, tool, and subsystem status
-- YAML-based runtime configuration
-- automated tests for command handling, state updates, and integration points
-
-## Repository layout
-
-The repository reflects the system boundary directly:
-
-- `GUI/` contains the Qt operator interface
-- `Server/` contains the machine runtime and command handling logic
-- `Utilities/` contains shared configuration, transport, logging, and common state types
-- `Config/rimokun.yaml` provides the current example runtime configuration
+<div class="card-grid">
+  <div class="card">
+    <h3>Architecture</h3>
+    <p>How the GUI, server, and hardware-facing subsystems fit together for deterministic control and feedback.</p>
+  </div>
+  <div class="card">
+    <h3>Interfaces</h3>
+    <p>How commands and status updates carry operator intent and machine truth across the process boundary.</p>
+  </div>
+  <div class="card">
+    <h3>Operation</h3>
+    <p>How beamline bring-up, tool switching, clamp interaction, and safe shutdown should be handled in practice.</p>
+  </div>
+  <div class="card">
+    <h3>Troubleshooting</h3>
+    <p>How to localize failures to transport, execution, status publication, tooling, or sensor paths.</p>
+  </div>
+</div>
 
 ## Start here
 
-- [Installation](installation.md) for prerequisites and setup
-- [Quickstart](quickstart.md) for the fastest path to a local run
-- [Operation](operation.md) for day-to-day bring-up and shutdown guidance
-- [Troubleshooting](troubleshooting.md) for common runtime failures
+- [Installation](installation.md) for prerequisites and local setup
+- [Quickstart](quickstart.md) for the fastest path to a running GUI and server
+- [Architecture](architecture.md) for the control model
+- [Operation](operation.md) for bring-up, tool changes, clamp interaction, and shutdown
 
-## Placeholder notes
-
-Some deployment details are still project placeholders, including formal service definitions, exact production topology, and any externally published interface contract. Those gaps are marked explicitly rather than filled with guessed behavior.
+<div class="callout">
+  <strong>Note:</strong> some deployment-specific details are still placeholders, including any formal external protocol publication and production service topology. Those gaps are marked explicitly rather than filled with guessed behavior.
+</div>

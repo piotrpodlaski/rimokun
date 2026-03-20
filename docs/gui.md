@@ -6,6 +6,19 @@
 
 The GUI is not the authority for machine state. It depends on the server for command execution and status publication.
 
+## Visual reference
+
+<div class="screenshot-grid">
+  <div class="shot-frame">
+    <img src="assets/images/gui-main-placeholder.svg" alt="Illustrative placeholder for the main rimokun operator console">
+    <div class="figure-note">Illustrative operator-console placeholder based on the current GUI structure. Replace with a real screenshot from the deployed control station when available.</div>
+  </div>
+  <div class="shot-frame">
+    <img src="assets/images/gui-panels-placeholder.svg" alt="Illustrative placeholder for motor, tool changer, and I/O panels">
+    <div class="figure-note">Illustrative panel overview showing the kinds of screens the operator uses for motion, tooling, and subsystem inspection. Replace with actual captures during commissioning.</div>
+  </div>
+</div>
+
 ## What operators do in the GUI
 
 In normal work, operators use the GUI to:
@@ -81,6 +94,12 @@ Based on the current source tree, the GUI includes support for:
 
 Those elements should eventually be documented with screenshots and operator procedures specific to the beamline workflow.
 
+The current repository structure suggests the GUI is organized around three operational views:
+
+- overview and state awareness
+- action-specific panels such as motors and tool changer controls
+- subsystem and recovery views for I/O, control panel, or diagnostics
+
 ## Operator-facing behavior
 
 The GUI should make the following distinctions clear:
@@ -106,3 +125,4 @@ Operators should use both together. A successful response is not sufficient conf
 - [Interfaces](interfaces.md) for command and status behavior
 - [Operation](operation.md) for the normal operating sequence
 - [Troubleshooting](troubleshooting.md) for operator-visible failure scenarios
+- [Architecture](architecture.md) for the full control and feedback path

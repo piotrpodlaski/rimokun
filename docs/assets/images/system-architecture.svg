@@ -1,0 +1,54 @@
+<svg width="1400" height="760" viewBox="0 0 1400 760" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1400" height="760" rx="32" fill="#F3F8FB"/>
+  <rect x="40" y="40" width="1320" height="680" rx="28" fill="white" stroke="#D6E2EA" stroke-width="2"/>
+  <text x="84" y="104" fill="#102033" font-family="Arial, sans-serif" font-size="34" font-weight="700">rimokun Control Architecture</text>
+  <text x="84" y="144" fill="#52657A" font-family="Arial, sans-serif" font-size="20">Remote manipulator control for the J-PARC beamline upgrade</text>
+
+  <rect x="86" y="192" width="360" height="250" rx="24" fill="#EAF6FB" stroke="#A8D0E2" stroke-width="2"/>
+  <text x="116" y="238" fill="#0D5F8F" font-family="Arial, sans-serif" font-size="28" font-weight="700">Operator GUI</text>
+  <text x="116" y="278" fill="#102033" font-family="Arial, sans-serif" font-size="20">rimokunControl</text>
+  <text x="116" y="320" fill="#385166" font-family="Arial, sans-serif" font-size="18">• Motion and positioning input</text>
+  <text x="116" y="354" fill="#385166" font-family="Arial, sans-serif" font-size="18">• Tool changer and clamp actions</text>
+  <text x="116" y="388" fill="#385166" font-family="Arial, sans-serif" font-size="18">• Live status and fault visibility</text>
+  <text x="116" y="422" fill="#385166" font-family="Arial, sans-serif" font-size="18">• Operator acknowledgement path</text>
+
+  <rect x="520" y="170" width="370" height="300" rx="24" fill="#EDF4FF" stroke="#B6CFF3" stroke-width="2"/>
+  <text x="552" y="216" fill="#244B8A" font-family="Arial, sans-serif" font-size="28" font-weight="700">Server Runtime</text>
+  <text x="552" y="256" fill="#102033" font-family="Arial, sans-serif" font-size="20">rimoServer / Machine</text>
+  <text x="552" y="298" fill="#385166" font-family="Arial, sans-serif" font-size="18">• Command validation and dispatch</text>
+  <text x="552" y="332" fill="#385166" font-family="Arial, sans-serif" font-size="18">• Ordered execution of machine actions</text>
+  <text x="552" y="366" fill="#385166" font-family="Arial, sans-serif" font-size="18">• Status aggregation and publication</text>
+  <text x="552" y="400" fill="#385166" font-family="Arial, sans-serif" font-size="18">• Fault handling and lifecycle control</text>
+  <text x="552" y="434" fill="#385166" font-family="Arial, sans-serif" font-size="18">• Single source of runtime truth</text>
+
+  <rect x="964" y="140" width="308" height="390" rx="24" fill="#EEF9F5" stroke="#ABD8C6" stroke-width="2"/>
+  <text x="996" y="186" fill="#1B6B56" font-family="Arial, sans-serif" font-size="28" font-weight="700">Hardware Layer</text>
+  <text x="996" y="228" fill="#102033" font-family="Arial, sans-serif" font-size="20">Manipulator subsystems</text>
+  <text x="996" y="270" fill="#385166" font-family="Arial, sans-serif" font-size="18">• Gantry and axis motion</text>
+  <text x="996" y="304" fill="#385166" font-family="Arial, sans-serif" font-size="18">• Tool changer actuators</text>
+  <text x="996" y="338" fill="#385166" font-family="Arial, sans-serif" font-size="18">• Vacuum clamp I/O</text>
+  <text x="996" y="372" fill="#385166" font-family="Arial, sans-serif" font-size="18">• Sensor and safety inputs</text>
+  <text x="996" y="406" fill="#385166" font-family="Arial, sans-serif" font-size="18">• Control panel / field devices</text>
+  <text x="996" y="440" fill="#385166" font-family="Arial, sans-serif" font-size="18">• Hardware fault sources</text>
+
+  <rect x="126" y="518" width="1118" height="130" rx="20" fill="#FFF8EA" stroke="#E7CB8A" stroke-width="2"/>
+  <text x="156" y="560" fill="#8A6112" font-family="Arial, sans-serif" font-size="24" font-weight="700">Operational constraint</text>
+  <text x="156" y="596" fill="#5F4A1F" font-family="Arial, sans-serif" font-size="18">Remote handling requires that command acknowledgement, hardware execution, and published feedback remain distinguishable.</text>
+  <text x="156" y="626" fill="#5F4A1F" font-family="Arial, sans-serif" font-size="18">Operators depend on status freshness and clear fault reporting to recover safely when tooling, clamps, or motion do not behave as expected.</text>
+
+  <path d="M446 302H500" stroke="#0D5F8F" stroke-width="6" stroke-linecap="round"/>
+  <path d="M489 286L517 302L489 318" fill="#0D5F8F"/>
+  <text x="428" y="284" fill="#0D5F8F" font-family="Arial, sans-serif" font-size="18" font-weight="700">Commands</text>
+
+  <path d="M520 364H466" stroke="#0D9DB8" stroke-width="6" stroke-linecap="round"/>
+  <path d="M477 348L449 364L477 380" fill="#0D9DB8"/>
+  <text x="364" y="388" fill="#0D9DB8" font-family="Arial, sans-serif" font-size="18" font-weight="700">Responses and status</text>
+
+  <path d="M890 318H944" stroke="#1B6B56" stroke-width="6" stroke-linecap="round"/>
+  <path d="M933 302L961 318L933 334" fill="#1B6B56"/>
+  <text x="825" y="296" fill="#1B6B56" font-family="Arial, sans-serif" font-size="18" font-weight="700">Execution</text>
+
+  <path d="M964 396H912" stroke="#D59A2A" stroke-width="6" stroke-linecap="round"/>
+  <path d="M923 380L895 396L923 412" fill="#D59A2A"/>
+  <text x="794" y="420" fill="#B98216" font-family="Arial, sans-serif" font-size="18" font-weight="700">Telemetry, faults, sensor state</text>
+</svg>

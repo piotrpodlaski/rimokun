@@ -14,6 +14,11 @@ The main runtime model is:
 
 This separation is deliberate. In a remote handling environment, the control path must be centralized and the feedback path must remain authoritative.
 
+<div class="diagram-frame">
+  <img src="assets/images/system-architecture.svg" alt="High-level architecture diagram for rimokun">
+  <div class="figure-note">The GUI is the operator surface, the server is the execution authority, and the hardware-facing layer provides the feedback needed to confirm motion, tool changes, and clamp state.</div>
+</div>
+
 ## Major components
 
 ### GUI layer
@@ -86,6 +91,11 @@ Typical command categories for this system include:
 
 Interface structure and lifecycle expectations are covered in [Interfaces](interfaces.md).
 
+<div class="diagram-frame">
+  <img src="assets/images/command-lifecycle.svg" alt="Diagram showing command lifecycle from issued to completed or failed">
+  <div class="figure-note">A response that says a command was accepted does not by itself prove that the manipulator reached the requested state. Completion is confirmed through subsequent status updates and subsystem feedback.</div>
+</div>
+
 ## Status flow
 
 The status path is hardware-informed feedback:
@@ -133,6 +143,14 @@ The current repository shows a local IPC-based default configuration for GUI/ser
 - command address: `ipc:///tmp/rimoCommand`
 
 That indicates a same-host control station model as the current baseline. If production deployment uses a different topology, document that explicitly when finalized.
+
+## Practical reading path
+
+Use this page together with:
+
+- [Interfaces](interfaces.md) to understand how command and status channels separate acknowledgement from completion
+- [Server](server.md) to see where ordering, validation, and state aggregation live
+- [GUI](gui.md) to understand how operators consume the feedback path
 
 ## Related pages
 

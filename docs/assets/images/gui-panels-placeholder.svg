@@ -1,0 +1,37 @@
+<svg width="1200" height="760" viewBox="0 0 1200 760" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="760" rx="28" fill="#F3F8FB"/>
+  <rect x="42" y="42" width="1116" height="676" rx="24" fill="#FFFFFF" stroke="#D6E2EA" stroke-width="2"/>
+  <text x="86" y="106" fill="#102033" font-family="Arial, sans-serif" font-size="34" font-weight="700">Operator Panels</text>
+  <text x="86" y="144" fill="#52657A" font-family="Arial, sans-serif" font-size="20">Illustrative placeholders aligned to the current GUI structure</text>
+
+  <rect x="86" y="188" width="304" height="466" rx="20" fill="#172839"/>
+  <text x="116" y="232" fill="#E9F3FA" font-family="Arial, sans-serif" font-size="24" font-weight="700">Motor panel</text>
+  <rect x="116" y="266" width="244" height="72" rx="12" fill="#20394F"/>
+  <rect x="116" y="354" width="244" height="72" rx="12" fill="#20394F"/>
+  <rect x="116" y="442" width="244" height="72" rx="12" fill="#20394F"/>
+  <rect x="116" y="530" width="244" height="72" rx="12" fill="#20394F"/>
+  <text x="136" y="312" fill="#C7D8E6" font-family="Arial, sans-serif" font-size="16">Axis state and motor diagnostics</text>
+  <text x="136" y="400" fill="#C7D8E6" font-family="Arial, sans-serif" font-size="16">Current position and speed</text>
+  <text x="136" y="488" fill="#C7D8E6" font-family="Arial, sans-serif" font-size="16">Warnings and alarm detail</text>
+  <text x="136" y="576" fill="#C7D8E6" font-family="Arial, sans-serif" font-size="16">Per-motor status flags</text>
+
+  <rect x="448" y="188" width="304" height="466" rx="20" fill="#172839"/>
+  <text x="478" y="232" fill="#E9F3FA" font-family="Arial, sans-serif" font-size="24" font-weight="700">Tool changer</text>
+  <rect x="478" y="266" width="244" height="124" rx="12" fill="#20394F"/>
+  <rect x="478" y="414" width="244" height="124" rx="12" fill="#20394F"/>
+  <text x="498" y="314" fill="#C7D8E6" font-family="Arial, sans-serif" font-size="16">Left / right tool status</text>
+  <text x="498" y="342" fill="#C7D8E6" font-family="Arial, sans-serif" font-size="16">Open, close, proximity, interlocks</text>
+  <text x="498" y="462" fill="#C7D8E6" font-family="Arial, sans-serif" font-size="16">Acknowledgement and fault display</text>
+  <text x="498" y="490" fill="#C7D8E6" font-family="Arial, sans-serif" font-size="16">Expected vs reported state</text>
+
+  <rect x="810" y="188" width="304" height="466" rx="20" fill="#172839"/>
+  <text x="840" y="232" fill="#E9F3FA" font-family="Arial, sans-serif" font-size="24" font-weight="700">I/O and control panel</text>
+  <rect x="840" y="266" width="244" height="124" rx="12" fill="#20394F"/>
+  <rect x="840" y="414" width="244" height="124" rx="12" fill="#20394F"/>
+  <text x="860" y="314" fill="#C7D8E6" font-family="Arial, sans-serif" font-size="16">Clamp signals and digital I/O</text>
+  <text x="860" y="342" fill="#C7D8E6" font-family="Arial, sans-serif" font-size="16">Safety and subsystem health</text>
+  <text x="860" y="462" fill="#C7D8E6" font-family="Arial, sans-serif" font-size="16">Manual recovery and diagnostics</text>
+  <text x="860" y="490" fill="#C7D8E6" font-family="Arial, sans-serif" font-size="16">Operator-facing fault inspection</text>
+
+  <text x="86" y="696" fill="#546879" font-family="Arial, sans-serif" font-size="18">Replace these illustrations with actual GUI screenshots when captures from the operational system are available.</text>
+</svg>

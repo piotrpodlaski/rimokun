@@ -1,0 +1,39 @@
+<svg width="1400" height="520" viewBox="0 0 1400 520" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1400" height="520" rx="30" fill="#F4F8FB"/>
+  <rect x="40" y="40" width="1320" height="440" rx="24" fill="white" stroke="#D6E2EA" stroke-width="2"/>
+  <text x="84" y="104" fill="#102033" font-family="Arial, sans-serif" font-size="34" font-weight="700">Command and Feedback Lifecycle</text>
+  <text x="84" y="144" fill="#52657A" font-family="Arial, sans-serif" font-size="20">The response path and the status path answer different questions.</text>
+
+  <rect x="94" y="218" width="176" height="110" rx="18" fill="#EAF6FB" stroke="#A8D0E2" stroke-width="2"/>
+  <text x="128" y="264" fill="#0D5F8F" font-family="Arial, sans-serif" font-size="24" font-weight="700">Issued</text>
+  <text x="128" y="300" fill="#385166" font-family="Arial, sans-serif" font-size="17">Operator requests</text>
+
+  <rect x="330" y="218" width="176" height="110" rx="18" fill="#EDF4FF" stroke="#B6CFF3" stroke-width="2"/>
+  <text x="356" y="264" fill="#244B8A" font-family="Arial, sans-serif" font-size="24" font-weight="700">Acknowledged</text>
+  <text x="356" y="300" fill="#385166" font-family="Arial, sans-serif" font-size="17">Server accepted</text>
+
+  <rect x="566" y="218" width="176" height="110" rx="18" fill="#EEF9F5" stroke="#ABD8C6" stroke-width="2"/>
+  <text x="606" y="264" fill="#1B6B56" font-family="Arial, sans-serif" font-size="24" font-weight="700">Executing</text>
+  <text x="606" y="300" fill="#385166" font-family="Arial, sans-serif" font-size="17">Hardware action</text>
+
+  <rect x="802" y="218" width="176" height="110" rx="18" fill="#FFF8EA" stroke="#E7CB8A" stroke-width="2"/>
+  <text x="842" y="264" fill="#B98216" font-family="Arial, sans-serif" font-size="24" font-weight="700">Completed</text>
+  <text x="842" y="300" fill="#385166" font-family="Arial, sans-serif" font-size="17">Expected state reached</text>
+
+  <rect x="1038" y="218" width="228" height="110" rx="18" fill="#FFF0F0" stroke="#E6B4B4" stroke-width="2"/>
+  <text x="1078" y="264" fill="#AD3E3E" font-family="Arial, sans-serif" font-size="24" font-weight="700">Failed / Timed out</text>
+  <text x="1078" y="300" fill="#385166" font-family="Arial, sans-serif" font-size="17">Validation, transport, or execution error</text>
+
+  <path d="M270 273H316" stroke="#0D5F8F" stroke-width="6" stroke-linecap="round"/>
+  <path d="M305 257L333 273L305 289" fill="#0D5F8F"/>
+  <path d="M506 273H552" stroke="#244B8A" stroke-width="6" stroke-linecap="round"/>
+  <path d="M541 257L569 273L541 289" fill="#244B8A"/>
+  <path d="M742 273H788" stroke="#1B6B56" stroke-width="6" stroke-linecap="round"/>
+  <path d="M777 257L805 273L777 289" fill="#1B6B56"/>
+  <path d="M978 273H1024" stroke="#B98216" stroke-width="6" stroke-linecap="round"/>
+  <path d="M1013 257L1041 273L1013 289" fill="#B98216"/>
+
+  <text x="108" y="390" fill="#102033" font-family="Arial, sans-serif" font-size="18" font-weight="700">Interpretation</text>
+  <text x="108" y="424" fill="#385166" font-family="Arial, sans-serif" font-size="18">• A command response confirms intake and validation.</text>
+  <text x="108" y="452" fill="#385166" font-family="Arial, sans-serif" font-size="18">• Status updates confirm whether motion, tool change, or clamp interaction actually converged to the expected machine state.</text>
+</svg>

@@ -1,6 +1,8 @@
 # rimokun
 
-`rimokun` is a complete software system with:
+`rimokun` is the control software for a gantry-style remote manipulator system used in the J-PARC remote-ready primary beamline upgrade. It is intended for remote handling work in constrained or hazardous environments where operators need reliable control, clear feedback, and safe recovery paths.
+
+The system includes:
 
 - a Qt-based GUI
 - a server runtime
@@ -14,7 +16,7 @@ It should be understood and documented as an application stack, not as an API-fi
 - `rimoServer`: server-side runtime and machine coordinator
 - shared transport, configuration, and status models in `Utilities/`
 
-The server owns machine coordination and publishes status. The GUI connects to the server, sends commands, and renders current machine state for operators.
+The software coordinates remote manipulator motion, tool changing, vacuum clamp interaction, and subsystem monitoring. The server owns machine coordination and publishes status. The GUI connects to the server, sends commands, and renders current machine state for operators and engineers.
 
 ## Getting started
 

@@ -1,7 +1,7 @@
 <div class="hero">
   <h1>rimokun Documentation</h1>
   <p><strong>Remote manipulator control for the J-PARC remote-ready primary beamline upgrade.</strong></p>
-  <p>`rimokun` coordinates a gantry-style handling system used where direct access is constrained, undesirable, or hazardous. Operators work through a GUI, the server owns command execution and state, and the whole control loop depends on credible feedback from motion, tooling, clamp, and safety subsystems.</p>
+  <p>`rimokun` controls a gantry-style remote handling system with a GUI, a server backend, and command/status links between them. It is built for motion control, tool changing, vacuum clamp work, and feedback-driven operation in constrained environments.</p>
   <div class="hero-badges">
     <span class="hero-badge">J-PARC beamline upgrade</span>
     <span class="hero-badge">Remote handling</span>
@@ -22,7 +22,7 @@
 
 ## Mission profile
 
-The manipulator system supports remote work around the beamline upgrade by coordinating:
+The system is used to coordinate:
 
 - gantry motion and positioning
 - tool changing associated with vacuum clamp tooling
@@ -31,9 +31,9 @@ The manipulator system supports remote work around the beamline upgrade by coord
 - operator feedback through a live control station
 
 <div class="metric-strip">
-  <div class="metric"><strong>Operators</strong>Use the GUI to command and verify manipulator behavior.</div>
-  <div class="metric"><strong>Engineers</strong>Integrate, commission, diagnose, and recover the control system.</div>
-  <div class="metric"><strong>Developers</strong>Maintain the GUI, server runtime, shared transport, and tests.</div>
+  <div class="metric"><strong>Operators</strong>Run the manipulator from the GUI and verify state.</div>
+  <div class="metric"><strong>Engineers</strong>Commission, maintain, and troubleshoot the system.</div>
+  <div class="metric"><strong>Developers</strong>Work on the GUI, server, transport, and tests.</div>
 </div>
 
 ## System overview
@@ -43,33 +43,28 @@ The manipulator system supports remote work around the beamline upgrade by coord
   <div class="figure-note">The system is built around a single authoritative server runtime. Operators act through the GUI, while hardware feedback flows back through the server so that published status reflects actual runtime state rather than optimistic UI assumptions.</div>
 </div>
 
-## Why this documentation is organized the way it is
-
-This is not an API-first project. For a beamline manipulator used remotely, the central questions are:
-
-- what state the machine is in now
-- whether a command was only accepted or actually completed
-- how tooling and clamp operations are confirmed
-- how operators recover when feedback is missing or contradictory
-
-Those concerns drive the documentation structure:
+## Main sections
 
 <div class="card-grid">
   <div class="card">
     <h3>Architecture</h3>
-    <p>How the GUI, server, and hardware-facing subsystems fit together for deterministic control and feedback.</p>
+    <p>How the GUI, server, and hardware-facing subsystems fit together.</p>
   </div>
   <div class="card">
     <h3>Interfaces</h3>
-    <p>How commands and status updates carry operator intent and machine truth across the process boundary.</p>
+    <p>How commands and status move between GUI and server.</p>
   </div>
   <div class="card">
     <h3>Operation</h3>
-    <p>How beamline bring-up, tool switching, clamp interaction, and safe shutdown should be handled in practice.</p>
+    <p>How to start, use, and stop the system safely.</p>
   </div>
   <div class="card">
     <h3>Troubleshooting</h3>
-    <p>How to localize failures to transport, execution, status publication, tooling, or sensor paths.</p>
+    <p>Where to look when commands, status, tools, or clamps do not behave correctly.</p>
+  </div>
+  <div class="card">
+    <h3>Class Reference</h3>
+    <p>A short guide to the main GUI and server classes in the codebase.</p>
   </div>
 </div>
 
@@ -79,6 +74,7 @@ Those concerns drive the documentation structure:
 - [Quickstart](quickstart.md) for the fastest path to a running GUI and server
 - [Architecture](architecture.md) for the control model
 - [Operation](operation.md) for bring-up, tool changes, clamp interaction, and shutdown
+- [Class Reference](classes.md) for key source-level classes
 
 <div class="callout">
   <strong>Note:</strong> some deployment-specific details are still placeholders, including any formal external protocol publication and production service topology. Those gaps are marked explicitly rather than filled with guessed behavior.

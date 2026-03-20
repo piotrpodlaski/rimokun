@@ -4,7 +4,7 @@
 
 `rimokunControl` is the operator console for the gantry-style remote manipulator. Operators use it to issue motion and tooling actions, observe current machine state, and detect when the manipulator or associated subsystems are no longer behaving as expected.
 
-The GUI is not the authority for machine state. It depends on the server for command execution and status publication.
+The GUI depends on the server for command execution and status publication.
 
 ## Visual reference
 
@@ -21,7 +21,7 @@ The GUI is not the authority for machine state. It depends on the server for com
 
 ## What operators do in the GUI
 
-In normal work, operators use the GUI to:
+Operators use the GUI to:
 
 - confirm the system is connected and publishing live status
 - observe current manipulator position and subsystem state
@@ -29,42 +29,35 @@ In normal work, operators use the GUI to:
 - monitor tool and clamp-related feedback after each action
 - respond to communication, subsystem, or fault indications
 
-This is an operational workflow, not just a collection of widgets.
-
 ## Operator workflow
-
-### 1. Confirm readiness
-
-Before commanding the manipulator, the operator should confirm in the GUI that:
+1. Confirm readiness:
+Before commanding the manipulator, confirm:
 
 - the server connection is active
 - status is updating
 - subsystem health indicators are credible
 - the machine is in the expected starting state
 
-### 2. Issue a command
-
-The operator selects an action in the GUI, such as:
+2. Issue a command:
+Select an action such as:
 
 - a manipulator movement
 - a tool changer action
 - a subsystem reset or recovery action
 
-The GUI sends that request to the server and waits for an explicit response.
+The GUI sends the request to the server and waits for a response.
 
-### 3. Watch feedback
-
-After a command is accepted, the operator should watch:
+3. Watch feedback:
+After a command is accepted, watch:
 
 - position or motion-related state
 - tool state
 - clamp-related state
 - warning or fault indicators
 
-The GUI should be used to confirm actual state transitions, not just command submission.
+Use the GUI to confirm real state changes, not just command submission.
 
-### 4. Respond to errors
-
+4. Respond to errors:
 If the GUI reports a timeout, connection problem, or unexpected status:
 
 - stop issuing additional commands
@@ -73,7 +66,7 @@ If the GUI reports a timeout, connection problem, or unexpected status:
 
 ## Main responsibilities
 
-The current codebase indicates that the GUI is responsible for:
+The GUI is responsible for:
 
 - presenting the main operator window
 - showing machine and subsystem state
@@ -82,9 +75,9 @@ The current codebase indicates that the GUI is responsible for:
 - reacting to responses and connection problems
 - updating local view state from streamed status messages
 
-## Major screens and functions
+## Main screens
 
-Based on the current source tree, the GUI includes support for:
+The current source tree suggests these main screens:
 
 - the main control window
 - joystick-related interaction
@@ -92,33 +85,21 @@ Based on the current source tree, the GUI includes support for:
 - tool changer controls
 - Contec-related views
 
-Those elements should eventually be documented with screenshots and operator procedures specific to the beamline workflow.
-
-The current repository structure suggests the GUI is organized around three operational views:
-
-- overview and state awareness
-- action-specific panels such as motors and tool changer controls
-- subsystem and recovery views for I/O, control panel, or diagnostics
-
-## Operator-facing behavior
-
-The GUI should make the following distinctions clear:
+These map to three practical views:
 
 - server reachable vs. server unreachable
 - command accepted vs. command completed
 - live status vs. stale status
 - subsystem fault vs. user-input error
 
-Those distinctions are important in a remote-handling environment where the operator may not have direct access to the hardware.
+## Feedback model
 
-## State update model
-
-The GUI receives continuous status updates and also performs synchronous command exchanges. That means operators see two different kinds of feedback:
+The GUI shows two kinds of feedback:
 
 - command responses that indicate whether the server accepted or rejected a request
 - status updates that show the current machine state
 
-Operators should use both together. A successful response is not sufficient confirmation for motion completion, tool change success, or clamp engagement.
+Use both together. A successful response does not by itself confirm motion completion, tool change success, or clamp engagement.
 
 ## Related pages
 
@@ -126,3 +107,4 @@ Operators should use both together. A successful response is not sufficient conf
 - [Operation](operation.md) for the normal operating sequence
 - [Troubleshooting](troubleshooting.md) for operator-visible failure scenarios
 - [Architecture](architecture.md) for the full control and feedback path
+- [Class Reference](classes.md) for GUI classes such as `MainWindow`, `Updater`, and `GuiStateStore`

@@ -2,7 +2,7 @@
 
 ## Repository structure
 
-The current repository is organized around the system boundary:
+The repository is organized around the system boundary:
 
 - `GUI/`: Qt application, UI forms, presenters, and transport integration
 - `Server/`: machine runtime, command handling, and hardware-oriented logic
@@ -13,7 +13,7 @@ The current repository is organized around the system boundary:
 
 ## Local development workflow
 
-A practical local workflow is:
+A practical workflow is:
 
 1. configure and build with CMake
 2. run targeted tests during development
@@ -38,7 +38,7 @@ CTest is enabled in the root CMake configuration. A typical test run is:
 ctest --test-dir build --output-on-failure
 ```
 
-Use narrower test targets while iterating if a full run is expensive.
+Use narrower test targets while iterating if needed.
 
 ## Running docs locally
 
@@ -72,6 +72,8 @@ Documentation changes should accompany:
 - deployment or startup changes
 - troubleshooting lessons that should become permanent guidance
 
+For key runtime classes, also update [Class Reference](classes.md).
+
 ## Testing expectations
 
 Prefer tests that protect system behavior, especially around:
@@ -90,14 +92,3 @@ Contributors should:
 - update docs when runtime behavior changes
 - avoid undocumented protocol drift between GUI and server
 - add or update tests for behavioral changes
-
-## Placeholder contribution process
-
-If the project later defines a formal contribution process, add:
-
-- branching policy
-- code review expectations
-- release process
-- version compatibility rules
-
-These details are not yet explicit in the repository and should be documented when established.

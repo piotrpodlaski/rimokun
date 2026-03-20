@@ -68,7 +68,7 @@ mkdocs serve
 
 To publish the docs from this repository with GitHub Actions:
 
-1. Push the documentation changes to the `main` branch.
+1. Push the documentation changes to the `master` branch.
 2. In the GitHub repository, open `Settings -> Pages`.
 3. Set the Pages source to `GitHub Actions`.
 4. Let the existing workflow in `.github/workflows/docs.yml` build and deploy the site.

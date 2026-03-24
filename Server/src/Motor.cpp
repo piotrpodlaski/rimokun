@@ -258,8 +258,16 @@ constexpr std::array<std::uint16_t, 16> kDefaultNetOutputFunctionCodes{
     48, 49, 50, 4, 70, 67, 66, 65, 80, 73, 74, 75, 72, 68, 69, 71};
 }  // namespace
 
-Motor::Motor(utl::EMotor id, int slaveAddress, MotorRegisterMap map)
-    : _id(id), _slaveAddress(slaveAddress), _map(std::move(map)) {}
+Motor::Motor(utl::EMotor id, int slaveAddress, MotorRegisterMap map,
+             const int commandSlaveAddress,
+             const bool forceFunction10ForSingleRegisterWrites)
+    : _id(id),
+      _slaveAddress(slaveAddress),
+      _commandSlaveAddress(commandSlaveAddress > 0 ? commandSlaveAddress
+                                                   : slaveAddress),
+      _map(std::move(map)),
+      _forceFunction10ForSingleRegisterWrites(
+          forceFunction10ForSingleRegisterWrites) {}
 
 void Motor::initialize(ModbusClient& bus) const {
   _driverInputCommandRawCache.reset();
@@ -268,7 +276,7 @@ void Motor::initialize(ModbusClient& bus) const {
   _inputFunctionAssignments.reset();
   _netOutputFunctionAssignments.reset();
   _netInputFunctionAssignments.reset();
-  selectSlave(bus);
+  selectSlave(bus, SlaveTarget::Device);
 
   // AR-KD2 sanity check: read present alarm register pair.
   auto alarm = bus.read_holding_registers(_map.presentAlarm, 2);
@@ -338,7 +346,7 @@ void Motor::initialize(ModbusClient& bus) const {
 
 std::uint32_t Motor::readU32(ModbusClient& bus, int upperAddr) const {
   RIMO_TIMED_SCOPE("Motor::readU32");
-  selectSlave(bus);
+  selectSlave(bus, SlaveTarget::Device);
   auto regs = bus.read_holding_registers(upperAddr, 2);
   if (!regs || regs->size() != 2) {
     auto reason = regs ? "Unexpected register count" : regs.error().message;
@@ -353,7 +361,7 @@ std::uint32_t Motor::readU32(ModbusClient& bus, int upperAddr) const {
 
 std::uint16_t Motor::readU16(ModbusClient& bus, const int addr) const {
   RIMO_TIMED_SCOPE("Motor::readU16");
-  selectSlave(bus);
+  selectSlave(bus, SlaveTarget::Device);
   auto regs = bus.read_holding_registers(addr, 1);
   if (!regs || regs->size() != 1) {
     auto reason = regs ? "Unexpected register count" : regs.error().message;
@@ -368,20 +376,28 @@ std::uint16_t Motor::readU16(ModbusClient& bus, const int addr) const {
 void Motor::writeU16(ModbusClient& bus, const int addr,
                      const std::uint16_t value) const {
   RIMO_TIMED_SCOPE("Motor::writeU16");
-  selectSlave(bus);
-  auto wr = bus.write_single_register(addr, value);
+  selectSlave(bus, SlaveTarget::Command);
+  const std::array<std::uint16_t, 1> singleWord{value};
+  ModbusResult<void> wr = _forceFunction10ForSingleRegisterWrites
+                              ? bus.write_multiple_registers(addr, singleWord)
+                              : bus.write_single_register(addr, value);
   if (!wr) {
     auto msg = std::format(
-        "Motor {} (slave {}) writeU16(0x{:04X}, 0x{:04X}) failed: {}",
-        magic_enum::enum_name(_id), _slaveAddress, addr, value,
+        "Motor {} (command slave {}) writeU16(0x{:04X}, 0x{:04X}) failed: {}",
+        magic_enum::enum_name(_id), _commandSlaveAddress, addr, value,
         wr.error().message);
     utl::throwRuntimeError(msg);
   }
 }
 
 void Motor::writeInt32(ModbusClient& bus, int upperAddr, std::int32_t value) const {
+  writeInt32(bus, upperAddr, value, SlaveTarget::Command);
+}
+
+void Motor::writeInt32(ModbusClient& bus, int upperAddr, std::int32_t value,
+                       const SlaveTarget target) const {
   RIMO_TIMED_SCOPE("Motor::writeInt32");
-  selectSlave(bus);
+  selectSlave(bus, target);
   std::uint32_t raw = static_cast<std::uint32_t>(value);
   std::vector<std::uint16_t> words = {
       static_cast<std::uint16_t>((raw >> 16) & 0xFFFFu),
@@ -390,7 +406,9 @@ void Motor::writeInt32(ModbusClient& bus, int upperAddr, std::int32_t value) con
   if (!wr) {
     auto msg =
         std::format("Motor {} (slave {}) writeInt32({}, {}) failed: {}",
-                    magic_enum::enum_name(_id), _slaveAddress,
+                    magic_enum::enum_name(_id),
+                    target == SlaveTarget::Command ? _commandSlaveAddress
+                                                   : _slaveAddress,
                     registerLabel(upperAddr), value, wr.error().message);
     utl::throwRuntimeError(msg);
   }
@@ -448,7 +466,7 @@ void Motor::setDriverInputFlag(ModbusClient& bus, const MotorInputFlag flag,
                                const bool enabled) const {
   auto raw = _driverInputCommandRawCache.has_value()
                  ? *_driverInputCommandRawCache
-                 : readDriverInputCommandRaw(bus);
+                 : readDriverInputCommandRawCommandTarget(bus);
   std::optional<std::uint16_t> bit;
   const auto bitMaskFromMapped = [&](const std::uint16_t functionCode)
       -> std::optional<std::uint16_t> {
@@ -577,7 +595,8 @@ std::uint8_t Motor::readSelectedOperationId(ModbusClient& bus) const {
   if (_selectedOperationIdCache.has_value()) {
     return *_selectedOperationIdCache;
   }
-  return decodeOperationIdFromInputRawMapped(readDriverInputCommandRaw(bus));
+  return decodeOperationIdFromInputRawMapped(
+      readDriverInputCommandRawCommandTarget(bus));
 }
 
 void Motor::setSelectedOperationId(ModbusClient& bus, const std::uint8_t opId) const {
@@ -587,7 +606,7 @@ void Motor::setSelectedOperationId(ModbusClient& bus, const std::uint8_t opId) c
   }
   auto raw = _driverInputCommandRawCache.has_value()
                  ? *_driverInputCommandRawCache
-                 : readDriverInputCommandRaw(bus);
+                 : readDriverInputCommandRawCommandTarget(bus);
   raw = static_cast<std::uint16_t>(raw & ~operationIdMask());
   const auto applyOpBit = [&](const std::uint8_t opMask,
                               const std::uint16_t functionCode) {
@@ -647,37 +666,56 @@ void Motor::setOperationDeceleration(ModbusClient& bus, const std::uint8_t opId,
 }
 
 void Motor::setRunCurrent(ModbusClient& bus, const std::int32_t current) const {
-  writeInt32(bus, _map.runCurrent, current);
+  writeInt32(bus, _map.runCurrent, current, SlaveTarget::Device);
 }
 
 void Motor::setStopCurrent(ModbusClient& bus, const std::int32_t current) const {
-  writeInt32(bus, _map.stopCurrent, current);
+  writeInt32(bus, _map.stopCurrent, current, SlaveTarget::Device);
+}
+
+void Motor::setStopInputAction(ModbusClient& bus, const std::int32_t value) const {
+  writeInt32(bus, _map.stopInputAction, value, SlaveTarget::Device);
 }
 
 void Motor::setStartingSpeed(ModbusClient& bus, const std::int32_t speed) const {
-  writeInt32(bus, _map.startingSpeed, speed);
+  writeInt32(bus, _map.startingSpeed, speed, SlaveTarget::Device);
 }
 
 void Motor::setOverloadAlarm(ModbusClient& bus, const std::int32_t value) const {
-  writeInt32(bus, _map.overloadAlarm, value);
+  writeInt32(bus, _map.overloadAlarm, value, SlaveTarget::Device);
 }
 
 void Motor::setExcessivePositionDeviationAlarm(ModbusClient& bus,
                                                const std::int32_t value) const {
-  writeInt32(bus, _map.excessivePositionDeviationAlarm, value);
+  writeInt32(bus, _map.excessivePositionDeviationAlarm, value,
+             SlaveTarget::Device);
 }
 
 void Motor::setOverloadWarning(ModbusClient& bus, const std::int32_t value) const {
-  writeInt32(bus, _map.overloadWarning, value);
+  writeInt32(bus, _map.overloadWarning, value, SlaveTarget::Device);
 }
 
 void Motor::setExcessivePositionDeviationWarning(ModbusClient& bus,
                                                  const std::int32_t value) const {
-  writeInt32(bus, _map.excessivePositionDeviationWarning, value);
+  writeInt32(bus, _map.excessivePositionDeviationWarning, value,
+             SlaveTarget::Device);
+}
+
+void Motor::setMotorRotationDirection(ModbusClient& bus,
+                                      const std::int32_t value) const {
+  writeInt32(bus, _map.motorRotationDirection, value, SlaveTarget::Device);
+}
+
+void Motor::executeConfiguration(ModbusClient& bus) const {
+  writeInt32(bus, _map.configurationExecute, 1, SlaveTarget::Device);
+}
+
+std::int32_t Motor::readGroupId(ModbusClient& bus) const {
+  return static_cast<std::int32_t>(readU32(bus, _map.groupId));
 }
 
 void Motor::setGroupId(ModbusClient& bus, const std::int32_t value) const {
-  writeInt32(bus, _map.groupId, value);
+  writeInt32(bus, _map.groupId, value, SlaveTarget::Device);
 }
 
 void Motor::configureConstantSpeedPair(ModbusClient& bus,
@@ -743,7 +781,7 @@ MotorMonitorSnapshot Motor::readMonitorSnapshot(ModbusClient& bus) const {
         magic_enum::enum_name(_id), _slaveAddress, baseAddr, lastAddr));
   }
 
-  selectSlave(bus);
+  selectSlave(bus, SlaveTarget::Device);
   auto regs = bus.read_holding_registers(baseAddr, wordCount);
   if (!regs || regs->size() != static_cast<std::size_t>(wordCount)) {
     const auto reason = regs ? "Unexpected register count" : regs.error().message;
@@ -899,7 +937,7 @@ MotorRemoteIoStatus Motor::decodeRemoteIoStatus(const std::uint16_t reg007D,
 
 std::array<std::uint16_t, 16> Motor::readOutputFunctionAssignments(
     ModbusClient& bus) const {
-  selectSlave(bus);
+  selectSlave(bus, SlaveTarget::Device);
   // Function assignment registers are 32-bit values (upper/lower per channel).
   // We keep only the lower 16-bit function code.
   constexpr int kChannels = 6;
@@ -923,7 +961,7 @@ std::array<std::uint16_t, 16> Motor::readOutputFunctionAssignments(
 
 std::array<std::uint16_t, 16> Motor::readNetOutputFunctionAssignments(
     ModbusClient& bus) const {
-  selectSlave(bus);
+  selectSlave(bus, SlaveTarget::Device);
   constexpr int kChannels = 16;
   constexpr int kWordsPerChannel = 2;
   constexpr int kMaxRegistersPerRead = 16;
@@ -967,7 +1005,7 @@ std::array<std::uint16_t, 16> Motor::readNetOutputFunctionAssignments(
 
 std::array<std::uint16_t, 16> Motor::readNetInputFunctionAssignments(
     ModbusClient& bus) const {
-  selectSlave(bus);
+  selectSlave(bus, SlaveTarget::Device);
   constexpr int kChannels = 16;
   constexpr int kWordsPerChannel = 2;
   constexpr int kMaxRegistersPerRead = 16;
@@ -1011,7 +1049,7 @@ std::array<std::uint16_t, 16> Motor::readNetInputFunctionAssignments(
 
 std::array<std::uint16_t, 12> Motor::readInputFunctionAssignments(
     ModbusClient& bus) const {
-  selectSlave(bus);
+  selectSlave(bus, SlaveTarget::Device);
   // Function assignment registers are 32-bit values (upper/lower per channel).
   // We keep only the lower 16-bit function code.
   constexpr int kChannels = 8;
@@ -1122,16 +1160,33 @@ void Motor::resetAlarm(ModbusClient& bus) const {
   }
 
   // Alarm reset is a 0->1 edge on 0x0180.
-  writeInt32(bus, _map.alarmResetCommand, 0u);
-  writeInt32(bus, _map.alarmResetCommand, 1u);
+  writeInt32(bus, _map.alarmResetCommand, 0u, SlaveTarget::Device);
+  writeInt32(bus, _map.alarmResetCommand, 1u, SlaveTarget::Device);
 }
 
-void Motor::selectSlave(ModbusClient& bus) const {
+std::uint16_t Motor::readDriverInputCommandRawCommandTarget(ModbusClient& bus) const {
+  selectSlave(bus, SlaveTarget::Command);
+  auto regs = bus.read_holding_registers(_map.driverInputCommandLower, 1);
+  if (!regs || regs->size() != 1) {
+    const auto reason = regs ? "Unexpected register count" : regs.error().message;
+    auto msg = std::format(
+        "Motor {} (command slave {}) read command driver input raw failed: {}",
+        magic_enum::enum_name(_id), _commandSlaveAddress, reason);
+    utl::throwRuntimeError(msg);
+  }
+  const auto raw = (*regs)[0];
+  _driverInputCommandRawCache = raw;
+  _selectedOperationIdCache = decodeOperationIdFromInputRawMapped(raw);
+  return raw;
+}
+
+void Motor::selectSlave(ModbusClient& bus, const SlaveTarget target) const {
   RIMO_TIMED_SCOPE("Motor::selectSlave");
-  if (auto s = bus.set_slave(_slaveAddress); !s) {
+  const auto slave =
+      target == SlaveTarget::Command ? _commandSlaveAddress : _slaveAddress;
+  if (auto s = bus.set_slave(slave); !s) {
     auto msg = std::format("Failed to select slave {} for motor {}: {}",
-                           _slaveAddress, magic_enum::enum_name(_id),
-                           s.error().message);
+                           slave, magic_enum::enum_name(_id), s.error().message);
     SPDLOG_ERROR(msg);
     utl::throwRuntimeError(msg);
   }

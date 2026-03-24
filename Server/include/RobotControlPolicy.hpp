@@ -55,7 +55,6 @@ class RimoKunControlPolicy final : public IRobotControlPolicy {
     double speedUpdateAxisDeltaThreshold{0.02};
     double maxLinearSpeedMmPerSec{80.0};
     double stepsPerMm{100.0};
-    bool invertAxis{false};
     std::int32_t acceleration001MsPerKHz{24575};
     std::int32_t deceleration001MsPerKHz{24575};
   };

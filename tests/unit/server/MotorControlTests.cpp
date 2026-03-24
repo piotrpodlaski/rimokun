@@ -172,6 +172,70 @@ std::filesystem::path writeMotorControlConfigWithGroupId(
   return path;
 }
 
+std::filesystem::path writeMotorControlConfigWithMotorRotationDirection(
+    const std::string& motorAddressValue, const int motorRotationDirection) {
+  const auto stamp =
+      std::chrono::high_resolution_clock::now().time_since_epoch().count();
+  const auto path =
+      std::filesystem::temp_directory_path() /
+      ("rimokun_motor_control_rotation_direction_test_" +
+       std::to_string(stamp) + ".yaml");
+
+  std::ofstream out(path);
+  out << "classes:\n";
+  out << "  MotorControl:\n";
+  out << "    model: \"AR-KD2\"\n";
+  out << "    transport:\n";
+  out << "      type: \"serialRtu\"\n";
+  out << "      serial:\n";
+  out << "        device: \"/dev/fake\"\n";
+  out << "        baud: 115200\n";
+  out << "        parity: \"N\"\n";
+  out << "        dataBits: 8\n";
+  out << "        stopBits: 1\n";
+  out << "    responseTimeoutMS: 1000\n";
+  out << "    motors:\n";
+  out << "      XLeft:\n";
+  out << "        address: " << motorAddressValue << "\n";
+  out << "        motorRotationDirection: " << motorRotationDirection << "\n";
+  out.close();
+
+  return path;
+}
+
+std::filesystem::path writeMotorControlConfigWithCommandAddressAndWriteMode(
+    const std::string& motorAddressValue, const int commandAddress,
+    const bool forceFunction10ForSingleRegisterWrites) {
+  const auto stamp =
+      std::chrono::high_resolution_clock::now().time_since_epoch().count();
+  const auto path =
+      std::filesystem::temp_directory_path() /
+      ("rimokun_motor_control_command_address_test_" + std::to_string(stamp) + ".yaml");
+
+  std::ofstream out(path);
+  out << "classes:\n";
+  out << "  MotorControl:\n";
+  out << "    model: \"AR-KD2\"\n";
+  out << "    transport:\n";
+  out << "      type: \"serialRtu\"\n";
+  out << "      serial:\n";
+  out << "        device: \"/dev/fake\"\n";
+  out << "        baud: 115200\n";
+  out << "        parity: \"N\"\n";
+  out << "        dataBits: 8\n";
+  out << "        stopBits: 1\n";
+  out << "    responseTimeoutMS: 1000\n";
+  out << "    motors:\n";
+  out << "      XLeft:\n";
+  out << "        address: " << motorAddressValue << "\n";
+  out << "        commandAddress: " << commandAddress << "\n";
+  out << "        forceFunction10ForSingleRegisterWrites: "
+      << (forceFunction10ForSingleRegisterWrites ? "true" : "false") << "\n";
+  out.close();
+
+  return path;
+}
+
 std::uint8_t readSelectedOperationIdForMotor(const int slave) {
   return Motor::decodeOperationIdFromInputRaw(
       fake_modbus::getHoldingRegister(slave, makeArKd2RegisterMap().driverInputCommandLower));
@@ -356,6 +420,10 @@ TEST(MotorControlTests, InitializeAppliesConfiguredPerMotorCurrents) {
             static_cast<std::uint16_t>(900u >> 16));
   EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.runCurrent + 1),
             static_cast<std::uint16_t>(900u & 0xFFFFu));
+  EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.stopInputAction),
+            static_cast<std::uint16_t>(3u >> 16));
+  EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.stopInputAction + 1),
+            static_cast<std::uint16_t>(3u & 0xFFFFu));
   EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.stopCurrent),
             static_cast<std::uint16_t>(700u >> 16));
   EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.stopCurrent + 1),
@@ -415,6 +483,131 @@ TEST(MotorControlTests, InitializeAppliesConfiguredGroupId) {
             static_cast<std::uint16_t>(7u >> 16));
   EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.groupId + 1),
             static_cast<std::uint16_t>(7u & 0xFFFFu));
+
+  std::filesystem::remove(configPath);
+}
+
+TEST(MotorControlTests, InitializeAppliesConfiguredMotorRotationDirection) {
+  fake_modbus::reset();
+  const auto configPath =
+      writeMotorControlConfigWithMotorRotationDirection("5", 1);
+  utl::Config::instance().setConfigPath(configPath.string());
+
+  MotorControl control;
+  control.initialize();
+
+  const auto map = makeArKd2RegisterMap();
+  EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.motorRotationDirection),
+            static_cast<std::uint16_t>(1u >> 16));
+  EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.motorRotationDirection + 1),
+            static_cast<std::uint16_t>(1u & 0xFFFFu));
+  EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.configurationExecute),
+            static_cast<std::uint16_t>(1u >> 16));
+  EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.configurationExecute + 1),
+            static_cast<std::uint16_t>(1u & 0xFFFFu));
+
+  std::filesystem::remove(configPath);
+}
+
+TEST(MotorControlTests, ResetAlarmReappliesConfiguredMotorParameters) {
+  fake_modbus::reset();
+  const auto configPath =
+      writeMotorControlConfigWithMotorRotationDirection("5", 1);
+  utl::Config::instance().setConfigPath(configPath.string());
+
+  MotorControl control;
+  control.initialize();
+
+  const auto map = makeArKd2RegisterMap();
+  fake_modbus::setHoldingRegister(5, map.runCurrent, 0);
+  fake_modbus::setHoldingRegister(5, map.runCurrent + 1, 0);
+  fake_modbus::setHoldingRegister(5, map.stopCurrent, 0);
+  fake_modbus::setHoldingRegister(5, map.stopCurrent + 1, 0);
+  fake_modbus::setHoldingRegister(5, map.motorRotationDirection, 0);
+  fake_modbus::setHoldingRegister(5, map.motorRotationDirection + 1, 0);
+  fake_modbus::setHoldingRegister(5, map.configurationExecute, 0);
+  fake_modbus::setHoldingRegister(5, map.configurationExecute + 1, 0);
+
+  control.resetAlarm(utl::EMotor::XLeft);
+
+  EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.runCurrent),
+            static_cast<std::uint16_t>(1000u >> 16));
+  EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.runCurrent + 1),
+            static_cast<std::uint16_t>(1000u & 0xFFFFu));
+  EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.stopCurrent),
+            static_cast<std::uint16_t>(500u >> 16));
+  EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.stopCurrent + 1),
+            static_cast<std::uint16_t>(500u & 0xFFFFu));
+  EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.motorRotationDirection + 1),
+            static_cast<std::uint16_t>(1u & 0xFFFFu));
+  EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.configurationExecute + 1),
+            static_cast<std::uint16_t>(1u & 0xFFFFu));
+
+  std::filesystem::remove(configPath);
+}
+
+TEST(MotorControlTests, TemporaryCommunicationFailureSetsComponentErrorState) {
+  fake_modbus::reset();
+  const auto configPath = writeMotorControlConfig("5");
+  utl::Config::instance().setConfigPath(configPath.string());
+
+  MotorControl control;
+  control.initialize();
+
+  fake_modbus::failNext(fake_modbus::FailurePoint::ReadRegisters,
+                        "Resource temporarily unavailable");
+  EXPECT_THROW((void)control.readGroupId(utl::EMotor::XLeft), std::runtime_error);
+  EXPECT_EQ(control.state(), MachineComponent::State::Error);
+
+  std::filesystem::remove(configPath);
+}
+
+TEST(MotorControlTests, ReadGroupIdReturnsConfiguredValue) {
+  fake_modbus::reset();
+  const auto configPath = writeMotorControlConfigWithGroupId("5", 7);
+  utl::Config::instance().setConfigPath(configPath.string());
+
+  MotorControl control;
+  control.initialize();
+
+  EXPECT_EQ(control.readGroupId(utl::EMotor::XLeft), 7);
+
+  std::filesystem::remove(configPath);
+}
+
+TEST(MotorControlTests,
+     ForceFunction10ForSingleRegisterWritesUsesMultipleRegisterWritesForCommands) {
+  fake_modbus::reset();
+  const auto configPath =
+      writeMotorControlConfigWithCommandAddressAndWriteMode("5", 5, true);
+  utl::Config::instance().setConfigPath(configPath.string());
+
+  MotorControl control;
+  control.initialize();
+  control.setDirection(utl::EMotor::XLeft, MotorControlDirection::Forward);
+
+  const auto writes = fake_modbus::writes();
+  ASSERT_FALSE(writes.empty());
+  EXPECT_EQ(writes.back().kind, fake_modbus::WriteKind::MultipleRegisters);
+  EXPECT_EQ(writes.back().slave, 5);
+  EXPECT_EQ(writes.back().values.size(), 1u);
+
+  std::filesystem::remove(configPath);
+}
+
+TEST(MotorControlTests, CommandAddressRoutesRuntimeWritesToConfiguredSlave) {
+  fake_modbus::reset();
+  const auto configPath =
+      writeMotorControlConfigWithCommandAddressAndWriteMode("5", 9, true);
+  utl::Config::instance().setConfigPath(configPath.string());
+
+  MotorControl control;
+  control.initialize();
+  control.setDirection(utl::EMotor::XLeft, MotorControlDirection::Forward);
+
+  const auto writes = fake_modbus::writes();
+  ASSERT_FALSE(writes.empty());
+  EXPECT_EQ(writes.back().slave, 9);
 
   std::filesystem::remove(configPath);
 }

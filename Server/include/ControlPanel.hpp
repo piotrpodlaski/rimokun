@@ -24,7 +24,9 @@ class ControlPanel final : public MachineComponent {
   ControlPanel(std::unique_ptr<IControlPanelComm> comm,
                std::size_t movingAverageDepth,
                std::size_t baselineSamples,
-               std::size_t buttonDebounceSamples);
+               std::size_t buttonDebounceSamples,
+               std::array<bool, 3> invertX = {},
+               std::array<bool, 3> invertY = {});
   ~ControlPanel() override;
   void initialize() override;
   void reset() override;
@@ -42,6 +44,8 @@ class ControlPanel final : public MachineComponent {
   std::size_t _movingAverageDepth;
   std::size_t _baselineSamples;
   std::size_t _buttonDebounceSamples;
+  std::array<bool, 3> _invertX{};
+  std::array<bool, 3> _invertY{};
   std::atomic<bool> _readerRunning{false};
   std::thread _readerThread;
   std::array<std::atomic<double>, 3> _x{};

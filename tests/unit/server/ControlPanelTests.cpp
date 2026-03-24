@@ -136,6 +136,29 @@ TEST(ControlPanelTests, MovingAverageSmoothingUsesConfiguredDepth) {
   panel.reset();
 }
 
+TEST(ControlPanelTests, AxisInversionIsAppliedAtJoystickProcessingLevel) {
+  auto fake = std::make_unique<FakeControlPanelComm>();
+  auto* fakeRaw = fake.get();
+  ControlPanel panel(std::move(fake), 1, 1, 1,
+                     {true, false, false},
+                     {false, true, false});
+
+  panel.initialize();
+  fakeRaw->pushLine(makeLine(512, 512, 0));
+  fakeRaw->pushLine(makeLine(1023, 0, 0, 512, 0, 0));
+
+  ASSERT_TRUE(waitUntil([&] {
+    const auto snapshot = panel.getSnapshot();
+    return snapshot.x[0] < -0.9 && snapshot.y[1] > 0.9;
+  }));
+
+  const auto snapshot = panel.getSnapshot();
+  EXPECT_NEAR(snapshot.x[0], -0.998, 0.01);
+  EXPECT_NEAR(snapshot.y[1], 1.0, 0.0001);
+
+  panel.reset();
+}
+
 TEST(ControlPanelTests, ButtonDebounceRequiresConfiguredConsecutiveSamples) {
   auto fake = std::make_unique<FakeControlPanelComm>();
   auto* fakeRaw = fake.get();

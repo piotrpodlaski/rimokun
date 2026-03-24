@@ -5,18 +5,35 @@
 #include <Logger.hpp>
 #include <TimingMetrics.hpp>
 
+#include <array>
 #include <sstream>
 #include <stdexcept>
 #include <utility>
 
+namespace {
+void loadAxisInvertFlag(const YAML::Node& axesCfg, const char* axisKey, bool& target) {
+  const auto axisNode = axesCfg[axisKey];
+  if (!axisNode || !axisNode.IsMap()) {
+    return;
+  }
+  if (const auto invertAxis = axisNode["invertAxis"]; invertAxis) {
+    target = invertAxis.as<bool>();
+  }
+}
+}  // namespace
+
 ControlPanel::ControlPanel(std::unique_ptr<IControlPanelComm> comm,
                            const std::size_t movingAverageDepth,
                            const std::size_t baselineSamples,
-                           const std::size_t buttonDebounceSamples)
+                           const std::size_t buttonDebounceSamples,
+                           const std::array<bool, 3> invertX,
+                           const std::array<bool, 3> invertY)
     : _comm(std::move(comm)),
       _movingAverageDepth(std::max<std::size_t>(1u, movingAverageDepth)),
       _baselineSamples(std::max<std::size_t>(1u, baselineSamples)),
-      _buttonDebounceSamples(std::max<std::size_t>(1u, buttonDebounceSamples)) {
+      _buttonDebounceSamples(std::max<std::size_t>(1u, buttonDebounceSamples)),
+      _invertX(invertX),
+      _invertY(invertY) {
   if (!_comm) {
     utl::throwRuntimeError("ControlPanel communication backend is null.");
   }
@@ -71,6 +88,23 @@ ControlPanel::ControlPanel() {
       std::max<std::size_t>(1u, getProcessingOrLegacy("baselineSamples", 50u));
   _buttonDebounceSamples = std::max<std::size_t>(
       1u, getProcessingOrLegacy("buttonDebounceSamples", 3u));
+
+  try {
+    const auto machineCfg = cfg.getClassConfig("Machine");
+    const auto motionCfg = machineCfg["motion"];
+    const auto axesCfg = motionCfg ? motionCfg["axes"] : YAML::Node{};
+    if (axesCfg && axesCfg.IsMap()) {
+      loadAxisInvertFlag(axesCfg, "leftArmX", _invertX[0]);
+      loadAxisInvertFlag(axesCfg, "leftArmY", _invertY[0]);
+      loadAxisInvertFlag(axesCfg, "rightArmX", _invertX[1]);
+      loadAxisInvertFlag(axesCfg, "rightArmY", _invertY[1]);
+      loadAxisInvertFlag(axesCfg, "gantryZ", _invertY[2]);
+      loadAxisInvertFlag(axesCfg, "gantryY", _invertY[2]);
+    }
+  } catch (const std::exception&) {
+    // Keep default non-inverted joystick axes when motion config is unavailable.
+  }
+
   if (!_comm) {
     utl::throwRuntimeError("ControlPanel communication backend is null.");
   }
@@ -191,8 +225,8 @@ void ControlPanel::processLine(const std::string& line) {
       SPDLOG_INFO("ControlPanel joystick[{}] baseline ready. x={:.3f} y={:.3f}",
                   i, out.x, out.y);
     }
-    _x[i].store(out.x, std::memory_order_release);
-    _y[i].store(out.y, std::memory_order_release);
+    _x[i].store(_invertX[i] ? -out.x : out.x, std::memory_order_release);
+    _y[i].store(_invertY[i] ? -out.y : out.y, std::memory_order_release);
     _b[i].store(out.button, std::memory_order_release);
   }
 }
@@ -215,4 +249,3 @@ void ControlPanel::resetSignalProcessingState() {
     _processors[i].reconfigure(_movingAverageDepth, _baselineSamples, _buttonDebounceSamples);
   }
 }
-

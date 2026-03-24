@@ -110,9 +110,6 @@ RimoKunControlPolicy::RimoKunControlPolicy() {
       if (const auto stepsPerMm = axisNode["stepsPerMm"]; stepsPerMm) {
         axis.stepsPerMm = stepsPerMm.as<double>();
       }
-      if (const auto invertAxis = axisNode["invertAxis"]; invertAxis) {
-        axis.invertAxis = invertAxis.as<bool>();
-      }
       if (const auto acceleration = axisNode["acceleration001MsPerKHz"];
           acceleration) {
         axis.acceleration001MsPerKHz = acceleration.as<std::int32_t>();
@@ -235,7 +232,7 @@ IRobotControlPolicy::ControlDecision RimoKunControlPolicy::decide(
                                      const double axisValue,
                                      const AxisConfig& axisCfg) {
     auto& runtime = _motorRuntime[motorId];
-    const auto clampedAxis = clampAxis(axisCfg.invertAxis ? -axisValue : axisValue);
+    const auto clampedAxis = clampAxis(axisValue);
     const auto active =
         std::abs(clampedAxis) >= axisCfg.neutralAxisActivationThreshold;
 
@@ -304,9 +301,8 @@ IRobotControlPolicy::ControlDecision RimoKunControlPolicy::decide(
   appendSpeedIntent(utl::EMotor::XRight, rightJs.x, _motion.rightArmX);
   appendSpeedIntent(utl::EMotor::YRight, rightJs.y, _motion.rightArmY);
 
-  // Gantry Z: single joystick axis drives both Z motors with the same command.
-  appendSpeedIntent(utl::EMotor::ZLeft, gantryJs.y, _motion.gantryZ);
-  appendSpeedIntent(utl::EMotor::ZRight, gantryJs.y, _motion.gantryZ);
+  // Gantry Z: single joystick axis drives both Z motors with the same command, through groups
+  appendSpeedIntent(utl::EMotor::ZLeft, rightJs.y, _motion.gantryZ);
 
   return {.outputs = std::move(ioOutputs),
           .motorIntents = std::move(motorIntents),

@@ -2,6 +2,7 @@
 
 #include <QCheckBox>
 #include <QCloseEvent>
+#include <QFrame>
 #include <QGridLayout>
 #include <QGroupBox>
 #include <QHBoxLayout>
@@ -139,22 +140,38 @@ std::vector<ContecPanelWindow::ChannelRow> ContecPanelWindow::createRows(
   std::vector<ChannelRow> rows(static_cast<std::size_t>(count));
   const int safeColumns = std::max(1, columns);
   const int rowsPerColumn = (count + safeColumns - 1) / safeColumns;
+  const int totalColumns = safeColumns * 3 - 1;
   for (int i = 0; i < count; ++i) {
     auto* mappingLabel = new QLabel("-", parent);
     auto* led = new LedIndicator(parent);
     led->setState(utl::ELEDState::Off);
     const int columnGroup = i / rowsPerColumn;
     const int row = i % rowsPerColumn;
-    const int baseColumn = columnGroup * 2;
-    layout->addWidget(mappingLabel, row, baseColumn);
-    layout->addWidget(led, row, baseColumn + 1);
+    const int baseColumn = columnGroup * 3;
+    const int displayRow = row * 2;
+    layout->addWidget(mappingLabel, displayRow, baseColumn);
+    layout->addWidget(led, displayRow, baseColumn + 1);
     rows[static_cast<std::size_t>(i)] = ChannelRow{
         .signalLabel = mappingLabel,
         .led = led,
     };
   }
+  for (int column = 0; column < safeColumns - 1; ++column) {
+    auto* separator = new QFrame(parent);
+    separator->setFrameShape(QFrame::VLine);
+    separator->setFrameShadow(QFrame::Sunken);
+    separator->setLineWidth(1);
+    layout->addWidget(separator, 0, column * 3 + 2, rowsPerColumn * 2 - 1, 1);
+  }
+  for (int row = 0; row < rowsPerColumn - 1; ++row) {
+    auto* separator = new QFrame(parent);
+    separator->setFrameShape(QFrame::HLine);
+    separator->setFrameShadow(QFrame::Sunken);
+    separator->setLineWidth(1);
+    layout->addWidget(separator, row * 2 + 1, 0, 1, totalColumns);
+  }
   for (int column = 0; column < safeColumns; ++column) {
-    layout->setColumnStretch(column * 2, 1);
+    layout->setColumnStretch(column * 3, 1);
   }
   return rows;
 }

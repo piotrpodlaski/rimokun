@@ -21,6 +21,8 @@ MotorRegisterMap makeArKd2RegisterMap() {
 
   // 0x0180/0x0181: alarm reset command (used by existing lab script)
   map.alarmResetCommand = 0x0180;
+  map.configurationExecute = 0x018C;
+  map.stopInputAction = 0x0200;
 
   // Monitor registers (32-bit)
   map.commandPosition = 0x00C6;
@@ -34,6 +36,7 @@ MotorRegisterMap makeArKd2RegisterMap() {
   map.excessivePositionDeviationAlarm = 0x0302;
   map.overloadWarning = 0x0342;
   map.excessivePositionDeviationWarning = 0x034A;
+  map.motorRotationDirection = 0x0384;
 
   // Operation data No.0 registers (32-bit)
   map.positionNo0 = 0x0400;

@@ -23,9 +23,9 @@ void signalHandler(int) { gStopRequested.store(true, std::memory_order_release);
 struct Args {
   std::string configPath{"Config/rimokun.yaml"};
   std::string motorName{};
-  std::int32_t speed1{200};
-  std::int32_t speed2{400};
-  int runSeconds{5};
+  std::int32_t speed1{2000};
+  std::int32_t speed2{4000};
+  int runSeconds{10};
   bool listMotorsOnly{false};
 };
 
@@ -227,6 +227,7 @@ int main(int argc, char** argv) {
       if (motor.has_value()) {
         try {
           mc.stopMovement(*motor);
+          mc.setEnabled(*motor, false);
         } catch (const std::exception& e) {
           SPDLOG_WARN("Failed to stop motor during cleanup: {}", e.what());
         }
@@ -249,6 +250,14 @@ int main(int argc, char** argv) {
     SPDLOG_INFO("Configured motors ({}):", configuredMotors.size());
     for (const auto motor : configuredMotors) {
       SPDLOG_INFO("  {}", utl::enumToString(motor));
+    }
+    for (const auto motor : configuredMotors) {
+      const auto& motorMap = mc.motors().at(motor).map();
+      const auto groupId = mc.readGroupId(motor);
+      SPDLOG_INFO(
+          "Motor {} groupId regs 0x{:04X}/0x{:04X} => {} (0x{:08X})",
+          utl::enumToString(motor), motorMap.groupId, motorMap.groupId + 1, groupId,
+          static_cast<std::uint32_t>(groupId));
     }
     if (args.listMotorsOnly) {
       cleanup(std::nullopt);
@@ -283,6 +292,7 @@ int main(int argc, char** argv) {
 
     mc.setMode(motorId, MotorControlMode::Speed);
     mc.setDirection(motorId, MotorControlDirection::Forward);
+    mc.setEnabled(motorId, true);
     mc.setSpeed(motorId, args.speed1);
     mc.startMovement(motorId);
     SPDLOG_INFO("Started speed mode: forward, speed={}", args.speed1);

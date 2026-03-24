@@ -23,6 +23,9 @@ class RimoClient {
     if (configNode.IsDefined()) {
       _statusAddress = configNode["statusAddress"].as<std::string>();
       _commandAddress = configNode["commandAddress"].as<std::string>();
+      _statusTimeoutMS = configNode["statusTimeoutMS"].as<int>(_statusTimeoutMS);
+      _commandTimeoutMS =
+          configNode["commandTimeoutMS"].as<int>(_commandTimeoutMS);
       SPDLOG_INFO("Found entry for RimoClient in the config file");
     }
 
@@ -30,12 +33,12 @@ class RimoClient {
     _statusSocket = zmq::socket_t(_context, zmq::socket_type::sub);
     _statusSocket.connect(_statusAddress);
     _statusSocket.set(zmq::sockopt::subscribe, "");
-    _statusSocket.set(zmq::sockopt::rcvtimeo, 1000);
+    _statusSocket.set(zmq::sockopt::rcvtimeo, _statusTimeoutMS);
 
     SPDLOG_INFO("Starting command client at '{}'", _commandAddress);
     _commandSocket = zmq::socket_t(_context, zmq::socket_type::req);
-    _commandSocket.set(zmq::sockopt::sndtimeo, 1000);
-    _commandSocket.set(zmq::sockopt::rcvtimeo, 1000);
+    _commandSocket.set(zmq::sockopt::sndtimeo, _commandTimeoutMS);
+    _commandSocket.set(zmq::sockopt::rcvtimeo, _commandTimeoutMS);
     _commandSocket.set(zmq::sockopt::linger, 0);
     _commandSocket.connect(_commandAddress);
   }
@@ -74,8 +77,8 @@ class RimoClient {
           "respawning the socket!");
       _commandSocket.close();
       _commandSocket = zmq::socket_t(_context, zmq::socket_type::req);
-      _commandSocket.set(zmq::sockopt::rcvtimeo, 1000);
-      _commandSocket.set(zmq::sockopt::sndtimeo, 1000);
+      _commandSocket.set(zmq::sockopt::rcvtimeo, _commandTimeoutMS);
+      _commandSocket.set(zmq::sockopt::sndtimeo, _commandTimeoutMS);
       _commandSocket.set(zmq::sockopt::linger, 0);
       _commandSocket.connect(_commandAddress);
       return std::nullopt;
@@ -98,6 +101,8 @@ class RimoClient {
   zmq::socket_t _commandSocket;
   std::string _statusAddress = "ipc:///tmp/rimoStatus";
   std::string _commandAddress = "ipc:///tmp/rimoCommand";
+  int _statusTimeoutMS{1000};
+  int _commandTimeoutMS{3000};
 };
 
 }  // namespace utl

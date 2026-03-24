@@ -1,5 +1,6 @@
 add_executable(utilities_unit_tests
         utilities/ConfigTests.cpp
+        utilities/JsonExtensionsTests.cpp
         utilities/YamlExtensionsTests.cpp
         utilities/VMotorStatsTests.cpp
 )

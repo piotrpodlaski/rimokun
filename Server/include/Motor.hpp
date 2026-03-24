@@ -131,10 +131,13 @@ enum class MotorOperationFunction : std::int32_t {
 
 class Motor {
  public:
-  Motor(utl::EMotor id, int slaveAddress, MotorRegisterMap map);
+  Motor(utl::EMotor id, int slaveAddress, MotorRegisterMap map,
+        int commandSlaveAddress = -1,
+        bool forceFunction10ForSingleRegisterWrites = false);
 
   [[nodiscard]] utl::EMotor id() const { return _id; }
   [[nodiscard]] int slaveAddress() const { return _slaveAddress; }
+  [[nodiscard]] int commandSlaveAddress() const { return _commandSlaveAddress; }
 
   void initialize(ModbusClient& bus) const;
   [[nodiscard]] std::uint32_t readU32(ModbusClient& bus, int upperAddr) const;
@@ -191,6 +194,7 @@ class Motor {
                                 std::int32_t deceleration) const;
   void setRunCurrent(ModbusClient& bus, std::int32_t current) const;
   void setStopCurrent(ModbusClient& bus, std::int32_t current) const;
+  void setStopInputAction(ModbusClient& bus, std::int32_t value) const;
   void setStartingSpeed(ModbusClient& bus, std::int32_t speed) const;
   void setOverloadAlarm(ModbusClient& bus, std::int32_t value) const;
   void setExcessivePositionDeviationAlarm(ModbusClient& bus,
@@ -198,6 +202,9 @@ class Motor {
   void setOverloadWarning(ModbusClient& bus, std::int32_t value) const;
   void setExcessivePositionDeviationWarning(ModbusClient& bus,
                                             std::int32_t value) const;
+  void setMotorRotationDirection(ModbusClient& bus, std::int32_t value) const;
+  void executeConfiguration(ModbusClient& bus) const;
+  [[nodiscard]] std::int32_t readGroupId(ModbusClient& bus) const;
   void setGroupId(ModbusClient& bus, std::int32_t value) const;
   void configureConstantSpeedPair(ModbusClient& bus, std::int32_t speedOp0,
                                   std::int32_t speedOp1, std::int32_t acceleration,
@@ -216,6 +223,10 @@ class Motor {
   [[nodiscard]] const MotorRegisterMap& map() const { return _map; }
 
  private:
+  enum class SlaveTarget {
+    Device,
+    Command,
+  };
   [[nodiscard]] std::array<std::uint16_t, 16> readOutputFunctionAssignments(
       ModbusClient& bus) const;
   [[nodiscard]] std::array<std::uint16_t, 12> readInputFunctionAssignments(
@@ -233,12 +244,18 @@ class Motor {
       std::uint16_t functionCode);
   [[nodiscard]] std::uint8_t decodeOperationIdFromInputRawMapped(
       std::uint16_t raw) const;
+  [[nodiscard]] std::uint16_t readDriverInputCommandRawCommandTarget(
+      ModbusClient& bus) const;
 
-  void selectSlave(ModbusClient& bus) const;
+  void selectSlave(ModbusClient& bus, SlaveTarget target) const;
+  void writeInt32(ModbusClient& bus, int upperAddr, std::int32_t value,
+                  SlaveTarget target) const;
 
   utl::EMotor _id;
   int _slaveAddress;
+  int _commandSlaveAddress;
   MotorRegisterMap _map;
+  bool _forceFunction10ForSingleRegisterWrites{false};
   mutable std::optional<std::uint16_t> _driverInputCommandRawCache;
   mutable std::optional<std::uint8_t> _selectedOperationIdCache;
   mutable std::optional<std::array<std::uint16_t, 16>> _outputFunctionAssignments;

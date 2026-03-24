@@ -6,6 +6,11 @@
 
 namespace fake_modbus {
 
+enum class WriteKind {
+  SingleRegister,
+  MultipleRegisters,
+};
+
 enum class FailurePoint {
   NewRtu,
   NewTcp,
@@ -25,6 +30,7 @@ enum class FailurePoint {
 struct WriteRecord {
   int slave{0};
   int addr{0};
+  WriteKind kind{WriteKind::SingleRegister};
   std::vector<std::uint16_t> values;
 };
 
@@ -35,4 +41,3 @@ void failNext(FailurePoint point, std::string message = "forced fake-modbus erro
 [[nodiscard]] std::vector<WriteRecord> writes();
 
 }  // namespace fake_modbus
-

@@ -66,28 +66,6 @@ std::filesystem::path writePolicyConfigLowThreshold() {
   return path;
 }
 
-std::filesystem::path writePolicyConfigWithInvertedLeftX() {
-  const auto stamp =
-      std::chrono::high_resolution_clock::now().time_since_epoch().count();
-  const auto path =
-      std::filesystem::temp_directory_path() /
-      ("rimokun_policy_invert_axis_" + std::to_string(stamp) + ".yaml");
-  std::ofstream out(path);
-  out << "classes:\n";
-  out << "  Machine:\n";
-  out << "    motion:\n";
-  out << "      neutralAxisActivationThreshold: 0.05\n";
-  out << "      speedUpdateAxisDeltaThreshold: 0.02\n";
-  out << "      axes:\n";
-  out << "        leftArmX: { invertAxis: true, maxLinearSpeedMmPerSec: 80.0, stepsPerMm: 10.0 }\n";
-  out << "        leftArmY: { maxLinearSpeedMmPerSec: 80.0, stepsPerMm: 10.0 }\n";
-  out << "        rightArmX: { maxLinearSpeedMmPerSec: 80.0, stepsPerMm: 10.0 }\n";
-  out << "        rightArmY: { maxLinearSpeedMmPerSec: 80.0, stepsPerMm: 10.0 }\n";
-  out << "        gantryZ: { maxLinearSpeedMmPerSec: 80.0, stepsPerMm: 10.0 }\n";
-  out.close();
-  return path;
-}
-
 void setAllComponentsOn(utl::RobotStatus& status) {
   status.robotComponents[utl::ERobotComponent::Contec] = utl::ELEDState::On;
   status.robotComponents[utl::ERobotComponent::MotorControl] = utl::ELEDState::On;
@@ -235,31 +213,6 @@ TEST(RobotControlPolicyTests, RimoKunPolicyUsesCommonThresholdWithPerAxisOverrid
   EXPECT_EQ(rightY, nullptr);  // rightArmY uses common 0.50
   EXPECT_EQ(zLeft, nullptr);   // gantryZ uses common 0.50
   EXPECT_EQ(zRight, nullptr);
-
-  std::filesystem::remove(configPath);
-}
-
-TEST(RobotControlPolicyTests, RimoKunPolicyCanInvertJoystickAxisFromConfig) {
-  const auto configPath = writePolicyConfigWithInvertedLeftX();
-  utl::Config::instance().setConfigPath(configPath.string());
-
-  RimoKunControlPolicy policy;
-  utl::RobotStatus status;
-  setAllComponentsOn(status);
-  status.joystics[utl::EArm::Left] = {.x = 0.6, .y = 0.0, .btn = false};
-  status.joystics[utl::EArm::Right] = {.x = 0.0, .y = 0.0, .btn = false};
-  status.joystics[utl::EArm::Gantry] = {.x = 0.0, .y = 0.0, .btn = false};
-
-  const auto decision = policy.decide(
-      IRobotControlPolicy::SignalMap{{"button1", false}, {"button2", false}},
-      std::nullopt, MachineComponent::State::Normal, status);
-
-  const auto* xLeft = findIntent(decision.motorIntents, utl::EMotor::XLeft);
-  ASSERT_NE(xLeft, nullptr);
-  ASSERT_TRUE(xLeft->direction.has_value());
-  EXPECT_EQ(*xLeft->direction, MotorControlDirection::Reverse);
-  ASSERT_TRUE(xLeft->speed.has_value());
-  EXPECT_EQ(*xLeft->speed, 480);  // |0.6| * 80 mm/s * 10 steps/mm
 
   std::filesystem::remove(configPath);
 }

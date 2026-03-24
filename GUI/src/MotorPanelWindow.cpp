@@ -6,6 +6,7 @@
 #include <QCheckBox>
 #include <QCloseEvent>
 #include <QComboBox>
+#include <QFrame>
 #include <QFormLayout>
 #include <QGridLayout>
 #include <QGroupBox>
@@ -416,16 +417,29 @@ void MotorPanelWindow::createAssignmentRows(
   for (const auto& channel : channels) {
     auto* mappingLabel = new QLabel("-", this);
     auto* led = new LedIndicator(this);
+    auto* separator = new QFrame(this);
     led->setState(utl::ELEDState::Off);
     led->setFixedSize(14, 14);
     mappingLabel->setAlignment(Qt::AlignVCenter | Qt::AlignLeft);
-    layout->addWidget(mappingLabel, row, 0);
-    layout->addWidget(led, row, 1, Qt::AlignTop | Qt::AlignHCenter);
+    separator->setFrameShape(QFrame::VLine);
+    separator->setFrameShadow(QFrame::Sunken);
+    separator->setLineWidth(1);
+    const int displayRow = row * 2;
+    layout->addWidget(mappingLabel, displayRow, 0);
+    layout->addWidget(separator, displayRow, 1);
+    layout->addWidget(led, displayRow, 2, Qt::AlignTop | Qt::AlignHCenter);
+    if (row + 1 < static_cast<int>(channels.size())) {
+      auto* rowSeparator = new QFrame(this);
+      rowSeparator->setFrameShape(QFrame::HLine);
+      rowSeparator->setFrameShadow(QFrame::Sunken);
+      rowSeparator->setLineWidth(1);
+      layout->addWidget(rowSeparator, displayRow + 1, 0, 1, 3);
+    }
     targetRows.emplace(channel, std::make_pair(mappingLabel, led));
     ++row;
   }
   layout->setColumnStretch(0, 1);
-  layout->setRowStretch(row, 1);
+  layout->setRowStretch(row * 2, 1);
   layout->setAlignment(Qt::AlignTop);
 }
 

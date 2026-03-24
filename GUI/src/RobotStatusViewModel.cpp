@@ -52,7 +52,7 @@ ResetControlsViewModel RobotStatusViewModel::resetControlsForStatus(
   vm.motor = getComponent(utl::ERobotComponent::MotorControl);
   vm.controlPanel = getComponent(utl::ERobotComponent::ControlPanel);
   if (status->safetyOn.has_value()) {
-    vm.motorPower = *status->safetyOn ? utl::ELEDState::On : utl::ELEDState::Error;
+    vm.motorPower = *status->safetyOn ? utl::ELEDState::On : utl::ELEDState::Off;
   } else {
     vm.motorPower = utl::ELEDState::Off;
   }

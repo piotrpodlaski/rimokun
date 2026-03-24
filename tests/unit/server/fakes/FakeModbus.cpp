@@ -194,7 +194,10 @@ int modbus_write_register(modbus_t* ctx, const int reg_addr,
   std::lock_guard<std::mutex> lock(st.mutex);
   st.holdingBySlave[asCtx(ctx)->slave][reg_addr] = value;
   st.writeHistory.push_back(fake_modbus::WriteRecord{
-      .slave = asCtx(ctx)->slave, .addr = reg_addr, .values = {value}});
+      .slave = asCtx(ctx)->slave,
+      .addr = reg_addr,
+      .kind = fake_modbus::WriteKind::SingleRegister,
+      .values = {value}});
   return 1;
 }
 
@@ -213,7 +216,10 @@ int modbus_write_registers(modbus_t* ctx, const int addr, const int nb,
     values.push_back(data[i]);
   }
   st.writeHistory.push_back(fake_modbus::WriteRecord{
-      .slave = asCtx(ctx)->slave, .addr = addr, .values = std::move(values)});
+      .slave = asCtx(ctx)->slave,
+      .addr = addr,
+      .kind = fake_modbus::WriteKind::MultipleRegisters,
+      .values = std::move(values)});
   return nb;
 }
 
@@ -248,4 +254,3 @@ int modbus_write_bits(modbus_t*, int, int nb, const uint8_t*) {
 }
 
 }  // extern "C"
-

@@ -6,6 +6,7 @@
 #include <map>
 #include <mutex>
 #include <optional>
+#include <string_view>
 #include <string>
 #include <vector>
 
@@ -88,6 +89,7 @@ class MotorControl final : public MachineComponent {
   [[nodiscard]] MotorCodeDiagnostic diagnoseCurrentWarning(utl::EMotor motorId);
   [[nodiscard]] MotorCodeDiagnostic diagnoseCurrentCommunicationError(
       utl::EMotor motorId);
+  [[nodiscard]] std::int32_t readGroupId(utl::EMotor motorId);
 
  private:
   enum class TransportType {
@@ -102,7 +104,9 @@ class MotorControl final : public MachineComponent {
 
   struct MotorConfig {
     int address{1};
+    std::optional<int> commandAddress;
     std::optional<std::int32_t> groupId;
+    std::optional<bool> forceFunction10ForSingleRegisterWrites;
     std::int32_t runCurrent{1000};
     std::int32_t stopCurrent{500};
     std::optional<std::int32_t> startingSpeed;
@@ -110,6 +114,7 @@ class MotorControl final : public MachineComponent {
     std::optional<std::int32_t> overloadAlarm;
     std::optional<std::int32_t> excessivePositionDeviationWarning;
     std::optional<std::int32_t> excessivePositionDeviationAlarm;
+    std::optional<std::int32_t> motorRotationDirection;
   };
 
   TransportType _transportType{TransportType::RawTcpRtu};
@@ -136,4 +141,9 @@ class MotorControl final : public MachineComponent {
 
   std::optional<ModbusClient> _bus;
   std::mutex _busMutex;
+
+  void applyConfiguredParameters(const Motor& motor, const MotorConfig& config,
+                                 ModbusClient& bus) const;
+  void handleCommunicationFailure(std::string_view action,
+                                  const std::exception& ex);
 };

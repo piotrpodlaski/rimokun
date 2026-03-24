@@ -19,6 +19,8 @@ struct MotorRegisterMap {
 
   // From lab validation script (vendor docs should be preferred for production reset flow).
   int alarmResetCommand{0x0180};
+  int configurationExecute{0x018C};
+  int stopInputAction{0x0200};
 
   int commandPosition{0x00C6};
   int commandSpeed{0x00C8};
@@ -31,6 +33,7 @@ struct MotorRegisterMap {
   int excessivePositionDeviationAlarm{0x0302};
   int overloadWarning{0x0342};
   int excessivePositionDeviationWarning{0x034A};
+  int motorRotationDirection{0x0384};
 
   // Operation data No.0 base addresses (each entry is 32-bit, upper/lower).
   int positionNo0{0x0400};

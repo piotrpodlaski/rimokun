@@ -178,6 +178,9 @@ struct adl_serializer<utl::RobotStatus> {
         {"robotComponents", utl::enumKeyedMapToJson(v.robotComponents)},
         {"joystics", utl::enumKeyedMapToJson(v.joystics)},
     };
+    if (v.safetyOn.has_value()) {
+      j["safetyOn"] = *v.safetyOn;
+    }
   }
 
   static void from_json(const json& j, utl::RobotStatus& v) {
@@ -189,6 +192,12 @@ struct adl_serializer<utl::RobotStatus> {
     v.robotComponents =
         utl::enumKeyedMapFromJson<utl::ERobotComponent, utl::ELEDState>(
             j.at("robotComponents"));
+    if (const auto safetyOnIt = j.find("safetyOn");
+        safetyOnIt != j.end() && safetyOnIt->is_boolean()) {
+      v.safetyOn = safetyOnIt->get<bool>();
+    } else {
+      v.safetyOn = std::nullopt;
+    }
     v.joystics = utl::enumKeyedMapFromJson<utl::EArm, utl::JoystickStatus>(
         j.at("joystics"));
   }

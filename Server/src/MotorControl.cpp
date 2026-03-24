@@ -9,6 +9,7 @@
 #include <cstdlib>
 #include <chrono>
 #include <format>
+#include <string_view>
 #include <stdexcept>
 
 namespace {
@@ -39,6 +40,10 @@ void validateCurrentRange(const std::int32_t current, const std::string_view fie
         motorName, field, kMinCurrent, kMaxCurrent, current));
   }
 }
+
+bool isTemporaryCommunicationFailure(const std::string_view message) {
+  return message.find("Resource temporarily unavailable") != std::string_view::npos;
+}
 }  // namespace
 
 MotorControl::MotorControl() {
@@ -62,6 +67,9 @@ MotorControl::MotorControl() {
       cfg.getOptional<unsigned>("MotorControl", "connectTimeoutMS", 1000u);
   _rtuConfig.interRequestDelayMS =
       cfg.getOptional<unsigned>("MotorControl", "interRequestDelayMS", 0u);
+  const auto globalForceFunction10ForSingleRegisterWrites =
+      cfg.getOptional<bool>("MotorControl",
+                            "forceFunction10ForSingleRegisterWrites", false);
 
   const auto motorCfg = cfg.getClassConfig("MotorControl");
   const auto transportCfg = motorCfg["transport"];
@@ -101,7 +109,7 @@ MotorControl::MotorControl() {
   const auto motorsNode = motorCfg["motors"];
   if (!motorsNode || !motorsNode.IsMap()) {
     utl::throwRuntimeError(
-        "MotorControl.motors map is required (per motor: address, optional groupId, runCurrent, stopCurrent, and optional startup thresholds).");
+        "MotorControl.motors map is required (per motor: address, optional commandAddress, optional groupId, runCurrent, stopCurrent, and optional startup thresholds).");
   }
   for (const auto& kv : motorsNode) {
     const auto motorId = kv.first.as<utl::EMotor>();
@@ -117,6 +125,15 @@ MotorControl::MotorControl() {
           "MotorControl.motors.{}.address must be in range 0..247 (got {})",
           magic_enum::enum_name(motorId), address));
     }
+    std::optional<int> commandAddress;
+    if (const auto commandAddressNode = entry["commandAddress"]; commandAddressNode) {
+      commandAddress = commandAddressNode.as<int>();
+      if (*commandAddress < 1 || *commandAddress > 247) {
+        utl::throwRuntimeError(std::format(
+            "MotorControl.motors.{}.commandAddress must be in range 1..247 (got {})",
+            magic_enum::enum_name(motorId), *commandAddress));
+      }
+    }
     const auto groupIdNode = entry["groupId"];
     const auto runCurrent =
         entry["runCurrent"].as<std::int32_t>(kDefaultRunCurrent);
@@ -129,6 +146,7 @@ MotorControl::MotorControl() {
         entry["excessivePositionDeviationWarning"];
     const auto excessivePositionDeviationAlarmNode =
         entry["excessivePositionDeviationAlarm"];
+    const auto motorRotationDirectionNode = entry["motorRotationDirection"];
     validateCurrentRange(runCurrent, "runCurrent", magic_enum::enum_name(motorId));
     validateCurrentRange(stopCurrent, "stopCurrent",
                          magic_enum::enum_name(motorId));
@@ -139,14 +157,20 @@ MotorControl::MotorControl() {
           magic_enum::enum_name(motorId), stopCurrent, runCurrent);
     }
     std::optional<std::int32_t> groupId;
+    std::optional<bool> forceFunction10ForSingleRegisterWrites;
     if (groupIdNode) {
       groupId = groupIdNode.as<std::int32_t>();
+    }
+    if (const auto forceNode = entry["forceFunction10ForSingleRegisterWrites"];
+        forceNode) {
+      forceFunction10ForSingleRegisterWrites = forceNode.as<bool>();
     }
     std::optional<std::int32_t> startingSpeed;
     std::optional<std::int32_t> overloadWarning;
     std::optional<std::int32_t> overloadAlarm;
     std::optional<std::int32_t> excessivePositionDeviationWarning;
     std::optional<std::int32_t> excessivePositionDeviationAlarm;
+    std::optional<std::int32_t> motorRotationDirection;
     const auto motorName = magic_enum::enum_name(motorId);
     if (startingSpeedNode) {
       startingSpeed = startingSpeedNode.as<std::int32_t>();
@@ -203,16 +227,24 @@ MotorControl::MotorControl() {
           motorName, *excessivePositionDeviationAlarm,
           *excessivePositionDeviationWarning));
     }
+    if (motorRotationDirectionNode) {
+      motorRotationDirection = motorRotationDirectionNode.as<std::int32_t>();
+    }
     _motorConfigs[motorId] = MotorConfig{
         .address = address,
+        .commandAddress = commandAddress,
         .groupId = groupId,
+        .forceFunction10ForSingleRegisterWrites =
+            forceFunction10ForSingleRegisterWrites
+                .value_or(globalForceFunction10ForSingleRegisterWrites),
         .runCurrent = runCurrent,
         .stopCurrent = stopCurrent,
         .startingSpeed = startingSpeed,
         .overloadWarning = overloadWarning,
         .overloadAlarm = overloadAlarm,
         .excessivePositionDeviationWarning = excessivePositionDeviationWarning,
-        .excessivePositionDeviationAlarm = excessivePositionDeviationAlarm};
+        .excessivePositionDeviationAlarm = excessivePositionDeviationAlarm,
+        .motorRotationDirection = motorRotationDirection};
   }
 }
 
@@ -283,35 +315,17 @@ void MotorControl::initialize() {
     }
 
     for (const auto& [motorId, motorCfg] : _motorConfigs) {
-      auto [it, inserted] =
-          _motors.emplace(motorId, Motor(motorId, motorCfg.address, _registerMap));
+      auto [it, inserted] = _motors.emplace(
+          motorId,
+          Motor(motorId, motorCfg.address, _registerMap,
+                motorCfg.commandAddress.value_or(motorCfg.address),
+                motorCfg.forceFunction10ForSingleRegisterWrites.value_or(false)));
       (void)inserted;
       _runtime.emplace(motorId, MotorRuntimeState{});
       {
         std::lock_guard<std::mutex> lock(_busMutex);
         it->second.initialize(*_bus);
-        if (motorCfg.groupId.has_value()) {
-          it->second.setGroupId(*_bus, *motorCfg.groupId);
-        }
-        it->second.setRunCurrent(*_bus, motorCfg.runCurrent);
-        it->second.setStopCurrent(*_bus, motorCfg.stopCurrent);
-        if (motorCfg.startingSpeed.has_value()) {
-          it->second.setStartingSpeed(*_bus, *motorCfg.startingSpeed);
-        }
-        if (motorCfg.overloadWarning.has_value()) {
-          it->second.setOverloadWarning(*_bus, *motorCfg.overloadWarning);
-        }
-        if (motorCfg.overloadAlarm.has_value()) {
-          it->second.setOverloadAlarm(*_bus, *motorCfg.overloadAlarm);
-        }
-        if (motorCfg.excessivePositionDeviationWarning.has_value()) {
-          it->second.setExcessivePositionDeviationWarning(
-              *_bus, *motorCfg.excessivePositionDeviationWarning);
-        }
-        if (motorCfg.excessivePositionDeviationAlarm.has_value()) {
-          it->second.setExcessivePositionDeviationAlarm(
-              *_bus, *motorCfg.excessivePositionDeviationAlarm);
-        }
+        applyConfiguredParameters(it->second, motorCfg, *_bus);
         const auto inputRaw = it->second.readDriverInputCommandRaw(*_bus);
         const auto outputRaw = it->second.readDriverOutputStatusRaw(*_bus);
         const bool hasAlarm =
@@ -760,16 +774,30 @@ bool MotorControl::isEnableControllable(const utl::EMotor motorId) const {
 
 std::uint8_t MotorControl::readSelectedOperationId(const utl::EMotor motorId) {
   const auto& motor = requireMotor(_motors, motorId);
-  std::lock_guard<std::mutex> lock(_busMutex);
-  if (!_bus) utl::throwRuntimeError("MotorControl bus is not initialized");
-  return motor.readSelectedOperationId(*_bus);
+  try {
+    std::lock_guard<std::mutex> lock(_busMutex);
+    if (!_bus) utl::throwRuntimeError("MotorControl bus is not initialized");
+    return motor.readSelectedOperationId(*_bus);
+  } catch (const std::exception& ex) {
+    handleCommunicationFailure("readSelectedOperationId", ex);
+    throw;
+  }
 }
 
 void MotorControl::resetAlarm(const utl::EMotor motorId) {
   const auto& motor = requireMotor(_motors, motorId);
-  std::lock_guard<std::mutex> lock(_busMutex);
-  if (!_bus) utl::throwRuntimeError("MotorControl bus is not initialized");
-  motor.resetAlarm(*_bus);
+  try {
+    std::lock_guard<std::mutex> lock(_busMutex);
+    if (!_bus) utl::throwRuntimeError("MotorControl bus is not initialized");
+    motor.resetAlarm(*_bus);
+    const auto cfgIt = _motorConfigs.find(motorId);
+    if (cfgIt != _motorConfigs.end()) {
+      applyConfiguredParameters(motor, cfgIt->second, *_bus);
+    }
+  } catch (const std::exception& ex) {
+    handleCommunicationFailure("resetAlarm", ex);
+    throw;
+  }
 }
 
 void MotorControl::setSelectedOperationId(const utl::EMotor motorId,
@@ -874,55 +902,84 @@ void MotorControl::updateConstantSpeedBuffered(const utl::EMotor motorId,
 
 MotorFlagStatus MotorControl::readInputStatus(const utl::EMotor motorId) {
   const auto& motor = requireMotor(_motors, motorId);
-  std::lock_guard<std::mutex> lock(_busMutex);
-  if (!_bus) utl::throwRuntimeError("MotorControl bus is not initialized");
-  return motor.decodeDriverInputStatus(motor.readDriverInputCommandRaw(*_bus));
+  try {
+    std::lock_guard<std::mutex> lock(_busMutex);
+    if (!_bus) utl::throwRuntimeError("MotorControl bus is not initialized");
+    return motor.decodeDriverInputStatus(motor.readDriverInputCommandRaw(*_bus));
+  } catch (const std::exception& ex) {
+    handleCommunicationFailure("readInputStatus", ex);
+    throw;
+  }
 }
 
 MotorFlagStatus MotorControl::readOutputStatus(const utl::EMotor motorId) {
   const auto& motor = requireMotor(_motors, motorId);
-  std::lock_guard<std::mutex> lock(_busMutex);
-  if (!_bus) utl::throwRuntimeError("MotorControl bus is not initialized");
-  return motor.decodeDriverOutputStatus(motor.readDriverOutputStatusRaw(*_bus));
+  try {
+    std::lock_guard<std::mutex> lock(_busMutex);
+    if (!_bus) utl::throwRuntimeError("MotorControl bus is not initialized");
+    return motor.decodeDriverOutputStatus(motor.readDriverOutputStatusRaw(*_bus));
+  } catch (const std::exception& ex) {
+    handleCommunicationFailure("readOutputStatus", ex);
+    throw;
+  }
 }
 
 MotorDirectIoStatus MotorControl::readDirectIoStatus(const utl::EMotor motorId) {
   const auto& motor = requireMotor(_motors, motorId);
-  std::lock_guard<std::mutex> lock(_busMutex);
-  if (!_bus) utl::throwRuntimeError("MotorControl bus is not initialized");
-  return motor.decodeDirectIoAndBrakeStatus(
-      motor.readDirectIoAndBrakeStatusRaw(*_bus));
+  try {
+    std::lock_guard<std::mutex> lock(_busMutex);
+    if (!_bus) utl::throwRuntimeError("MotorControl bus is not initialized");
+    return motor.decodeDirectIoAndBrakeStatus(
+        motor.readDirectIoAndBrakeStatusRaw(*_bus));
+  } catch (const std::exception& ex) {
+    handleCommunicationFailure("readDirectIoStatus", ex);
+    throw;
+  }
 }
 
 MotorMonitorSnapshot MotorControl::readMonitorSnapshot(const utl::EMotor motorId) {
   const auto& motor = requireMotor(_motors, motorId);
-  std::lock_guard<std::mutex> lock(_busMutex);
-  if (!_bus) utl::throwRuntimeError("MotorControl bus is not initialized");
-  return motor.readMonitorSnapshot(*_bus);
+  try {
+    std::lock_guard<std::mutex> lock(_busMutex);
+    if (!_bus) utl::throwRuntimeError("MotorControl bus is not initialized");
+    return motor.readMonitorSnapshot(*_bus);
+  } catch (const std::exception& ex) {
+    handleCommunicationFailure("readMonitorSnapshot", ex);
+    throw;
+  }
 }
 
 MotorRemoteIoStatus MotorControl::readRemoteIoStatus(const utl::EMotor motorId) {
   const auto& motor = requireMotor(_motors, motorId);
-  std::lock_guard<std::mutex> lock(_busMutex);
-  if (!_bus) utl::throwRuntimeError("MotorControl bus is not initialized");
-  return motor.decodeRemoteIoStatus(motor.readDriverInputCommandRaw(*_bus),
-                                    motor.readDriverOutputStatusRaw(*_bus));
+  try {
+    std::lock_guard<std::mutex> lock(_busMutex);
+    if (!_bus) utl::throwRuntimeError("MotorControl bus is not initialized");
+    return motor.decodeRemoteIoStatus(motor.readDriverInputCommandRaw(*_bus),
+                                      motor.readDriverOutputStatusRaw(*_bus));
+  } catch (const std::exception& ex) {
+    handleCommunicationFailure("readRemoteIoStatus", ex);
+    throw;
+  }
 }
 
 bool MotorControl::hasAnyWarningOrAlarm() {
-  std::lock_guard<std::mutex> lock(_busMutex);
-  if (!_bus) {
-    utl::throwRuntimeError("MotorControl bus is not initialized");
-  }
-
-  for (const auto& [_, motor] : _motors) {
-    const auto raw = motor.readDriverOutputStatusRaw(*_bus);
-    if (Motor::isDriverOutputFlagSet(raw, MotorOutputFlag::Warning) ||
-        Motor::isDriverOutputFlagSet(raw, MotorOutputFlag::Alarm)) {
-      return true;
+  try {
+    std::lock_guard<std::mutex> lock(_busMutex);
+    if (!_bus) {
+      utl::throwRuntimeError("MotorControl bus is not initialized");
     }
+    for (const auto& [_, motor] : _motors) {
+      const auto raw = motor.readDriverOutputStatusRaw(*_bus);
+      if (Motor::isDriverOutputFlagSet(raw, MotorOutputFlag::Warning) ||
+          Motor::isDriverOutputFlagSet(raw, MotorOutputFlag::Alarm)) {
+        return true;
+      }
+    }
+    return false;
+  } catch (const std::exception& ex) {
+    handleCommunicationFailure("hasAnyWarningOrAlarm", ex);
+    throw;
   }
-  return false;
 }
 
 void MotorControl::setWarningState(const bool warningActive) {
@@ -935,30 +992,107 @@ void MotorControl::setWarningState(const bool warningActive) {
 MotorCodeDiagnostic MotorControl::diagnoseCurrentAlarm(
     const utl::EMotor motorId) {
   const auto& motor = requireMotor(_motors, motorId);
-  std::lock_guard<std::mutex> lock(_busMutex);
-  if (!_bus) {
-    utl::throwRuntimeError("MotorControl bus is not initialized");
+  try {
+    std::lock_guard<std::mutex> lock(_busMutex);
+    if (!_bus) {
+      utl::throwRuntimeError("MotorControl bus is not initialized");
+    }
+    return motor.diagnoseAlarm(motor.readAlarmCode(*_bus));
+  } catch (const std::exception& ex) {
+    handleCommunicationFailure("diagnoseCurrentAlarm", ex);
+    throw;
   }
-  return motor.diagnoseAlarm(motor.readAlarmCode(*_bus));
 }
 
 MotorCodeDiagnostic MotorControl::diagnoseCurrentWarning(
     const utl::EMotor motorId) {
   const auto& motor = requireMotor(_motors, motorId);
-  std::lock_guard<std::mutex> lock(_busMutex);
-  if (!_bus) {
-    utl::throwRuntimeError("MotorControl bus is not initialized");
+  try {
+    std::lock_guard<std::mutex> lock(_busMutex);
+    if (!_bus) {
+      utl::throwRuntimeError("MotorControl bus is not initialized");
+    }
+    return motor.diagnoseWarning(motor.readWarningCode(*_bus));
+  } catch (const std::exception& ex) {
+    handleCommunicationFailure("diagnoseCurrentWarning", ex);
+    throw;
   }
-  return motor.diagnoseWarning(motor.readWarningCode(*_bus));
 }
 
 MotorCodeDiagnostic MotorControl::diagnoseCurrentCommunicationError(
     const utl::EMotor motorId) {
   const auto& motor = requireMotor(_motors, motorId);
-  std::lock_guard<std::mutex> lock(_busMutex);
-  if (!_bus) {
-    utl::throwRuntimeError("MotorControl bus is not initialized");
+  try {
+    std::lock_guard<std::mutex> lock(_busMutex);
+    if (!_bus) {
+      utl::throwRuntimeError("MotorControl bus is not initialized");
+    }
+    return motor.diagnoseCommunicationError(
+        motor.readCommunicationErrorCode(*_bus));
+  } catch (const std::exception& ex) {
+    handleCommunicationFailure("diagnoseCurrentCommunicationError", ex);
+    throw;
   }
-  return motor.diagnoseCommunicationError(
-      motor.readCommunicationErrorCode(*_bus));
+}
+
+std::int32_t MotorControl::readGroupId(const utl::EMotor motorId) {
+  const auto& motor = requireMotor(_motors, motorId);
+  try {
+    std::lock_guard<std::mutex> lock(_busMutex);
+    if (!_bus) {
+      utl::throwRuntimeError("MotorControl bus is not initialized");
+    }
+    return motor.readGroupId(*_bus);
+  } catch (const std::exception& ex) {
+    handleCommunicationFailure("readGroupId", ex);
+    throw;
+  }
+}
+
+void MotorControl::applyConfiguredParameters(const Motor& motor,
+                                             const MotorConfig& config,
+                                             ModbusClient& bus) const {
+  if (config.groupId.has_value()) {
+    motor.setGroupId(bus, *config.groupId);
+  }
+  // Fixed startup policy: STOP input triggers deceleration and current-off.
+  // This is intentionally hardcoded for all active motors, not config-driven.
+  motor.setStopInputAction(bus, 3);
+  motor.setRunCurrent(bus, config.runCurrent);
+  motor.setStopCurrent(bus, config.stopCurrent);
+  if (config.startingSpeed.has_value()) {
+    motor.setStartingSpeed(bus, *config.startingSpeed);
+  }
+  if (config.overloadWarning.has_value()) {
+    motor.setOverloadWarning(bus, *config.overloadWarning);
+  }
+  if (config.overloadAlarm.has_value()) {
+    motor.setOverloadAlarm(bus, *config.overloadAlarm);
+  }
+  if (config.excessivePositionDeviationWarning.has_value()) {
+    motor.setExcessivePositionDeviationWarning(
+        bus, *config.excessivePositionDeviationWarning);
+  }
+  if (config.excessivePositionDeviationAlarm.has_value()) {
+    motor.setExcessivePositionDeviationAlarm(
+        bus, *config.excessivePositionDeviationAlarm);
+  }
+  if (config.motorRotationDirection.has_value()) {
+    motor.setMotorRotationDirection(bus, *config.motorRotationDirection);
+    motor.executeConfiguration(bus);
+  }
+}
+
+void MotorControl::handleCommunicationFailure(const std::string_view action,
+                                              const std::exception& ex) {
+  if (!isTemporaryCommunicationFailure(ex.what())) {
+    return;
+  }
+  SPDLOG_ERROR("MotorControl communication failure during {}: {}", action,
+               ex.what());
+  if (_bus.has_value()) {
+    _bus->close();
+    _bus.reset();
+  }
+  setState(State::Error);
 }

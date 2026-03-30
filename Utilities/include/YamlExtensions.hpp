@@ -100,6 +100,8 @@ struct convert<utl::SingleMotorStatus> {
     node["warningDescription"] = rhs.warningDescription;
     node["alarmDescription"] = rhs.alarmDescription;
     node["flags"] = rhs.flags;
+    node["speedCommandPercent"] = rhs.speedCommandPercent;
+    node["modeMaxLinearSpeedMmPerSec"] = rhs.modeMaxLinearSpeedMmPerSec;
     return node;
   }
 
@@ -120,6 +122,12 @@ struct convert<utl::SingleMotorStatus> {
                                   : std::string{};
     rhs.flags =
         node["flags"].as<std::map<utl::EMotorStatusFlags, utl::ELEDState>>();
+    rhs.speedCommandPercent =
+        node["speedCommandPercent"] ? node["speedCommandPercent"].as<double>() : 0.0;
+    rhs.modeMaxLinearSpeedMmPerSec =
+        node["modeMaxLinearSpeedMmPerSec"]
+            ? node["modeMaxLinearSpeedMmPerSec"].as<double>()
+            : 0.0;
     return true;
   }
 };

@@ -61,6 +61,8 @@ struct SingleMotorStatus {
   std::string warningDescription;
   std::string alarmDescription;
   std::map<EMotorStatusFlags, ELEDState> flags;
+  double speedCommandPercent{0};         // [-100, 100]; 0 when locked/idle
+  double modeMaxLinearSpeedMmPerSec{0};  // max speed for the current mode
 };
 
 struct JoystickStatus {

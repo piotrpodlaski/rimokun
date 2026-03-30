@@ -1,4 +1,5 @@
 ﻿#include "MotorStats.hpp"
+#include "SpeedCommandBar.hpp"
 #include "magic_enum/magic_enum.hpp"
 
 #include <format>
@@ -53,9 +54,6 @@ QString formatNumber(const double value) {
 }  // namespace
 
 MotorStats::~MotorStats() { delete _ui; }
-void MotorStats::setTorque(const int value) const {
-  _ui->torquePercent->setValue(value);
-}
 void MotorStats::setSpeed(const double value) const {
   _ui->speedCms->display(formatNumber(value));
 }
@@ -80,6 +78,10 @@ void MotorStats::setStatus(const utl::ELEDState value) const {
 // void MotorStats::setMotorName(const std::string& name) const {
 //   ui->groupBox->setTitle(name.c_str());
 // }
+
+void MotorStats::setSpeedCommand(const double percent, const double maxMmPerSec) {
+  _ui->speedCommandBar->setValues(percent, maxMmPerSec);
+}
 
 void MotorStats::setMotorId(utl::EMotor mot) {
   _motorId = mot;

@@ -42,8 +42,13 @@ void MachineController::runControlLoopTasks() {
       _controlPolicy->decide(_io.readInputs(), _io.readOutputs(), _io.contecState(),
                              _robotStatus);
 
-  // Publish arm states so the GUI can display them
+  // Publish arm states and per-motor speed commands so the GUI can display them
   _robotStatus.armStates = decision.armStates;
+  for (const auto& [motorId, cmd] : decision.motorSpeedCommands) {
+    auto& ms = _robotStatus.motors[motorId];
+    ms.speedCommandPercent = cmd.speedCommandPercent;
+    ms.modeMaxLinearSpeedMmPerSec = cmd.modeMaxLinearSpeedMmPerSec;
+  }
 
   if (decision.setToolChangerErrorBlinking) {
     return;

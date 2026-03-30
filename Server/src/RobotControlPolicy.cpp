@@ -312,6 +312,7 @@ IRobotControlPolicy::ControlDecision RimoKunControlPolicy::decide(
 
   std::vector<MotorIntent> motorIntents;
   motorIntents.reserve(6);
+  std::map<utl::EMotor, MotorSpeedCommand> motorSpeedCommands;
 
   const auto appendSpeedIntent = [&](const utl::EMotor motorId,
                                      const double axisValue,
@@ -326,6 +327,8 @@ IRobotControlPolicy::ControlDecision RimoKunControlPolicy::decide(
 
     // In Locked state: ignore all movement, emit stop if was active
     if (armState == utl::EAxisState::Locked) {
+      motorSpeedCommands[motorId] = {.speedCommandPercent = 0.0,
+                                     .modeMaxLinearSpeedMmPerSec = 0.0};
       runtime.hasLastAxis = false;
       runtime.lastDirection.reset();
       if (runtime.wasActive) {
@@ -348,6 +351,11 @@ IRobotControlPolicy::ControlDecision RimoKunControlPolicy::decide(
     const std::int32_t decel = (armState == utl::EAxisState::Slow)
                                    ? axisCfg.slowDeceleration001MsPerKHz
                                    : axisCfg.fastDeceleration001MsPerKHz;
+
+    // Record speed command for GUI display
+    motorSpeedCommands[motorId] = {
+        .speedCommandPercent = active ? clampedAxis * 100.0 : 0.0,
+        .modeMaxLinearSpeedMmPerSec = maxSpeed};
 
     MotorIntent intent;
     intent.motorId = motorId;
@@ -421,7 +429,8 @@ IRobotControlPolicy::ControlDecision RimoKunControlPolicy::decide(
   return {.outputs = std::move(ioOutputs),
           .motorIntents = std::move(motorIntents),
           .setToolChangerErrorBlinking = false,
-          .armStates = _armStates};
+          .armStates = _armStates,
+          .motorSpeedCommands = std::move(motorSpeedCommands)};
 }
 
 void RimoKunControlPolicy::warnOnce(bool& flag, const std::string& message) {

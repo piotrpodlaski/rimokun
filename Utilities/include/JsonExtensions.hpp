@@ -134,6 +134,8 @@ struct adl_serializer<utl::SingleMotorStatus> {
         {"warningDescription", v.warningDescription},
         {"alarmDescription", v.alarmDescription},
         {"flags", utl::enumKeyedMapToJson(v.flags)},
+        {"speedCommandPercent", v.speedCommandPercent},
+        {"modeMaxLinearSpeedMmPerSec", v.modeMaxLinearSpeedMmPerSec},
     };
   }
 
@@ -149,6 +151,8 @@ struct adl_serializer<utl::SingleMotorStatus> {
     v.alarmDescription = j.value("alarmDescription", std::string{});
     v.flags = utl::enumKeyedMapFromJson<utl::EMotorStatusFlags, utl::ELEDState>(
         j.at("flags"));
+    v.speedCommandPercent = j.value("speedCommandPercent", 0.0);
+    v.modeMaxLinearSpeedMmPerSec = j.value("modeMaxLinearSpeedMmPerSec", 0.0);
   }
 };
 

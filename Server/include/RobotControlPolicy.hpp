@@ -27,11 +27,17 @@ class IRobotControlPolicy {
     bool stopMovement{false};
   };
 
+  struct MotorSpeedCommand {
+    double speedCommandPercent{0};        // [-100, 100]; 0 when locked/idle
+    double modeMaxLinearSpeedMmPerSec{0}; // max speed for the current mode
+  };
+
   struct ControlDecision {
     std::optional<SignalMap> outputs;
     std::vector<MotorIntent> motorIntents;
     bool setToolChangerErrorBlinking{false};
     std::map<utl::EArm, utl::EAxisState> armStates;
+    std::map<utl::EMotor, MotorSpeedCommand> motorSpeedCommands;
   };
 
   virtual ~IRobotControlPolicy() = default;

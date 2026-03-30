@@ -7,7 +7,6 @@ class FakeMotorStats final : public VMotorStats {
  public:
   void apply(const utl::SingleMotorStatus& status) { configure(status); }
 
-  void setTorque(int value) const override { torque = value; }
   void setSpeed(double value) const override { speed = value; }
   void setSpeedRpm(double value) const override { speedRpm = value; }
   void setCurrentPosition(double value) const override { currentPosition = value; }
@@ -17,8 +16,11 @@ class FakeMotorStats final : public VMotorStats {
   void setStatus(utl::ELEDState value) const override { status = value; }
   void setMotorId(utl::EMotor value) override { motorId = value; }
   void setAxisState(utl::EAxisState value) override { axisState = value; }
+  void setSpeedCommand(double pct, double maxMmPs) override {
+    speedCommandPercent = pct;
+    modeMaxLinearSpeedMmPerSec = maxMmPs;
+  }
 
-  mutable int torque{0};
   mutable double speed{0};
   mutable double speedRpm{0};
   mutable double currentPosition{0};
@@ -28,6 +30,8 @@ class FakeMotorStats final : public VMotorStats {
   mutable utl::ELEDState status{utl::ELEDState::On};
   utl::EMotor motorId{utl::EMotor::XLeft};
   utl::EAxisState axisState{utl::EAxisState::Locked};
+  double speedCommandPercent{0};
+  double modeMaxLinearSpeedMmPerSec{0};
 };
 }  // namespace
 
@@ -41,7 +45,9 @@ TEST(VMotorStatsTests, ConfigureCopiesNumericFieldsAndFlags) {
       .torque = 17,
       .state = utl::ELEDState::Warning,
       .flags = {{utl::EMotorStatusFlags::BrakeApplied, utl::ELEDState::Error},
-                {utl::EMotorStatusFlags::Enabled, utl::ELEDState::Off}}};
+                {utl::EMotorStatusFlags::Enabled, utl::ELEDState::Off}},
+      .speedCommandPercent = -42.0,
+      .modeMaxLinearSpeedMmPerSec = 120.0};
 
   stats.apply(input);
 
@@ -49,10 +55,11 @@ TEST(VMotorStatsTests, ConfigureCopiesNumericFieldsAndFlags) {
   EXPECT_DOUBLE_EQ(stats.targetPosition, -22.0);
   EXPECT_DOUBLE_EQ(stats.speed, 5.5);
   EXPECT_DOUBLE_EQ(stats.speedRpm, 123.0);
-  EXPECT_EQ(stats.torque, 17);
   EXPECT_EQ(stats.status, utl::ELEDState::Warning);
   EXPECT_EQ(stats.brake, utl::ELEDState::Error);
   EXPECT_EQ(stats.enabled, utl::ELEDState::Off);
+  EXPECT_DOUBLE_EQ(stats.speedCommandPercent, -42.0);
+  EXPECT_DOUBLE_EQ(stats.modeMaxLinearSpeedMmPerSec, 120.0);
 }
 
 TEST(VMotorStatsTests, ConfigureDefaultsFlagsToOffWhenMissing) {

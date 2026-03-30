@@ -18,7 +18,6 @@ class MotorStats : public QWidget, public VMotorStats {
   explicit MotorStats(QWidget* parent = nullptr);
   ~MotorStats() override;
 
-  void setTorque(int value) const override;
   void setSpeed(double value) const override;
   void setSpeedRpm(double value) const override;
   void setCurrentPosition(double value) const override;
@@ -28,6 +27,7 @@ class MotorStats : public QWidget, public VMotorStats {
   void setStatus(utl::ELEDState value) const override;
   void setMotorId(utl::EMotor id) override;
   void setAxisState(utl::EAxisState state) override;
+  void setSpeedCommand(double percent, double maxMmPerSec) override;
 
  signals:
   void clicked(utl::EMotor motor);

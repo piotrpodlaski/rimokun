@@ -179,23 +179,19 @@
         </item>
        </layout>
       </item>
-      <item row="4" column="1">
-       <widget class="QProgressBar" name="torquePercent">
+      <item row="4" column="0" colspan="3">
+       <widget class="SpeedCommandBar" name="speedCommandBar" native="true">
         <property name="sizePolicy">
          <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
           <horstretch>0</horstretch>
           <verstretch>0</verstretch>
          </sizepolicy>
         </property>
-        <property name="value">
-         <number>24</number>
-        </property>
-       </widget>
-      </item>
-      <item row="4" column="0">
-       <widget class="QLabel" name="label_5">
-        <property name="text">
-         <string>Torque</string>
+        <property name="minimumSize">
+         <size>
+          <width>0</width>
+          <height>26</height>
+         </size>
         </property>
        </widget>
       </item>
@@ -247,13 +243,7 @@
         </property>
        </widget>
       </item>
-      <item row="4" column="2">
-       <widget class="QLabel" name="label_10">
-        <property name="text">
-         <string/>
-        </property>
-       </widget>
-      </item>
+
       <item row="2" column="2">
        <widget class="QLabel" name="label_8">
         <property name="text">
@@ -315,6 +305,12 @@
    <class>LedIndicator</class>
    <extends>QWidget</extends>
    <header location="global">LedIndicator.hpp</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>SpeedCommandBar</class>
+   <extends>QWidget</extends>
+   <header location="global">SpeedCommandBar.hpp</header>
    <container>1</container>
   </customwidget>
  </customwidgets>

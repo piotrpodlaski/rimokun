@@ -27,7 +27,7 @@ class MotorStats : public QWidget, public VMotorStats {
   void setStatus(utl::ELEDState value) const override;
   void setMotorId(utl::EMotor id) override;
   void setAxisState(utl::EAxisState state) override;
-  void setSpeedCommand(double percent, double maxMmPerSec) override;
+  void setSpeedCommand(double percent, double maxMmPerSec) const override;
 
  signals:
   void clicked(utl::EMotor motor);

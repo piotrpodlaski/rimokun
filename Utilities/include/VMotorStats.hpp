@@ -15,7 +15,7 @@ class VMotorStats {
   virtual void setMotorId(utl::EMotor) = 0;
   virtual void setAxisState(utl::EAxisState state) = 0;
   // percent: [-100, 100], maxMmPerSec: mode maximum linear speed
-  virtual void setSpeedCommand(double percent, double maxMmPerSec) = 0;
+  virtual void setSpeedCommand(double percent, double maxMmPerSec) const = 0;
 
  protected:
   void configure(const utl::SingleMotorStatus& s) const;

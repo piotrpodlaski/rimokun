@@ -16,7 +16,7 @@ class FakeMotorStats final : public VMotorStats {
   void setStatus(utl::ELEDState value) const override { status = value; }
   void setMotorId(utl::EMotor value) override { motorId = value; }
   void setAxisState(utl::EAxisState value) override { axisState = value; }
-  void setSpeedCommand(double pct, double maxMmPs) override {
+  void setSpeedCommand(double pct, double maxMmPs) const override {
     speedCommandPercent = pct;
     modeMaxLinearSpeedMmPerSec = maxMmPs;
   }
@@ -30,8 +30,8 @@ class FakeMotorStats final : public VMotorStats {
   mutable utl::ELEDState status{utl::ELEDState::On};
   utl::EMotor motorId{utl::EMotor::XLeft};
   utl::EAxisState axisState{utl::EAxisState::Locked};
-  double speedCommandPercent{0};
-  double modeMaxLinearSpeedMmPerSec{0};
+  mutable double speedCommandPercent{0};
+  mutable double modeMaxLinearSpeedMmPerSec{0};
 };
 }  // namespace
 

@@ -79,7 +79,7 @@ void MotorStats::setStatus(const utl::ELEDState value) const {
 //   ui->groupBox->setTitle(name.c_str());
 // }
 
-void MotorStats::setSpeedCommand(const double percent, const double maxMmPerSec) {
+void MotorStats::setSpeedCommand(const double percent, const double maxMmPerSec) const {
   _ui->speedCommandBar->setValues(percent, maxMmPerSec);
 }
 

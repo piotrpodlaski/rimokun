@@ -41,13 +41,13 @@ void SpeedCommandBar::paintEvent(QPaintEvent* event) {
     QRect fillRect;
     QColor fillColor;
     if (_percent > 0.0) {
-      // Forward: fill from centre to right, green
+      // Forward: fill from centre to right, blue
       fillRect = QRect(cx, r.top(), fillW, r.height());
-      fillColor = QColor(0x2e, 0x9e, 0x4e);
+      fillColor = QColor(0x2d, 0x7d, 0xc8);
     } else {
-      // Reverse: fill from centre to left, amber
+      // Reverse: fill from centre to left, steel blue
       fillRect = QRect(cx - fillW, r.top(), fillW, r.height());
-      fillColor = QColor(0xe6, 0xa8, 0x17);
+      fillColor = QColor(0x1a, 0x55, 0x96);
     }
     p.setBrush(fillColor);
     p.drawRect(fillRect);

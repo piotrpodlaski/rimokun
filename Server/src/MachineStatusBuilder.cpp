@@ -174,11 +174,17 @@ void MachineStatusBuilder::updateAndPublish(
                                                              MotorOutputFlag::Alarm);
           const bool enableControllable =
               motorControl->isEnableControllable(motorId);
-          const bool enabledForStatus =
-              !hasAlarm &&
-              (enableControllable ? motorControl->isEnabled(motorId) : true);
-          motorStatus.flags[utl::EMotorStatusFlags::Enabled] =
-              enabledForStatus ? utl::ELEDState::On : utl::ELEDState::Off;
+          const bool isEnabled =
+              enableControllable ? motorControl->isEnabled(motorId) : true;
+          utl::ELEDState enabledLed;
+          if (hasAlarm) {
+            enabledLed = utl::ELEDState::Off;
+          } else if (!isEnabled) {
+            enabledLed = utl::ELEDState::Warning;  // disabled but no fault
+          } else {
+            enabledLed = utl::ELEDState::On;
+          }
+          motorStatus.flags[utl::EMotorStatusFlags::Enabled] = enabledLed;
           hasAnyMotorWarningOrAlarm = hasAnyMotorWarningOrAlarm || hasWarning || hasAlarm;
 
           motorStatus.flags[utl::EMotorStatusFlags::Warning] =

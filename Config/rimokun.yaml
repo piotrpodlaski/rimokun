@@ -134,7 +134,7 @@ classes:
         leftArmX:
           invertAxis: true
           slowMaxLinearSpeedMmPerSec: &slowSpeedX 50.0
-          fastMaxLinearSpeedMmPerSec: &fastSpeedX 150.0
+          fastMaxLinearSpeedMmPerSec: &fastSpeedX 350.0
           stepsPerMm: &stepsMmX 14.15
           slowAcceleration001MsPerKHz: &slowAccel 100000
           slowDeceleration001MsPerKHz: &slowDeccel 100000
@@ -142,8 +142,8 @@ classes:
           fastDeceleration001MsPerKHz: &fastDeccel 50000
         leftArmY:
           invertAxis: true
-          slowMaxLinearSpeedMmPerSec: &slowSpeedY 50.0
-          fastMaxLinearSpeedMmPerSec: &fastSpeedY 150.0
+          slowMaxLinearSpeedMmPerSec: &slowSpeedY 30.0
+          fastMaxLinearSpeedMmPerSec: &fastSpeedY 200.0
           stepsPerMm: &stepsMmY 20
           slowAcceleration001MsPerKHz: *slowAccel
           slowDeceleration001MsPerKHz: *slowDeccel

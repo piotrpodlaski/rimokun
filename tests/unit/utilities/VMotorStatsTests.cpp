@@ -16,6 +16,7 @@ class FakeMotorStats final : public VMotorStats {
   void setEnabled(utl::ELEDState value) const override { enabled = value; }
   void setStatus(utl::ELEDState value) const override { status = value; }
   void setMotorId(utl::EMotor value) override { motorId = value; }
+  void setAxisState(utl::EAxisState value) override { axisState = value; }
 
   mutable int torque{0};
   mutable double speed{0};
@@ -26,6 +27,7 @@ class FakeMotorStats final : public VMotorStats {
   mutable utl::ELEDState enabled{utl::ELEDState::On};
   mutable utl::ELEDState status{utl::ELEDState::On};
   utl::EMotor motorId{utl::EMotor::XLeft};
+  utl::EAxisState axisState{utl::EAxisState::Locked};
 };
 }  // namespace
 

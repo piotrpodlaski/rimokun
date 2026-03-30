@@ -10,9 +10,27 @@
 #include "spdlog/spdlog.h"
 #include "ui_motorstats.h"
 
+namespace {
+std::optional<utl::EArm> motorToArm(const utl::EMotor motor) {
+  switch (motor) {
+    case utl::EMotor::XLeft:
+    case utl::EMotor::YLeft:
+      return utl::EArm::Left;
+    case utl::EMotor::XRight:
+    case utl::EMotor::YRight:
+      return utl::EArm::Right;
+    case utl::EMotor::ZLeft:
+    case utl::EMotor::ZRight:
+      return utl::EArm::Gantry;
+  }
+  return std::nullopt;
+}
+}  // namespace
+
 MotorStats::MotorStats(QWidget* parent)
     : QWidget(parent), _ui(new Ui::MotorStats) {
   _ui->setupUi(this);
+  setAxisState(utl::EAxisState::Locked);
   setCursor(Qt::PointingHandCursor);
   setToolTip("Click to open motor monitor");
   setStyleSheet(
@@ -77,6 +95,34 @@ void MotorStats::handleUpdate(const utl::RobotStatus& rs) {
   }
   const auto motData = rs.motors.at(_motorId);
   configure(motData);
+
+  const auto arm = motorToArm(_motorId);
+  if (arm.has_value() && rs.armStates.contains(*arm)) {
+    setAxisState(rs.armStates.at(*arm));
+  }
+}
+
+void MotorStats::setAxisState(const utl::EAxisState state) {
+  switch (state) {
+    case utl::EAxisState::Locked:
+      _ui->axisStateLabel->setText("LOCKED");
+      _ui->axisStateLabel->setStyleSheet(
+          "QLabel { background-color: #444; color: #ccc;"
+          " border-radius: 4px; padding: 1px 4px; font-weight: bold; }");
+      break;
+    case utl::EAxisState::Slow:
+      _ui->axisStateLabel->setText("SLOW");
+      _ui->axisStateLabel->setStyleSheet(
+          "QLabel { background-color: #e6a817; color: #000;"
+          " border-radius: 4px; padding: 1px 4px; font-weight: bold; }");
+      break;
+    case utl::EAxisState::Fast:
+      _ui->axisStateLabel->setText("FAST");
+      _ui->axisStateLabel->setStyleSheet(
+          "QLabel { background-color: #2e9e4e; color: #fff;"
+          " border-radius: 4px; padding: 1px 4px; font-weight: bold; }");
+      break;
+  }
 }
 
 void MotorStats::mousePressEvent(QMouseEvent* event) {

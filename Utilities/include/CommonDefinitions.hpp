@@ -21,6 +21,8 @@ enum class EToolChangerAction { Open, Close };
 
 enum class ERobotComponent {Contec, MotorControl, ControlPanel};
 
+enum class EAxisState { Locked, Slow, Fast };
+
 // Known Contec digital input signal names.  All keys in Machine.inputMapping
 // must correspond to one of these values (validated at startup).
 enum class EInputSignal {
@@ -78,6 +80,7 @@ struct RobotStatus {
   std::map<ERobotComponent, ELEDState> robotComponents;
   std::map<EArm, JoystickStatus> joystics;
   std::optional<bool> safetyOn;
+  std::map<EArm, EAxisState> armStates;
 };
 
 }  // namespace utl

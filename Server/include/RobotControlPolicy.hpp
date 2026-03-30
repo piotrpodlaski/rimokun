@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <map>
 #include <cstdint>
 #include <optional>
@@ -30,6 +31,7 @@ class IRobotControlPolicy {
     std::optional<SignalMap> outputs;
     std::vector<MotorIntent> motorIntents;
     bool setToolChangerErrorBlinking{false};
+    std::map<utl::EArm, utl::EAxisState> armStates;
   };
 
   virtual ~IRobotControlPolicy() = default;
@@ -53,10 +55,13 @@ class RimoKunControlPolicy final : public IRobotControlPolicy {
   struct AxisConfig {
     double neutralAxisActivationThreshold{0.10};
     double speedUpdateAxisDeltaThreshold{0.02};
-    double maxLinearSpeedMmPerSec{80.0};
+    double slowMaxLinearSpeedMmPerSec{40.0};
+    double fastMaxLinearSpeedMmPerSec{80.0};
     double stepsPerMm{100.0};
-    std::int32_t acceleration001MsPerKHz{24575};
-    std::int32_t deceleration001MsPerKHz{24575};
+    std::int32_t slowAcceleration001MsPerKHz{24575};
+    std::int32_t fastAcceleration001MsPerKHz{24575};
+    std::int32_t slowDeceleration001MsPerKHz{24575};
+    std::int32_t fastDeceleration001MsPerKHz{24575};
   };
 
  struct MotionConfig {
@@ -88,7 +93,22 @@ class RimoKunControlPolicy final : public IRobotControlPolicy {
   void warnOnce(bool& flag, const std::string& message);
   void setWarningFlag(bool& flag, bool value);
 
+  static std::optional<utl::EArm> motorToArm(utl::EMotor motor);
+
   MotionConfig _motion;
   WarningState _warningState;
   std::map<utl::EMotor, MotorRuntimeState> _motorRuntime;
+
+  std::int64_t _autoLockTimeoutMs{5000};
+  std::map<utl::EArm, utl::EAxisState> _armStates{
+      {utl::EArm::Left, utl::EAxisState::Locked},
+      {utl::EArm::Right, utl::EAxisState::Locked},
+      {utl::EArm::Gantry, utl::EAxisState::Locked},
+  };
+  std::map<utl::EArm, std::chrono::steady_clock::time_point> _lastMovementTime;
+  std::map<utl::EArm, bool> _prevButtonState{
+      {utl::EArm::Left, false},
+      {utl::EArm::Right, false},
+      {utl::EArm::Gantry, false},
+  };
 };

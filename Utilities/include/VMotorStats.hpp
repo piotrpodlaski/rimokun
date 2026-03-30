@@ -14,6 +14,7 @@ class VMotorStats {
   virtual void setEnabled(utl::ELEDState value) const = 0;
   virtual void setStatus(utl::ELEDState value) const = 0;
   virtual void setMotorId(utl::EMotor) = 0;
+  virtual void setAxisState(utl::EAxisState state) = 0;
 
  protected:
   void configure(const utl::SingleMotorStatus& s) const;

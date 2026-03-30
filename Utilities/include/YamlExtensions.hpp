@@ -65,6 +65,9 @@ template <>
 struct convert<utl::ERobotComponent> : convert_enum<utl::ERobotComponent> {
 };
 
+template <>
+struct convert<utl::EAxisState> : convert_enum<utl::EAxisState> {};
+
 #if __has_include(<libserial/SerialPortConstants.h>)
 template <>
 struct convert<LibSerial::BaudRate> : convert_enum<LibSerial::BaudRate> {};
@@ -178,6 +181,9 @@ struct convert<utl::RobotStatus> {
     for (const auto& [arm, js] : rhs.joystics) {
       node["joystics"][convert<utl::EArm>::encode(arm)] = js;
     }
+    for (const auto& [arm, state] : rhs.armStates) {
+      node["armStates"][convert<utl::EArm>::encode(arm)] = state;
+    }
     return node;
   }
 
@@ -209,6 +215,14 @@ struct convert<utl::RobotStatus> {
         utl::EArm arm;
         if (!convert<utl::EArm>::decode(kv.first, arm)) return false;
         rhs.joystics[arm] = kv.second.as<utl::JoystickStatus>();
+      }
+    }
+    const auto armStatesNode = node["armStates"];
+    if (armStatesNode && armStatesNode.IsMap()) {
+      for (const auto& kv : armStatesNode) {
+        utl::EArm arm;
+        if (!convert<utl::EArm>::decode(kv.first, arm)) return false;
+        rhs.armStates[arm] = kv.second.as<utl::EAxisState>();
       }
     }
 

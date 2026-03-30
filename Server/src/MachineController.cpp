@@ -41,6 +41,10 @@ void MachineController::runControlLoopTasks() {
   const auto decision =
       _controlPolicy->decide(_io.readInputs(), _io.readOutputs(), _io.contecState(),
                              _robotStatus);
+
+  // Publish arm states so the GUI can display them
+  _robotStatus.armStates = decision.armStates;
+
   if (decision.setToolChangerErrorBlinking) {
     return;
   }

@@ -46,6 +46,7 @@ classes:
       baselineSamples: 50
       buttonDebounceSamples: 3
   MotorControl:
+    forceFunction10ForSingleRegisterWrites: true
     model: "AR-KD2"
     transport:
       type: "rawTcpRtu" # default path for motors
@@ -74,12 +75,11 @@ classes:
         excessivePositionDeviationAlarm: 700
 #      XRight:
 #        address: 2
-#        groupId: 1
 #        runCurrent: 1000
 #        stopCurrent: 500
 #        startingSpeed: 100
-#        overloadWarning: 1000
-#        overloadAlarm: 1200
+#        overloadWarning: 10
+#        overloadAlarm: 300
 #        excessivePositionDeviationWarning: 500
 #        excessivePositionDeviationAlarm: 700
       YLeft:
@@ -97,28 +97,28 @@ classes:
 #        runCurrent: 1000
 #        stopCurrent: 500
 #        startingSpeed: 100
-#        overloadWarning: 1000
-#        overloadAlarm: 1200
+#        overloadWarning: 10
+#        overloadAlarm: 300
 #        excessivePositionDeviationWarning: 500
 #        excessivePositionDeviationAlarm: 700
 #      ZLeft:
-#        address: 5
-#        groupId: 1
+#        address: 1
 #        runCurrent: 1000
 #        stopCurrent: 500
-#        startingSpeed: 100
-#        overloadWarning: 1000
-#        overloadAlarm: 1200
+#        startingSpeed: 10
+#        overloadWarning: 10
+#        overloadAlarm: 50
 #        excessivePositionDeviationWarning: 500
 #        excessivePositionDeviationAlarm: 700
 #      ZRight:
-#        address: 6
+#        motorRotationDirection: 0
 #        groupId: 1
+#        address: 2
 #        runCurrent: 1000
 #        stopCurrent: 500
-#        startingSpeed: 100
-#        overloadWarning: 1000
-#        overloadAlarm: 1200
+#        startingSpeed: 10
+#        overloadWarning: 10
+#        overloadAlarm: 50
 #        excessivePositionDeviationWarning: 500
 #        excessivePositionDeviationAlarm: 700
   Machine:
@@ -129,42 +129,53 @@ classes:
       stepsPerRevolution: 1000
       neutralAxisActivationThreshold: 0.05
       speedUpdateAxisDeltaThreshold: 0.02
+      autoLockTimeoutMs: 5000
       axes:
         leftArmX:
-          invertAxis: false
-          speedUpdateAxisDeltaThreshold: 0.02
-          maxLinearSpeedMmPerSec: 150.0
-          stepsPerMm: 14.15
-          acceleration001MsPerKHz: 50000
-          deceleration001MsPerKHz: 50000
+          invertAxis: true
+          slowMaxLinearSpeedMmPerSec: &slowSpeedX 50.0
+          fastMaxLinearSpeedMmPerSec: &fastSpeedX 150.0
+          stepsPerMm: &stepsMmX 14.15
+          slowAcceleration001MsPerKHz: &slowAccel 100000
+          slowDeceleration001MsPerKHz: &slowDeccel 100000
+          fastAcceleration001MsPerKHz: &fastAccel 50000
+          fastDeceleration001MsPerKHz: &fastDeccel 50000
         leftArmY:
-          invertAxis: false
-          speedUpdateAxisDeltaThreshold: 0.02
-          maxLinearSpeedMmPerSec: 150.0
-          stepsPerMm: 20
-          acceleration001MsPerKHz: 50000
-          deceleration001MsPerKHz: 50000
+          invertAxis: true
+          slowMaxLinearSpeedMmPerSec: &slowSpeedY 50.0
+          fastMaxLinearSpeedMmPerSec: &fastSpeedY 150.0
+          stepsPerMm: &stepsMmY 20
+          slowAcceleration001MsPerKHz: *slowAccel
+          slowDeceleration001MsPerKHz: *slowDeccel
+          fastAcceleration001MsPerKHz: *fastAccel
+          fastDeceleration001MsPerKHz: *fastDeccel
         rightArmX:
           invertAxis: false
-          speedUpdateAxisDeltaThreshold: 0.02
-          maxLinearSpeedMmPerSec: 80.0
-          stepsPerMm: 100.0
-          acceleration001MsPerKHz: 24575
-          deceleration001MsPerKHz: 24575
+          slowMaxLinearSpeedMmPerSec: *slowSpeedX
+          fastMaxLinearSpeedMmPerSec: *fastSpeedX
+          stepsPerMm: *stepsMmX
+          slowAcceleration001MsPerKHz: *slowAccel
+          slowDeceleration001MsPerKHz: *slowDeccel
+          fastAcceleration001MsPerKHz: *fastAccel
+          fastDeceleration001MsPerKHz: *fastDeccel
         rightArmY:
           invertAxis: false
-          speedUpdateAxisDeltaThreshold: 0.02
-          maxLinearSpeedMmPerSec: 80.0
-          stepsPerMm: 100.0
-          acceleration001MsPerKHz: 24575
-          deceleration001MsPerKHz: 24575
+          slowMaxLinearSpeedMmPerSec: *slowSpeedY
+          fastMaxLinearSpeedMmPerSec: *fastSpeedY
+          stepsPerMm: *stepsMmY
+          slowAcceleration001MsPerKHz: *slowAccel
+          slowDeceleration001MsPerKHz: *slowDeccel
+          fastAcceleration001MsPerKHz: *fastAccel
+          fastDeceleration001MsPerKHz: *fastDeccel
         gantryZ:
           invertAxis: false
-          speedUpdateAxisDeltaThreshold: 0.02
-          maxLinearSpeedMmPerSec: 80.0
-          stepsPerMm: 100.0
-          acceleration001MsPerKHz: 24575
-          deceleration001MsPerKHz: 24575
+          slowMaxLinearSpeedMmPerSec: 150.0
+          fastMaxLinearSpeedMmPerSec: 500.0
+          stepsPerMm: *stepsMmX
+          slowAcceleration001MsPerKHz: *slowAccel
+          slowDeceleration001MsPerKHz: *slowDeccel
+          fastAcceleration001MsPerKHz: *fastAccel
+          fastDeceleration001MsPerKHz: *fastDeccel
     inputMapping:
       safetyON : 8
       button1 : 9

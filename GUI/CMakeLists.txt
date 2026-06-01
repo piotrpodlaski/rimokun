@@ -30,6 +30,7 @@ qt_add_resources(rimokunControl "images"
 target_include_directories(rimokunControl
         PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/Server/include
 )
 
 target_link_libraries(rimokunControl PRIVATE

@@ -6,6 +6,7 @@
 #include <ITransportWorker.hpp>
 #include <Updater.hpp>
 
+#include <memory>
 #include <thread>
 #include <vector>
 
@@ -26,7 +27,7 @@ class FakeTransportWorker final : public ITransportWorker {
 
   void emitStatus(const utl::RobotStatus& status) const {
     if (statusCb) {
-      statusCb(status);
+      statusCb(std::make_shared<const utl::RobotStatus>(status));
     }
   }
 
@@ -79,7 +80,7 @@ TEST(UpdaterCoordinationTests, NotifiesErrorWhenSendingWithoutStart) {
   Updater updater(nullptr, std::move(fakeWorker),
                   [&](const QString&, const QString&) { ++errorCalls; });
   GuiCommand command;
-  command.payload = GuiReconnectCommand{.component = utl::ERobotComponent::Contec};
+  command.payload = cmd::ReconnectCommand{.robotComponent = utl::ERobotComponent::Contec};
   updater.sendCommand(command);
 
   EXPECT_EQ(errorCalls, 1);
@@ -110,8 +111,8 @@ TEST(UpdaterCoordinationTests, ForwardsStatusConnectionAndResponses) {
   EXPECT_EQ(disconnectedSpy.count(), 1);
 
   GuiCommand command;
-  command.payload = GuiReconnectCommand{
-      .component = utl::ERobotComponent::MotorControl};
+  command.payload = cmd::ReconnectCommand{
+      .robotComponent = utl::ERobotComponent::MotorControl};
   updater.sendCommand(command);
   ASSERT_EQ(workerRaw->requests.size(), 1U);
   const auto requestId = workerRaw->requests.front().id;

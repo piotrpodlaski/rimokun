@@ -39,9 +39,9 @@ TEST(MachineControllerTests, ErrorDecisionDoesNotMutateToolChangerStatusInContro
   bool outputsCalled = false;
   MachineController controller(
       MachineController::IoOps{
-          .readInputs = []() -> std::optional<signal_map_t> { return signal_map_t{{"button1", true}}; },
-          .setOutputs = [&](const signal_map_t&) { outputsCalled = true; },
-          .readOutputs = []() -> std::optional<signal_map_t> { return std::nullopt; },
+          .readInputs = []() -> std::optional<utl::SignalMap> { return utl::SignalMap{{"button1", true}}; },
+          .setOutputs = [&](const utl::SignalMap&) { outputsCalled = true; },
+          .readOutputs = []() -> std::optional<utl::SignalMap> { return std::nullopt; },
           .contecState = []() { return MachineComponent::State::Error; },
       },
       MachineController::MotorOps{.isConfigured = [](utl::EMotor) { return true; }},
@@ -61,15 +61,15 @@ TEST(MachineControllerTests, ErrorDecisionDoesNotMutateToolChangerStatusInContro
 
 TEST(MachineControllerTests, ToolChangerCommandSetsExpectedOutputSignal) {
   utl::RobotStatus status;
-  signal_map_t seenOutputs;
+  utl::SignalMap seenOutputs;
   auto policy = std::make_unique<FakeControlPolicy>();
 
   MachineController controller(
       MachineController::IoOps{
-          .readInputs = []() -> std::optional<signal_map_t> { return signal_map_t{}; },
-          .setOutputs = [&](const signal_map_t& outputs) { seenOutputs = outputs; },
-          .readOutputs = []() -> std::optional<signal_map_t> {
-              return signal_map_t{{"toolChangerLeft", true}};
+          .readInputs = []() -> std::optional<utl::SignalMap> { return utl::SignalMap{}; },
+          .setOutputs = [&](const utl::SignalMap& outputs) { seenOutputs = outputs; },
+          .readOutputs = []() -> std::optional<utl::SignalMap> {
+              return utl::SignalMap{{"toolChangerLeft", true}};
           },
           .contecState = []() { return MachineComponent::State::Normal; },
       },
@@ -85,15 +85,15 @@ TEST(MachineControllerTests, ToolChangerCommandSetsExpectedOutputSignal) {
 
 TEST(MachineControllerTests, PolicyOutputsAreForwardedToOutputsWriter) {
   utl::RobotStatus status;
-  signal_map_t seenOutputs;
+  utl::SignalMap seenOutputs;
   auto policy = std::make_unique<FakeControlPolicy>();
-  policy->decisionToReturn.outputs = signal_map_t{{"light1", true}, {"light2", false}};
+  policy->decisionToReturn.outputs = utl::SignalMap{{"light1", true}, {"light2", false}};
 
   MachineController controller(
       MachineController::IoOps{
-          .readInputs = []() -> std::optional<signal_map_t> { return signal_map_t{{"button1", true}}; },
-          .setOutputs = [&](const signal_map_t& outputs) { seenOutputs = outputs; },
-          .readOutputs = []() -> std::optional<signal_map_t> { return std::nullopt; },
+          .readInputs = []() -> std::optional<utl::SignalMap> { return utl::SignalMap{{"button1", true}}; },
+          .setOutputs = [&](const utl::SignalMap& outputs) { seenOutputs = outputs; },
+          .readOutputs = []() -> std::optional<utl::SignalMap> { return std::nullopt; },
           .contecState = []() { return MachineComponent::State::Normal; },
       },
       MachineController::MotorOps{.isConfigured = [](utl::EMotor) { return true; }},
@@ -114,9 +114,9 @@ TEST(MachineControllerTests, ToolChangerCommandThrowsWhenContecIsInErrorState) {
 
   MachineController controller(
       MachineController::IoOps{
-          .readInputs = []() -> std::optional<signal_map_t> { return signal_map_t{}; },
-          .setOutputs = [&](const signal_map_t&) { outputsCalled = true; },
-          .readOutputs = []() -> std::optional<signal_map_t> { return signal_map_t{}; },
+          .readInputs = []() -> std::optional<utl::SignalMap> { return utl::SignalMap{}; },
+          .setOutputs = [&](const utl::SignalMap&) { outputsCalled = true; },
+          .readOutputs = []() -> std::optional<utl::SignalMap> { return utl::SignalMap{}; },
           .contecState = []() { return MachineComponent::State::Error; },
       },
       MachineController::MotorOps{.isConfigured = [](utl::EMotor) { return true; }},
@@ -136,9 +136,9 @@ TEST(MachineControllerTests, ToolChangerCommandThrowsWhenOutputReadbackFails) {
 
   MachineController controller(
       MachineController::IoOps{
-          .readInputs = []() -> std::optional<signal_map_t> { return signal_map_t{}; },
-          .setOutputs = [&](const signal_map_t&) { outputsCalled = true; },
-          .readOutputs = []() -> std::optional<signal_map_t> { return std::nullopt; },
+          .readInputs = []() -> std::optional<utl::SignalMap> { return utl::SignalMap{}; },
+          .setOutputs = [&](const utl::SignalMap&) { outputsCalled = true; },
+          .readOutputs = []() -> std::optional<utl::SignalMap> { return std::nullopt; },
           .contecState = []() { return MachineComponent::State::Normal; },
       },
       MachineController::MotorOps{.isConfigured = [](utl::EMotor) { return true; }},
@@ -164,9 +164,9 @@ TEST(MachineControllerTests, PolicyMotorIntentsAreAppliedInExpectedOrder) {
   std::vector<std::string> applied;
   MachineController controller(
       MachineController::IoOps{
-          .readInputs = []() -> std::optional<signal_map_t> { return signal_map_t{{"button1", true}}; },
-          .setOutputs = [](const signal_map_t&) {},
-          .readOutputs = []() -> std::optional<signal_map_t> { return signal_map_t{}; },
+          .readInputs = []() -> std::optional<utl::SignalMap> { return utl::SignalMap{{"button1", true}}; },
+          .setOutputs = [](const utl::SignalMap&) {},
+          .readOutputs = []() -> std::optional<utl::SignalMap> { return utl::SignalMap{}; },
           .contecState = []() { return MachineComponent::State::Normal; },
       },
       MachineController::MotorOps{
@@ -204,9 +204,9 @@ TEST(MachineControllerTests, UnconfiguredMotorIntentsAreIgnored) {
   std::vector<std::string> applied;
   MachineController controller(
       MachineController::IoOps{
-          .readInputs = []() -> std::optional<signal_map_t> { return signal_map_t{{"button1", true}}; },
-          .setOutputs = [](const signal_map_t&) {},
-          .readOutputs = []() -> std::optional<signal_map_t> { return signal_map_t{}; },
+          .readInputs = []() -> std::optional<utl::SignalMap> { return utl::SignalMap{{"button1", true}}; },
+          .setOutputs = [](const utl::SignalMap&) {},
+          .readOutputs = []() -> std::optional<utl::SignalMap> { return utl::SignalMap{}; },
           .contecState = []() { return MachineComponent::State::Normal; },
       },
       MachineController::MotorOps{
@@ -241,9 +241,9 @@ TEST(MachineControllerTests, AccelerationAndDecelerationIntentsAreApplied) {
   std::vector<std::string> applied;
   MachineController controller(
       MachineController::IoOps{
-          .readInputs = []() -> std::optional<signal_map_t> { return signal_map_t{{"button1", true}}; },
-          .setOutputs = [](const signal_map_t&) {},
-          .readOutputs = []() -> std::optional<signal_map_t> { return signal_map_t{}; },
+          .readInputs = []() -> std::optional<utl::SignalMap> { return utl::SignalMap{{"button1", true}}; },
+          .setOutputs = [](const utl::SignalMap&) {},
+          .readOutputs = []() -> std::optional<utl::SignalMap> { return utl::SignalMap{}; },
           .contecState = []() { return MachineComponent::State::Normal; },
       },
       MachineController::MotorOps{

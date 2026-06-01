@@ -1,12 +1,14 @@
 #pragma once
 
 #include <QMainWindow>
+#include <QPointer>
 #include <memory>
 #include <vector>
 
 #include "CommonDefinitions.hpp"
 #include "ContecPanelWindow.hpp"
 #include "GuiStateStore.hpp"
+#include "HomingWindow.hpp"
 #include "JoystickPanelWindow.h"
 #include "MotorPanelWindow.hpp"
 #include "MotorStats.hpp"
@@ -33,6 +35,7 @@ class MainWindow : public QMainWindow {
   void openMotorPanel();
   void openMotorPanelForMotor(utl::EMotor motor);
   void openContecPanel();
+  void openHomingPanel();
   void onJoystickUpdate(int id, double x, double y, bool pressed);
 
  private:
@@ -49,8 +52,9 @@ class MainWindow : public QMainWindow {
   std::shared_ptr<spdlog::logger> _logger;
   std::shared_ptr<spdlog::sinks::stdout_color_sink_mt> _consoleSink;
   std::shared_ptr<QtLogSink> _qtSink;
-  JoystickPanelWindow* joystickPanel = nullptr;
-  MotorPanelWindow* motorPanel = nullptr;
-  ContecPanelWindow* contecPanel = nullptr;
+  QPointer<JoystickPanelWindow> joystickPanel;
+  QPointer<MotorPanelWindow> motorPanel;
+  QPointer<ContecPanelWindow> contecPanel;
+  QPointer<HomingWindow> homingPanel;
 
 };

@@ -2,52 +2,71 @@
 
 #include <JsonExtensions.hpp>
 
+namespace {
+std::string homingTargetToString(const cmd::HomingTarget target) {
+  switch (target) {
+    case cmd::HomingTarget::All: return "All";
+    case cmd::HomingTarget::XLeft: return "XLeft";
+    case cmd::HomingTarget::YLeft: return "YLeft";
+    case cmd::HomingTarget::XRight: return "XRight";
+    case cmd::HomingTarget::YRight: return "YRight";
+    case cmd::HomingTarget::Z: return "Z";
+  }
+  return "All";
+}
+}  // namespace
+
 nlohmann::json GuiCommandJsonAdapter::toJson(const GuiCommand& command) {
   return std::visit(
-      [](const auto& cmd) -> nlohmann::json {
-        using CmdT = std::decay_t<decltype(cmd)>;
-        if constexpr (std::is_same_v<CmdT, GuiToolChangerCommand>) {
+      [](const auto& payload) -> nlohmann::json {
+        using CmdT = std::decay_t<decltype(payload)>;
+        if constexpr (std::is_same_v<CmdT, cmd::ToolChangerCommand>) {
           return nlohmann::json{
               {"type", "toolChanger"},
-              {"position", utl::enumToString(cmd.arm)},
-              {"action", utl::enumToString(cmd.action)},
+              {"position", utl::enumToString(payload.arm)},
+              {"action", utl::enumToString(payload.action)},
           };
-        } else if constexpr (std::is_same_v<CmdT, GuiReconnectCommand>) {
+        } else if constexpr (std::is_same_v<CmdT, cmd::ReconnectCommand>) {
           return nlohmann::json{
               {"type", "reset"},
-              {"system", utl::enumToString(cmd.component)},
+              {"system", utl::enumToString(payload.robotComponent)},
           };
-        } else if constexpr (std::is_same_v<CmdT, GuiMotorDiagnosticsCommand>) {
+        } else if constexpr (std::is_same_v<CmdT, cmd::MotorDiagnosticsCommand>) {
           return nlohmann::json{
               {"type", "motorDiagnostics"},
-              {"motor", utl::enumToString(cmd.motor)},
+              {"motor", utl::enumToString(payload.motor)},
           };
-        } else if constexpr (std::is_same_v<CmdT, GuiResetMotorAlarmCommand>) {
+        } else if constexpr (std::is_same_v<CmdT, cmd::ResetMotorAlarmCommand>) {
           return nlohmann::json{
               {"type", "resetMotorAlarm"},
-              {"motor", utl::enumToString(cmd.motor)},
+              {"motor", utl::enumToString(payload.motor)},
           };
-        } else if constexpr (std::is_same_v<CmdT, GuiSetMotorEnabledCommand>) {
+        } else if constexpr (std::is_same_v<CmdT, cmd::SetMotorEnabledCommand>) {
           return nlohmann::json{
               {"type", "setMotorEnabled"},
-              {"motor", utl::enumToString(cmd.motor)},
-              {"enabled", cmd.enabled},
+              {"motor", utl::enumToString(payload.motor)},
+              {"enabled", payload.enabled},
           };
-        } else if constexpr (std::is_same_v<CmdT, GuiSetAllMotorsEnabledCommand>) {
+        } else if constexpr (std::is_same_v<CmdT, cmd::SetAllMotorsEnabledCommand>) {
           return nlohmann::json{
               {"type", "setAllMotorsEnabled"},
-              {"enabled", cmd.enabled},
+              {"enabled", payload.enabled},
           };
-        } else if constexpr (std::is_same_v<CmdT, GuiContecDiagnosticsCommand>) {
+        } else if constexpr (std::is_same_v<CmdT, cmd::HomingCommand>) {
+          return nlohmann::json{
+              {"type", "homing"},
+              {"target", homingTargetToString(payload.target)},
+          };
+        } else if constexpr (std::is_same_v<CmdT, cmd::ContecDiagnosticsCommand>) {
           return nlohmann::json{
               {"type", "contecDiagnostics"},
           };
-        } else if constexpr (std::is_same_v<CmdT, GuiEmergencyStopCommand>) {
+        } else if constexpr (std::is_same_v<CmdT, cmd::EmergencyStopCommand>) {
           return nlohmann::json{
               {"type", "emergencyStop"},
           };
         } else {
-          return cmd.node;
+          return payload.node;
         }
       },
       command.payload);

@@ -12,6 +12,7 @@ ResetControls::ResetControls(QWidget* parent) : QWidget(parent), _ui(new Ui::Res
   _bResetControlPanel=_ui->resetControlPanel;
   _bEnableAllMotors = _ui->enableAllMotors;
   _bDisableAllMotors = _ui->disableAllMotors;
+  _bHoming = _ui->homingMotors;
 
   _lServerLed = _ui->ledServer;
   _lContecLed = _ui->ledContec;
@@ -26,6 +27,7 @@ ResetControls::ResetControls(QWidget* parent) : QWidget(parent), _ui(new Ui::Res
   _bResetControlPanel->setEnabled(false);
   _bEnableAllMotors->setEnabled(false);
   _bDisableAllMotors->setEnabled(false);
+  _bHoming->setEnabled(false);
 
   connect(_bResetContec, &QPushButton::clicked, this, &ResetControls::handleButtons);
   connect(_bResetMotors, &QPushButton::clicked, this, &ResetControls::handleButtons);
@@ -34,6 +36,8 @@ ResetControls::ResetControls(QWidget* parent) : QWidget(parent), _ui(new Ui::Res
           &ResetControls::handleButtons);
   connect(_bDisableAllMotors, &QPushButton::clicked, this,
           &ResetControls::handleButtons);
+  connect(_bHoming, &QPushButton::clicked, this,
+          &ResetControls::openHomingWindow);
   connect(_bEmergencyStop, &QPushButton::clicked, this,
           &ResetControls::handleButtons);
 }
@@ -49,30 +53,42 @@ void ResetControls::applyViewModel(const ResetControlsViewModel& vm) const {
   _bResetControlPanel->setEnabled(vm.resetControlPanelEnabled);
   _bEnableAllMotors->setEnabled(vm.enableAllMotorsEnabled);
   _bDisableAllMotors->setEnabled(vm.disableAllMotorsEnabled);
+  _bHoming->setEnabled(vm.homingEnabled);
+}
+
+void ResetControls::openHomingWindow() {
+  if (_homingWindow == nullptr) {
+    _homingWindow = new HomingWindow(this);
+    connect(_homingWindow, &HomingWindow::commandIssued, this,
+            &ResetControls::buttonPressed);
+  }
+  _homingWindow->show();
+  _homingWindow->raise();
+  _homingWindow->activateWindow();
 }
 
 void ResetControls::handleButtons() {
   const auto sender = dynamic_cast<QPushButton*>(QObject::sender());
   GuiCommand command;
   if (sender == _ui->resetContec) {
-    command.payload = GuiReconnectCommand{.component = ERobotComponent::Contec};
+    command.payload = cmd::ReconnectCommand{.robotComponent = ERobotComponent::Contec};
   }
   else if (sender == _ui->resetMotors) {
     command.payload =
-        GuiReconnectCommand{.component = ERobotComponent::MotorControl};
+        cmd::ReconnectCommand{.robotComponent = ERobotComponent::MotorControl};
   }
   else if (sender == _ui->resetControlPanel) {
     command.payload =
-        GuiReconnectCommand{.component = ERobotComponent::ControlPanel};
+        cmd::ReconnectCommand{.robotComponent = ERobotComponent::ControlPanel};
   }
   else if (sender == _ui->enableAllMotors) {
-    command.payload = GuiSetAllMotorsEnabledCommand{.enabled = true};
+    command.payload = cmd::SetAllMotorsEnabledCommand{.enabled = true};
   }
   else if (sender == _ui->disableAllMotors) {
-    command.payload = GuiSetAllMotorsEnabledCommand{.enabled = false};
+    command.payload = cmd::SetAllMotorsEnabledCommand{.enabled = false};
   }
   else if (sender == _ui->emergencyStop) {
-    command.payload = GuiEmergencyStopCommand{};
+    command.payload = cmd::EmergencyStopCommand{};
   }
   else
     return;

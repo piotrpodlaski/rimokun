@@ -63,5 +63,7 @@ ResetControlsViewModel RobotStatusViewModel::resetControlsForStatus(
       vm.motor == utl::ELEDState::On || vm.motor == utl::ELEDState::Warning;
   vm.disableAllMotorsEnabled =
       vm.motor == utl::ELEDState::On || vm.motor == utl::ELEDState::Warning;
+  vm.homingEnabled =
+      vm.motor == utl::ELEDState::On || vm.motor == utl::ELEDState::Warning;
   return vm;
 }

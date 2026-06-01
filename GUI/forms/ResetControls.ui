@@ -289,6 +289,25 @@
          </property>
         </widget>
        </item>
+       <item>
+        <widget class="QPushButton" name="homingMotors">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+           <horstretch>1</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="font">
+          <font>
+           <pointsize>12</pointsize>
+           <bold>false</bold>
+          </font>
+         </property>
+         <property name="text">
+          <string>Homing</string>
+         </property>
+        </widget>
+       </item>
       </layout>
      </item>
     </layout>

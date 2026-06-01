@@ -44,9 +44,9 @@ void Updater::startUpdaterThread() {
 
   _running.store(true, std::memory_order_release);
   _worker->start(
-      [this](const utl::RobotStatus& status) {
+      [this](std::shared_ptr<const utl::RobotStatus> statusPtr) {
         QMetaObject::invokeMethod(
-            this, [this, status]() { emit newDataArrived(status); },
+            this, [this, statusPtr]() { emit newDataArrived(*statusPtr); },
             Qt::QueuedConnection);
       },
       [this]() {

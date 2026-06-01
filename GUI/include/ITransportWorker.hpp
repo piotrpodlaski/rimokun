@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <optional>
 
 #include "CommonDefinitions.hpp"
@@ -19,7 +20,7 @@ class ITransportWorker {
     std::optional<GuiResponse> response;
   };
 
-  using StatusCallback = std::function<void(const utl::RobotStatus&)>;
+  using StatusCallback = std::function<void(std::shared_ptr<const utl::RobotStatus>)>;
   using ConnectionLostCallback = std::function<void()>;
   using ResponseCallback = std::function<void(const ResponseEvent&)>;
 

@@ -4,7 +4,7 @@
 #include <ModbusClient.hpp>
 
 class Contec final : public MachineComponent {
-  typedef std::vector<bool> bitVector;
+  using bitVector = std::vector<bool>;
  public:
   Contec();
   ~Contec();

@@ -17,6 +17,11 @@ TEST(ArKd2RegisterMapTests, CoreAddressesMatchExpectedManualValues) {
   EXPECT_EQ(map.directIoAndBrakeStatus, 0x00D4);
   EXPECT_EQ(map.alarmResetCommand, 0x0180);
   EXPECT_EQ(map.startingSpeed, 0x0284);
+  EXPECT_EQ(map.homeSeekingMode, 0x02C0);
+  EXPECT_EQ(map.homeSeekingOperatingSpeed, 0x02C2);
+  EXPECT_EQ(map.homeSeekingAcceleration, 0x02C4);
+  EXPECT_EQ(map.homeSeekingStartingSpeed, 0x02C6);
+  EXPECT_EQ(map.homeSeekingStartingDirection, 0x02CA);
   EXPECT_EQ(map.overloadAlarm, 0x0300);
   EXPECT_EQ(map.excessivePositionDeviationAlarm, 0x0302);
   EXPECT_EQ(map.overloadWarning, 0x0342);
@@ -71,6 +76,11 @@ TEST(ArKd2RegisterMapTests, CompactMapAddressesExistInFullRegisterMap) {
       map.actualPosition,
       map.actualSpeed,
       map.startingSpeed,
+      map.homeSeekingMode,
+      map.homeSeekingOperatingSpeed,
+      map.homeSeekingAcceleration,
+      map.homeSeekingStartingSpeed,
+      map.homeSeekingStartingDirection,
       map.overloadAlarm,
       map.excessivePositionDeviationAlarm,
       map.overloadWarning,

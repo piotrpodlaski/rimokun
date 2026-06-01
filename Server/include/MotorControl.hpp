@@ -74,6 +74,10 @@ class MotorControl final : public MachineComponent {
                                 std::int32_t deceleration);
   void setRunCurrent(utl::EMotor motorId, std::int32_t current);
   void setStopCurrent(utl::EMotor motorId, std::int32_t current);
+  void configureHoming(utl::EMotor motorId, std::int32_t mode,
+                       std::int32_t operatingSpeed, std::int32_t acceleration,
+                       std::int32_t startingSpeed,
+                       std::int32_t startingDirection);
   void configureConstantSpeedPair(utl::EMotor motorId, std::int32_t speedOp0,
                                   std::int32_t speedOp1, std::int32_t acceleration,
                                   std::int32_t deceleration);
@@ -141,6 +145,9 @@ class MotorControl final : public MachineComponent {
 
   std::optional<ModbusClient> _bus;
   std::mutex _busMutex;
+
+  template <typename F>
+  decltype(auto) withBus(utl::EMotor motorId, F&& fn);
 
   void applyConfiguredParameters(const Motor& motor, const MotorConfig& config,
                                  ModbusClient& bus) const;

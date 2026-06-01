@@ -109,6 +109,77 @@ struct MotorRemoteIoStatus {
   std::vector<AssignedSignal> inputAssignments;
 };
 
+struct MotorIoAssignmentDefault {
+  std::string_view channel;
+  std::string_view function;
+  std::uint16_t functionCode{0};
+};
+
+namespace motor_io_defaults {
+inline constexpr std::array<MotorIoAssignmentDefault, 7> ioOutput{{
+    {"OUT0", "HOME-P", 70},
+    {"OUT1", "END", 69},
+    {"OUT2", "AREA1", 73},
+    {"OUT3", "READY", 67},
+    {"OUT4", "WNG", 66},
+    {"OUT5", "ALM", 65},
+    {"MB", "MB", 0},
+}};
+
+inline constexpr std::array<MotorIoAssignmentDefault, 12> ioInput{{
+    {"IN0", "HOME", 3},
+    {"IN1", "START", 4},
+    {"IN2", "M0", 48},
+    {"IN3", "M1", 49},
+    {"IN4", "M2", 50},
+    {"IN5", "FREE", 16},
+    {"IN6", "STOP", 18},
+    {"IN7", "ALM-RST", 24},
+    {"+LS", "+LS", 0},
+    {"-LS", "-LS", 0},
+    {"HOMES", "HOMES", 0},
+    {"SLIT", "SLIT", 0},
+}};
+
+inline constexpr std::array<MotorIoAssignmentDefault, 16> netInput{{
+    {"NET-IN0", "M0", 48},
+    {"NET-IN1", "M1", 49},
+    {"NET-IN2", "M2", 50},
+    {"NET-IN3", "START", 4},
+    {"NET-IN4", "HOME", 3},
+    {"NET-IN5", "STOP", 18},
+    {"NET-IN6", "FREE", 16},
+    {"NET-IN7", "not used", 0},
+    {"NET-IN8", "MS0", 8},
+    {"NET-IN9", "MS1", 9},
+    {"NET-IN10", "MS2", 10},
+    {"NET-IN11", "SSTART", 5},
+    {"NET-IN12", "+JOG", 6},
+    {"NET-IN13", "-JOG", 7},
+    {"NET-IN14", "FWD", 1},
+    {"NET-IN15", "RVS", 2},
+}};
+
+inline constexpr std::array<MotorIoAssignmentDefault, 16> netOutput{{
+    {"NET-OUT0", "M0_R", 48},
+    {"NET-OUT1", "M1_R", 49},
+    {"NET-OUT2", "M2_R", 50},
+    {"NET-OUT3", "START_R", 4},
+    {"NET-OUT4", "HOME-P", 70},
+    {"NET-OUT5", "READY", 67},
+    {"NET-OUT6", "WNG", 66},
+    {"NET-OUT7", "ALM", 65},
+    {"NET-OUT8", "S-BSY", 80},
+    {"NET-OUT9", "AREA1", 73},
+    {"NET-OUT10", "AREA2", 74},
+    {"NET-OUT11", "AREA3", 75},
+    {"NET-OUT12", "TIM", 72},
+    {"NET-OUT13", "MOVE", 68},
+    {"NET-OUT14", "END", 69},
+    {"NET-OUT15", "TLC", 71},
+}};
+}  // namespace motor_io_defaults
+
 struct MotorMonitorSnapshot {
   std::int32_t commandPosition{0};
   std::int32_t actualSpeed{0};
@@ -196,6 +267,11 @@ class Motor {
   void setStopCurrent(ModbusClient& bus, std::int32_t current) const;
   void setStopInputAction(ModbusClient& bus, std::int32_t value) const;
   void setStartingSpeed(ModbusClient& bus, std::int32_t speed) const;
+  void configureHoming(ModbusClient& bus, std::int32_t mode,
+                       std::int32_t operatingSpeed,
+                       std::int32_t acceleration,
+                       std::int32_t startingSpeed,
+                       std::int32_t startingDirection) const;
   void setOverloadAlarm(ModbusClient& bus, std::int32_t value) const;
   void setExcessivePositionDeviationAlarm(ModbusClient& bus,
                                           std::int32_t value) const;

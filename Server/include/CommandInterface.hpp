@@ -7,6 +7,9 @@
 #include <mutex>
 #include <optional>
 #include <queue>
+#include <string>
+#include <variant>
+#include <vector>
 #include <CommonDefinitions.hpp>
 
 
@@ -45,6 +48,12 @@ struct SetAllMotorsEnabledCommand {
   bool enabled;
 };
 
+enum class HomingTarget { All, XLeft, YLeft, XRight, YRight, Z };
+
+struct HomingCommand {
+  HomingTarget target;
+};
+
 struct ContecDiagnosticsCommand {};
 
 struct EmergencyStopCommand {};
@@ -52,7 +61,7 @@ struct EmergencyStopCommand {};
 struct Command {
   std::variant<ToolChangerCommand, ReconnectCommand, MotorDiagnosticsCommand,
                ResetMotorAlarmCommand, SetMotorEnabledCommand,
-               SetAllMotorsEnabledCommand, ContecDiagnosticsCommand,
+               SetAllMotorsEnabledCommand, HomingCommand, ContecDiagnosticsCommand,
                EmergencyStopCommand>
       payload;
   std::promise<std::string> reply;

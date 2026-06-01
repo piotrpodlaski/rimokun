@@ -29,6 +29,11 @@ struct MotorRegisterMap {
   int runCurrent{0x0240};
   int stopCurrent{0x0242};
   int startingSpeed{0x0284};
+  int homeSeekingMode{0x02C0};
+  int homeSeekingOperatingSpeed{0x02C2};
+  int homeSeekingAcceleration{0x02C4};
+  int homeSeekingStartingSpeed{0x02C6};
+  int homeSeekingStartingDirection{0x02CA};
   int overloadAlarm{0x0300};
   int excessivePositionDeviationAlarm{0x0302};
   int overloadWarning{0x0342};

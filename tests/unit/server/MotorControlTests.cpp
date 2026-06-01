@@ -367,6 +367,39 @@ TEST(MotorControlTests, SpeedModeStopMovementClearsDirectionBits) {
   std::filesystem::remove(configPath);
 }
 
+TEST(MotorControlTests, ConfigureHomingWritesHomeSeekingRegisters) {
+  fake_modbus::reset();
+  const auto configPath = writeMotorControlConfig("5");
+  utl::Config::instance().setConfigPath(configPath.string());
+
+  MotorControl control;
+  control.initialize();
+  control.configureHoming(utl::EMotor::XLeft, 0, 1234, 5678, 1234, 1);
+
+  const auto map = makeArKd2RegisterMap();
+  EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.homeSeekingMode), 0u);
+  EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.homeSeekingMode + 1), 0u);
+  EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.homeSeekingOperatingSpeed),
+            0u);
+  EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.homeSeekingOperatingSpeed + 1),
+            1234u);
+  EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.homeSeekingAcceleration),
+            0u);
+  EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.homeSeekingAcceleration + 1),
+            5678u);
+  EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.homeSeekingStartingSpeed),
+            0u);
+  EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.homeSeekingStartingSpeed + 1),
+            1234u);
+  EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.homeSeekingStartingDirection),
+            0u);
+  EXPECT_EQ(
+      fake_modbus::getHoldingRegister(5, map.homeSeekingStartingDirection + 1),
+      1u);
+
+  std::filesystem::remove(configPath);
+}
+
 TEST(MotorControlTests, UnknownMotorIdIsRejectedByCommandMethods) {
   fake_modbus::reset();
   const auto configPath = writeMotorControlConfig("5");

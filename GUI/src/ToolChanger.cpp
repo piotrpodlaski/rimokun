@@ -32,7 +32,7 @@ void ToolChanger::handleButtons() {
   auto reply = QMessageBox::No;
   if (sender == _ui->closeButton) {
     command.payload =
-        GuiToolChangerCommand{.arm = _arm, .action = EToolChangerAction::Close};
+        cmd::ToolChangerCommand{.arm = _arm, .action = EToolChangerAction::Close};
     auto msg =
         std::format("Are you sure you want to close the {} tool changer?",
                     magic_enum::enum_name(_arm));
@@ -50,7 +50,7 @@ void ToolChanger::handleButtons() {
     }
   } else if (sender == _ui->openButon) {
     command.payload =
-        GuiToolChangerCommand{.arm = _arm, .action = EToolChangerAction::Open};
+        cmd::ToolChangerCommand{.arm = _arm, .action = EToolChangerAction::Open};
     const auto msg =
         std::format("Are you sure you want to open the {} tool changer?",
                     magic_enum::enum_name(_arm));

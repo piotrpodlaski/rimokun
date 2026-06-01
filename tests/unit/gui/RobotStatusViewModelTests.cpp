@@ -38,4 +38,5 @@ TEST(RobotStatusViewModelTests, ResetControlsMapsServerAndComponentStates) {
   EXPECT_TRUE(vm.resetContecEnabled);
   EXPECT_FALSE(vm.resetMotorEnabled);
   EXPECT_FALSE(vm.resetControlPanelEnabled);
+  EXPECT_TRUE(vm.homingEnabled);
 }

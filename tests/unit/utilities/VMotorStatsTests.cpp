@@ -13,6 +13,7 @@ class FakeMotorStats final : public VMotorStats {
   void setTargetPosition(double value) const override { targetPosition = value; }
   void setBrake(utl::ELEDState value) const override { brake = value; }
   void setEnabled(utl::ELEDState value) const override { enabled = value; }
+  void setHoming(utl::ELEDState value) const override { homing = value; }
   void setStatus(utl::ELEDState value) const override { status = value; }
   void setMotorId(utl::EMotor value) override { motorId = value; }
   void setAxisState(utl::EAxisState value) override { axisState = value; }
@@ -27,6 +28,7 @@ class FakeMotorStats final : public VMotorStats {
   mutable double targetPosition{0};
   mutable utl::ELEDState brake{utl::ELEDState::On};
   mutable utl::ELEDState enabled{utl::ELEDState::On};
+  mutable utl::ELEDState homing{utl::ELEDState::On};
   mutable utl::ELEDState status{utl::ELEDState::On};
   utl::EMotor motorId{utl::EMotor::XLeft};
   utl::EAxisState axisState{utl::EAxisState::Locked};
@@ -45,7 +47,8 @@ TEST(VMotorStatsTests, ConfigureCopiesNumericFieldsAndFlags) {
       .torque = 17,
       .state = utl::ELEDState::Warning,
       .flags = {{utl::EMotorStatusFlags::BrakeApplied, utl::ELEDState::Error},
-                {utl::EMotorStatusFlags::Enabled, utl::ELEDState::Off}},
+                {utl::EMotorStatusFlags::Enabled, utl::ELEDState::Off},
+                {utl::EMotorStatusFlags::Homing, utl::ELEDState::Warning}},
       .speedCommandPercent = -42.0,
       .modeMaxLinearSpeedMmPerSec = 120.0};
 
@@ -58,6 +61,7 @@ TEST(VMotorStatsTests, ConfigureCopiesNumericFieldsAndFlags) {
   EXPECT_EQ(stats.status, utl::ELEDState::Warning);
   EXPECT_EQ(stats.brake, utl::ELEDState::Error);
   EXPECT_EQ(stats.enabled, utl::ELEDState::Off);
+  EXPECT_EQ(stats.homing, utl::ELEDState::Warning);
   EXPECT_DOUBLE_EQ(stats.speedCommandPercent, -42.0);
   EXPECT_DOUBLE_EQ(stats.modeMaxLinearSpeedMmPerSec, 120.0);
 }
@@ -66,6 +70,7 @@ TEST(VMotorStatsTests, ConfigureDefaultsFlagsToOffWhenMissing) {
   FakeMotorStats stats;
   stats.brake = utl::ELEDState::On;
   stats.enabled = utl::ELEDState::Error;
+  stats.homing = utl::ELEDState::Warning;
   stats.status = utl::ELEDState::Error;
   utl::SingleMotorStatus input{
       .currentPosition = 0,
@@ -81,4 +86,5 @@ TEST(VMotorStatsTests, ConfigureDefaultsFlagsToOffWhenMissing) {
   EXPECT_EQ(stats.status, utl::ELEDState::Off);
   EXPECT_EQ(stats.brake, utl::ELEDState::Off);
   EXPECT_EQ(stats.enabled, utl::ELEDState::Off);
+  EXPECT_EQ(stats.homing, utl::ELEDState::Off);
 }

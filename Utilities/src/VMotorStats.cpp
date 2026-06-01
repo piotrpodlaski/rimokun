@@ -15,4 +15,8 @@ void VMotorStats::configure(const utl::SingleMotorStatus& s) const {
     setEnabled(s.flags.at(utl::EMotorStatusFlags::Enabled));
   else
     setEnabled(utl::ELEDState::Off);
+  if (s.flags.contains(utl::EMotorStatusFlags::Homing))
+    setHoming(s.flags.at(utl::EMotorStatusFlags::Homing));
+  else
+    setHoming(utl::ELEDState::Off);
 }

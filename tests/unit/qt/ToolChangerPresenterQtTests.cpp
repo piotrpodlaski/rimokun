@@ -78,16 +78,16 @@ void ToolChangerPresenterQtTests::forwardsViewCommand() {
                      captured = command;
                    });
 
-  GuiCommand cmd;
-  cmd.payload = GuiToolChangerCommand{
+  GuiCommand command;
+  command.payload = cmd::ToolChangerCommand{
       .arm = utl::EArm::Right, .action = utl::EToolChangerAction::Open};
   qRegisterMetaType<GuiCommand>("GuiCommand");
   const bool invoked = QMetaObject::invokeMethod(
-      &view, "buttonPressed", Qt::DirectConnection, Q_ARG(GuiCommand, cmd));
+      &view, "buttonPressed", Qt::DirectConnection, Q_ARG(GuiCommand, command));
   QVERIFY(invoked);
 
   QCOMPARE(callCount, 1);
-  const auto* tool = std::get_if<GuiToolChangerCommand>(&captured.payload);
+  const auto* tool = std::get_if<cmd::ToolChangerCommand>(&captured.payload);
   QVERIFY(tool != nullptr);
   QCOMPARE(tool->arm, utl::EArm::Right);
   QCOMPARE(tool->action, utl::EToolChangerAction::Open);

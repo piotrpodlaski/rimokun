@@ -69,7 +69,7 @@ TEST(RimoTransportWorkerTests, EmitsStatusAndConnectionLostCallbacks) {
   RimoTransportWorker worker(std::move(fakeClient));
   std::atomic<int> statusCalls{0};
   std::atomic<int> lostCalls{0};
-  worker.start([&](const utl::RobotStatus&) { ++statusCalls; },
+  worker.start([&](std::shared_ptr<const utl::RobotStatus>) { ++statusCalls; },
                [&]() { ++lostCalls; }, [&](const ITransportWorker::ResponseEvent&) {});
 
   ASSERT_TRUE(waitFor([&]() { return statusCalls.load() > 0; }));
@@ -98,7 +98,7 @@ TEST(RimoTransportWorkerTests, ProcessesQueuedCommandAndEmitsResponse) {
   std::optional<ITransportWorker::ResponseEvent> responseEvent;
 
   worker.start(
-      [](const utl::RobotStatus&) {}, []() {},
+      [](std::shared_ptr<const utl::RobotStatus>) {}, []() {},
       [&](const ITransportWorker::ResponseEvent& event) {
         {
           std::lock_guard<std::mutex> lock(responseMutex);
@@ -108,7 +108,7 @@ TEST(RimoTransportWorkerTests, ProcessesQueuedCommandAndEmitsResponse) {
       });
 
   GuiCommand command;
-  command.payload = GuiReconnectCommand{.component = utl::ERobotComponent::Contec};
+  command.payload = cmd::ReconnectCommand{.robotComponent = utl::ERobotComponent::Contec};
   worker.enqueue({.id = 77, .command = command});
 
   {

@@ -65,9 +65,9 @@ classes:
     interRequestDelayMS: 3
     motors:
       XLeft:
-        address: 1
+        address: 2
         runCurrent: 500
-        stopCurrent: 100
+        stopCurrent: 500
         startingSpeed: 100
         overloadWarning: 10
         overloadAlarm: 300
@@ -83,9 +83,9 @@ classes:
 #        excessivePositionDeviationWarning: 500
 #        excessivePositionDeviationAlarm: 700
       YLeft:
-        address: 2
+        address: 1
         runCurrent: 500
-        stopCurrent: 0
+        stopCurrent: 500
         startingSpeed: 100
         overloadWarning: 10
         overloadAlarm: 300
@@ -125,6 +125,19 @@ classes:
     loopIntervalMS: 60
     updateIntervalMS: 200
     commandQueueMaxSize: 16  # max pending commands; excess are rejected with an error response
+    homing:
+      order:
+        - Z
+        - XLeft
+        - XRight
+        - YLeft
+        - YRight
+      startingDirection:
+        XLeft: 1
+        XRight: 0
+        YLeft: 0
+        YRight: 0
+        Z: 1
     motion:
       stepsPerRevolution: 1000
       neutralAxisActivationThreshold: 0.05
@@ -136,46 +149,46 @@ classes:
           slowMaxLinearSpeedMmPerSec: &slowSpeedX 50.0
           fastMaxLinearSpeedMmPerSec: &fastSpeedX 350.0
           stepsPerMm: &stepsMmX 14.15
-          slowAcceleration001MsPerKHz: &slowAccel 100000
-          slowDeceleration001MsPerKHz: &slowDeccel 100000
-          fastAcceleration001MsPerKHz: &fastAccel 50000
-          fastDeceleration001MsPerKHz: &fastDeccel 50000
+          slowAcceleration001MsPerKHz: &slowAccelX 300000
+          slowDeceleration001MsPerKHz: &slowDeccelX 300000
+          fastAcceleration001MsPerKHz: &fastAccelX 150000
+          fastDeceleration001MsPerKHz: &fastDeccelX 150000
         leftArmY:
           invertAxis: true
-          slowMaxLinearSpeedMmPerSec: &slowSpeedY 30.0
-          fastMaxLinearSpeedMmPerSec: &fastSpeedY 200.0
-          stepsPerMm: &stepsMmY 20
-          slowAcceleration001MsPerKHz: *slowAccel
-          slowDeceleration001MsPerKHz: *slowDeccel
-          fastAcceleration001MsPerKHz: *fastAccel
-          fastDeceleration001MsPerKHz: *fastDeccel
+          slowMaxLinearSpeedMmPerSec: &slowSpeedY 10.0
+          fastMaxLinearSpeedMmPerSec: &fastSpeedY 60.0
+          stepsPerMm: &stepsMmY 200
+          slowAcceleration001MsPerKHz: &slowAccelY 100000
+          slowDeceleration001MsPerKHz: &slowDeccelY 100000
+          fastAcceleration001MsPerKHz: &fastAccelY 50000
+          fastDeceleration001MsPerKHz: &fastDeccelY 50000
         rightArmX:
           invertAxis: false
           slowMaxLinearSpeedMmPerSec: *slowSpeedX
           fastMaxLinearSpeedMmPerSec: *fastSpeedX
           stepsPerMm: *stepsMmX
-          slowAcceleration001MsPerKHz: *slowAccel
-          slowDeceleration001MsPerKHz: *slowDeccel
-          fastAcceleration001MsPerKHz: *fastAccel
-          fastDeceleration001MsPerKHz: *fastDeccel
+          slowAcceleration001MsPerKHz: *slowAccelX
+          slowDeceleration001MsPerKHz: *slowDeccelX
+          fastAcceleration001MsPerKHz: *fastAccelX
+          fastDeceleration001MsPerKHz: *fastDeccelX
         rightArmY:
           invertAxis: false
           slowMaxLinearSpeedMmPerSec: *slowSpeedY
           fastMaxLinearSpeedMmPerSec: *fastSpeedY
           stepsPerMm: *stepsMmY
-          slowAcceleration001MsPerKHz: *slowAccel
-          slowDeceleration001MsPerKHz: *slowDeccel
-          fastAcceleration001MsPerKHz: *fastAccel
-          fastDeceleration001MsPerKHz: *fastDeccel
+          slowAcceleration001MsPerKHz: *slowAccelY
+          slowDeceleration001MsPerKHz: *slowDeccelY
+          fastAcceleration001MsPerKHz: *fastAccelY
+          fastDeceleration001MsPerKHz: *fastDeccelY
         gantryZ:
           invertAxis: false
           slowMaxLinearSpeedMmPerSec: 150.0
           fastMaxLinearSpeedMmPerSec: 500.0
           stepsPerMm: *stepsMmX
-          slowAcceleration001MsPerKHz: *slowAccel
-          slowDeceleration001MsPerKHz: *slowDeccel
-          fastAcceleration001MsPerKHz: *fastAccel
-          fastDeceleration001MsPerKHz: *fastDeccel
+          slowAcceleration001MsPerKHz: *slowAccelX
+          slowDeceleration001MsPerKHz: *slowDeccelX
+          fastAcceleration001MsPerKHz: *fastAccelX
+          fastDeceleration001MsPerKHz: *fastDeccelX
     inputMapping:
       safetyON : 8
       button1 : 9

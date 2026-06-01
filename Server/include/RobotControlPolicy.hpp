@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "CommonDefinitions.hpp"
@@ -96,8 +97,8 @@ class RimoKunControlPolicy final : public IRobotControlPolicy {
     std::optional<MotorControlDirection> lastDirection;
   };
 
-  void warnOnce(bool& flag, const std::string& message);
-  void setWarningFlag(bool& flag, bool value);
+  void warnOnce(bool& flag, std::string_view message);
+  void setWarningFlag(bool& flag, bool value, std::string_view condition);
 
   static std::optional<utl::EArm> motorToArm(utl::EMotor motor);
 

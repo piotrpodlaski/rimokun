@@ -101,7 +101,7 @@ void ContecPanelWindow::closeEvent(QCloseEvent* event) {
 
 void ContecPanelWindow::requestDiagnostics() {
   GuiCommand command;
-  command.payload = GuiContecDiagnosticsCommand{};
+  command.payload = cmd::ContecDiagnosticsCommand{};
   emit commandIssued(command);
 }
 

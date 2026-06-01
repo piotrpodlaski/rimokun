@@ -62,6 +62,13 @@ Main reliability concerns are:
 - publishing timely status after state changes
 - making subsystem faults visible quickly
 
+Motor pulse operations hold the shared Modbus bus lock for the full
+assert/hold/deassert sequence. This is intentional: all motors share one
+RS-485/TCP bus, and interleaving another request in the middle of a pulse can
+corrupt the hardware-visible signal. Status timestamps can therefore show
+short jitter during pulse-heavy operations; treat this as an expected hardware
+constraint, not as a server scheduling fault.
+
 ## Runtime behavior
 
 At startup, the server:

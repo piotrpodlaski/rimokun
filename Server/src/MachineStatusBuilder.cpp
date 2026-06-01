@@ -8,7 +8,6 @@
 
 #include <Logger.hpp>
 #include <Motor.hpp>
-#include <MotorControl.hpp>
 #include <magic_enum/magic_enum.hpp>
 
 namespace {
@@ -102,12 +101,12 @@ double MachineStatusBuilder::speedMmPerSecFromRpm(const utl::EMotor motorId,
 
 void MachineStatusBuilder::updateAndPublish(
     utl::RobotStatus& status, const ComponentsMap& components,
-    const SnapshotFn& readJoystickSnapshot, const ReadSignalsFn& readInputSignals,
-    const ReadSignalsFn& readOutputSignals, const PublishFn& publish) const {
+    MotorControl* motorControl, const SnapshotFn& readJoystickSnapshot,
+    const ReadSignalsFn& readInputSignals, const ReadSignalsFn& readOutputSignals,
+    const PublishFn& publish) const {
   const auto motorControlIt = components.find(utl::ERobotComponent::MotorControl);
-  if (motorControlIt != components.end() && motorControlIt->second != nullptr) {
-    if (auto* motorControl = dynamic_cast<MotorControl*>(motorControlIt->second);
-        motorControl != nullptr) {
+  if (motorControl != nullptr && motorControlIt != components.end() &&
+      motorControlIt->second != nullptr) {
       const auto componentState = motorControlIt->second->state();
       bool hasAnyMotorWarningOrAlarm = false;
       const auto configuredMotorIds = motorControl->configuredMotorIds();
@@ -122,6 +121,7 @@ void MachineStatusBuilder::updateAndPublish(
               utl::ELEDState::Error;
           motorStatus.flags[utl::EMotorStatusFlags::Warning] = utl::ELEDState::Off;
           motorStatus.flags[utl::EMotorStatusFlags::Alarm] = utl::ELEDState::Error;
+          motorStatus.flags[utl::EMotorStatusFlags::Homing] = utl::ELEDState::Off;
           motorStatus.warningDescription.clear();
           motorStatus.alarmDescription =
               "MotorControl component is in error state";
@@ -137,6 +137,7 @@ void MachineStatusBuilder::updateAndPublish(
               utl::ELEDState::Error;
           motorStatus.flags[utl::EMotorStatusFlags::Warning] = utl::ELEDState::Off;
           motorStatus.flags[utl::EMotorStatusFlags::Alarm] = utl::ELEDState::Error;
+          motorStatus.flags[utl::EMotorStatusFlags::Homing] = utl::ELEDState::Off;
           motorStatus.warningDescription.clear();
           motorStatus.alarmDescription =
               "Motor is configured but unavailable in runtime";
@@ -172,6 +173,8 @@ void MachineStatusBuilder::updateAndPublish(
               outputStatus.raw, MotorOutputFlag::Warning);
           const bool hasAlarm = Motor::isDriverOutputFlagSet(outputStatus.raw,
                                                              MotorOutputFlag::Alarm);
+          const bool homeComplete = Motor::isDriverOutputFlagSet(
+              outputStatus.raw, MotorOutputFlag::HomeP);
           const bool enableControllable =
               motorControl->isEnableControllable(motorId);
           const bool isEnabled =
@@ -191,6 +194,8 @@ void MachineStatusBuilder::updateAndPublish(
               hasWarning ? utl::ELEDState::Warning : utl::ELEDState::Off;
           motorStatus.flags[utl::EMotorStatusFlags::Alarm] =
               hasAlarm ? utl::ELEDState::Error : utl::ELEDState::Off;
+          motorStatus.flags[utl::EMotorStatusFlags::Homing] =
+              homeComplete ? utl::ELEDState::On : utl::ELEDState::Off;
           motorStatus.state = hasAlarm
                                   ? utl::ELEDState::Error
                                   : (hasWarning ? utl::ELEDState::Warning
@@ -223,13 +228,13 @@ void MachineStatusBuilder::updateAndPublish(
               utl::ELEDState::Error;
           motorStatus.flags[utl::EMotorStatusFlags::Warning] = utl::ELEDState::Off;
           motorStatus.flags[utl::EMotorStatusFlags::Alarm] = utl::ELEDState::Error;
+          motorStatus.flags[utl::EMotorStatusFlags::Homing] = utl::ELEDState::Off;
           motorStatus.warningDescription.clear();
           motorStatus.alarmDescription = ex.what();
           hasAnyMotorWarningOrAlarm = true;
         }
       }
       motorControl->setWarningState(hasAnyMotorWarningOrAlarm);
-    }
   }
 
   for (const auto& [componentType, component] : components) {
@@ -326,6 +331,14 @@ void MachineStatusBuilder::updateAndPublish(
   }
 
   publish(status);
+}
+
+void MachineStatusBuilder::updateAndPublish(
+    utl::RobotStatus& status, const ComponentsMap& components,
+    const SnapshotFn& readJoystickSnapshot, const ReadSignalsFn& readInputSignals,
+    const ReadSignalsFn& readOutputSignals, const PublishFn& publish) const {
+  updateAndPublish(status, components, nullptr, readJoystickSnapshot,
+                   readInputSignals, readOutputSignals, publish);
 }
 
 utl::ELEDState MachineStatusBuilder::stateToLed(MachineComponent::State state) {

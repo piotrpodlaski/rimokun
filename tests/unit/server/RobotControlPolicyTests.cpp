@@ -274,13 +274,15 @@ TEST(RobotControlPolicyTests,
   EXPECT_FALSE(decision.motorIntents.empty());
 }
 
-TEST(RobotControlPolicyTests, RimoKunPolicyDisablesMotionWhenAnyMotorIsInAlarm) {
+TEST(RobotControlPolicyTests, RimoKunPolicyStopsAllMotorsWhenAnyMotorIsInAlarm) {
   RimoKunControlPolicy policy;
   utl::RobotStatus status;
   setAllComponentsOn(status);
   status.motors[utl::EMotor::XLeft].state = utl::ELEDState::Error;
   status.motors[utl::EMotor::XLeft].flags[utl::EMotorStatusFlags::Alarm] =
       utl::ELEDState::Error;
+  status.motors[utl::EMotor::YLeft].state = utl::ELEDState::On;
+  status.motors[utl::EMotor::XRight].state = utl::ELEDState::On;
   status.joystics[utl::EArm::Left] = {.x = 0.8, .y = 0.0, .btn = false};
   status.joystics[utl::EArm::Right] = {.x = 0.0, .y = 0.0, .btn = false};
   status.joystics[utl::EArm::Gantry] = {.x = 0.0, .y = 0.0, .btn = false};
@@ -292,7 +294,24 @@ TEST(RobotControlPolicyTests, RimoKunPolicyDisablesMotionWhenAnyMotorIsInAlarm) 
   ASSERT_TRUE(decision.outputs.has_value());
   EXPECT_TRUE(decision.outputs->at("light1"));
   EXPECT_FALSE(decision.outputs->at("light2"));
-  EXPECT_TRUE(decision.motorIntents.empty());
+
+  const auto* xLeft = findIntent(decision.motorIntents, utl::EMotor::XLeft);
+  ASSERT_NE(xLeft, nullptr);
+  ASSERT_TRUE(xLeft->speed.has_value());
+  EXPECT_EQ(*xLeft->speed, 0);
+  EXPECT_TRUE(xLeft->stopMovement);
+
+  const auto* yLeft = findIntent(decision.motorIntents, utl::EMotor::YLeft);
+  ASSERT_NE(yLeft, nullptr);
+  ASSERT_TRUE(yLeft->speed.has_value());
+  EXPECT_EQ(*yLeft->speed, 0);
+  EXPECT_TRUE(yLeft->stopMovement);
+
+  const auto* xRight = findIntent(decision.motorIntents, utl::EMotor::XRight);
+  ASSERT_NE(xRight, nullptr);
+  ASSERT_TRUE(xRight->speed.has_value());
+  EXPECT_EQ(*xRight->speed, 0);
+  EXPECT_TRUE(xRight->stopMovement);
 }
 
 TEST(RobotControlPolicyTests, RimoKunPolicyUpdatesSpeedOnlyAfterAxisDeltaThreshold) {

@@ -11,6 +11,7 @@ class VMotorStats {
   virtual void setTargetPosition(double value) const = 0;
   virtual void setBrake(utl::ELEDState value) const = 0;
   virtual void setEnabled(utl::ELEDState value) const = 0;
+  virtual void setHoming(utl::ELEDState value) const = 0;
   virtual void setStatus(utl::ELEDState value) const = 0;
   virtual void setMotorId(utl::EMotor) = 0;
   virtual void setAxisState(utl::EAxisState state) = 0;
@@ -21,4 +22,5 @@ class VMotorStats {
   void configure(const utl::SingleMotorStatus& s) const;
 };
 
-typedef std::map<utl::EMotor, VMotorStats*> MotorStatsMap_t;
+// Non-owning pointers to Qt widgets owned by the MainWindow UI tree.
+using MotorStatsMap_t = std::map<utl::EMotor, VMotorStats*>;

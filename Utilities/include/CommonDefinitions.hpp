@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <map>
 #include <optional>
 #include <string>
@@ -7,7 +8,13 @@
 namespace utl {
 enum class EMotor { XLeft, XRight, YLeft, YRight, ZLeft, ZRight };
 enum class ELEDState { On, Off, Warning, Error, ErrorBlinking };
-enum class EMotorStatusFlags { BrakeApplied, Enabled, Error, Warning, Alarm };
+enum class EMotorStatusFlags {
+  BrakeApplied,
+  Enabled,
+  Warning,
+  Alarm,
+  Homing
+};
 enum class EArm { Left, Right, Gantry };
 enum class EToolChangerStatusFlags {
   ProxSen,
@@ -46,7 +53,7 @@ enum class EOutputSignal {
   light2,
 };
 
-using SignalMap = std::map<std::string, bool>;
+using SignalMap = std::map<std::string, bool, std::less<>>;
 
 std::string getMotorName(EMotor em);
 EMotor getMotorType(std::string name);

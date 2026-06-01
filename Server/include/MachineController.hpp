@@ -12,14 +12,12 @@
 #include "MotorControl.hpp"
 #include "RobotControlPolicy.hpp"
 
-using signal_map_t = utl::SignalMap;
-
 class MachineController {
  public:
   struct IoOps {
-    std::function<std::optional<signal_map_t>()> readInputs;
-    std::function<void(const signal_map_t&)> setOutputs;
-    std::function<std::optional<signal_map_t>()> readOutputs;
+    std::function<std::optional<utl::SignalMap>()> readInputs;
+    std::function<void(const utl::SignalMap&)> setOutputs;
+    std::function<std::optional<utl::SignalMap>()> readOutputs;
     std::function<MachineComponent::State()> contecState;
   };
 

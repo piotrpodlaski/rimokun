@@ -6,48 +6,19 @@
 #include <QMetaType>
 
 #include "CommonDefinitions.hpp"
+#include "CommandInterface.hpp"
 #include "nlohmann/json.hpp"
-
-struct GuiToolChangerCommand {
-  utl::EArm arm;
-  utl::EToolChangerAction action;
-};
-
-struct GuiReconnectCommand {
-  utl::ERobotComponent component;
-};
-
-struct GuiMotorDiagnosticsCommand {
-  utl::EMotor motor;
-};
-
-struct GuiResetMotorAlarmCommand {
-  utl::EMotor motor;
-};
-
-struct GuiSetMotorEnabledCommand {
-  utl::EMotor motor;
-  bool enabled;
-};
-
-struct GuiSetAllMotorsEnabledCommand {
-  bool enabled;
-};
-
-struct GuiContecDiagnosticsCommand {};
-
-struct GuiEmergencyStopCommand {};
 
 struct GuiRawCommand {
   nlohmann::json node;
 };
 
 struct GuiCommand {
-  std::variant<GuiToolChangerCommand, GuiReconnectCommand,
-               GuiMotorDiagnosticsCommand, GuiResetMotorAlarmCommand,
-               GuiSetMotorEnabledCommand, GuiSetAllMotorsEnabledCommand,
-               GuiContecDiagnosticsCommand, GuiRawCommand,
-               GuiEmergencyStopCommand>
+  std::variant<cmd::ToolChangerCommand, cmd::ReconnectCommand,
+               cmd::MotorDiagnosticsCommand, cmd::ResetMotorAlarmCommand,
+               cmd::SetMotorEnabledCommand, cmd::SetAllMotorsEnabledCommand,
+               cmd::HomingCommand, cmd::ContecDiagnosticsCommand, GuiRawCommand,
+               cmd::EmergencyStopCommand>
       payload;
 };
 

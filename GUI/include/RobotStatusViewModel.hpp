@@ -25,6 +25,7 @@ struct ResetControlsViewModel {
   bool resetControlPanelEnabled{false};
   bool enableAllMotorsEnabled{false};
   bool disableAllMotorsEnabled{false};
+  bool homingEnabled{false};
 };
 
 class RobotStatusViewModel {

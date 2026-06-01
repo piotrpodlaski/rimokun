@@ -89,21 +89,8 @@ constexpr std::array<std::pair<MotorOutputFlag, std::string_view>, 16>
         {MotorOutputFlag::Tlc, "TLC"},
     }};
 
-std::string joinFlags(const std::vector<std::string_view>& flags) {
-  if (flags.empty()) {
-    return "none";
-  }
-  std::string out;
-  for (std::size_t i = 0; i < flags.size(); ++i) {
-    if (i != 0) {
-      out += ", ";
-    }
-    out += flags[i];
-  }
-  return out;
-}
-
-std::string joinFlags(const std::vector<std::string>& flags) {
+template <typename Range>
+std::string joinFlags(const Range& flags) {
   if (flags.empty()) {
     return "none";
   }
@@ -140,13 +127,34 @@ int operationAddr(const int baseUpperAddr, const std::uint8_t opId) {
   return baseUpperAddr + static_cast<int>(opId) * 2;
 }
 
+template <std::size_t N>
+std::optional<std::string_view> defaultFunctionName(
+    const std::array<MotorIoAssignmentDefault, N>& assignments,
+    const std::uint16_t code) {
+  if (code == 0) {
+    return std::nullopt;
+  }
+  const auto it = std::find_if(
+      assignments.begin(), assignments.end(),
+      [code](const auto& assignment) { return assignment.functionCode == code; });
+  if (it == assignments.end()) {
+    return std::nullopt;
+  }
+  return it->function;
+}
+
 std::string outputFunctionName(const std::uint16_t code) {
+  if (const auto name = defaultFunctionName(motor_io_defaults::netOutput, code)) {
+    return std::string(*name);
+  }
+  if (const auto name = defaultFunctionName(motor_io_defaults::ioOutput, code)) {
+    return std::string(*name);
+  }
   switch (code) {
     case 0: return "No function";
     case 1: return "FWD_R";
     case 2: return "RVS_R";
     case 3: return "HOME_R";
-    case 4: return "START_R";
     case 5: return "SSTART_R";
     case 6: return "+JOG_R";
     case 7: return "-JOG_R";
@@ -175,9 +183,6 @@ std::string outputFunctionName(const std::uint16_t code) {
     case 45: return "R13";
     case 46: return "R14";
     case 47: return "R15";
-    case 48: return "M0_R";
-    case 49: return "M1_R";
-    case 50: return "M2_R";
     case 51: return "M3_R";
     case 52: return "M4_R";
     case 53: return "M5_R";
@@ -185,43 +190,24 @@ std::string outputFunctionName(const std::uint16_t code) {
     case 61: return "-LS_R";
     case 62: return "HOMES_R";
     case 63: return "SLIT_R";
-    case 65: return "ALM";
-    case 66: return "WNG";
-    case 67: return "READY";
-    case 68: return "MOVE";
-    case 69: return "END";
-    case 70: return "HOME-P";
-    case 71: return "TLC";
-    case 72: return "TIM";
-    case 73: return "AREA1";
-    case 74: return "AREA2";
-    case 75: return "AREA3";
-    case 80: return "S-BSY";
     case 82: return "MPS";
     default: return std::format("Unknown({})", code);
   }
 }
 
 std::string inputFunctionName(const std::uint16_t code) {
+  if (const auto name = defaultFunctionName(motor_io_defaults::netInput, code)) {
+    return std::string(*name);
+  }
+  if (const auto name = defaultFunctionName(motor_io_defaults::ioInput, code)) {
+    return std::string(*name);
+  }
   switch (code) {
     case 0: return "No function";
-    case 1: return "FWD";
-    case 2: return "RVS";
-    case 3: return "HOME";
-    case 4: return "START";
-    case 5: return "SSTART";
-    case 6: return "+JOG";
-    case 7: return "-JOG";
-    case 8: return "MS0";
-    case 9: return "MS1";
-    case 10: return "MS2";
     case 11: return "MS3";
     case 12: return "MS4";
     case 13: return "MS5";
-    case 16: return "FREE";
     case 17: return "C-ON";
-    case 18: return "STOP";
-    case 24: return "ALM-RST";
     case 25: return "P-PRESET";
     case 26: return "P-CLR";
     case 27: return "HMI";
@@ -241,9 +227,6 @@ std::string inputFunctionName(const std::uint16_t code) {
     case 45: return "R13";
     case 46: return "R14";
     case 47: return "R15";
-    case 48: return "M0";
-    case 49: return "M1";
-    case 50: return "M2";
     case 51: return "M3";
     case 52: return "M4";
     case 53: return "M5";
@@ -252,10 +235,40 @@ std::string inputFunctionName(const std::uint16_t code) {
 }
 
 constexpr std::array<std::uint16_t, 16> kDefaultNetInputFunctionCodes{
-    48, 49, 50, 4, 3, 18, 16, 0, 8, 9, 10, 5, 6, 7, 1, 2};
+    motor_io_defaults::netInput[0].functionCode,
+    motor_io_defaults::netInput[1].functionCode,
+    motor_io_defaults::netInput[2].functionCode,
+    motor_io_defaults::netInput[3].functionCode,
+    motor_io_defaults::netInput[4].functionCode,
+    motor_io_defaults::netInput[5].functionCode,
+    motor_io_defaults::netInput[6].functionCode,
+    motor_io_defaults::netInput[7].functionCode,
+    motor_io_defaults::netInput[8].functionCode,
+    motor_io_defaults::netInput[9].functionCode,
+    motor_io_defaults::netInput[10].functionCode,
+    motor_io_defaults::netInput[11].functionCode,
+    motor_io_defaults::netInput[12].functionCode,
+    motor_io_defaults::netInput[13].functionCode,
+    motor_io_defaults::netInput[14].functionCode,
+    motor_io_defaults::netInput[15].functionCode};
 
 constexpr std::array<std::uint16_t, 16> kDefaultNetOutputFunctionCodes{
-    48, 49, 50, 4, 70, 67, 66, 65, 80, 73, 74, 75, 72, 68, 69, 71};
+    motor_io_defaults::netOutput[0].functionCode,
+    motor_io_defaults::netOutput[1].functionCode,
+    motor_io_defaults::netOutput[2].functionCode,
+    motor_io_defaults::netOutput[3].functionCode,
+    motor_io_defaults::netOutput[4].functionCode,
+    motor_io_defaults::netOutput[5].functionCode,
+    motor_io_defaults::netOutput[6].functionCode,
+    motor_io_defaults::netOutput[7].functionCode,
+    motor_io_defaults::netOutput[8].functionCode,
+    motor_io_defaults::netOutput[9].functionCode,
+    motor_io_defaults::netOutput[10].functionCode,
+    motor_io_defaults::netOutput[11].functionCode,
+    motor_io_defaults::netOutput[12].functionCode,
+    motor_io_defaults::netOutput[13].functionCode,
+    motor_io_defaults::netOutput[14].functionCode,
+    motor_io_defaults::netOutput[15].functionCode};
 }  // namespace
 
 Motor::Motor(utl::EMotor id, int slaveAddress, MotorRegisterMap map,
@@ -327,12 +340,10 @@ void Motor::initialize(ModbusClient& bus) const {
   _netOutputFunctionAssignments = readNetOutputFunctionAssignments(bus);
   _netInputFunctionAssignments = readNetInputFunctionAssignments(bus);
   const auto ioRaw = readDirectIoAndBrakeStatusRaw(bus);
-  const auto remoteInRaw = readDriverInputCommandRaw(bus);
-  const auto remoteOutRaw = readDriverOutputStatusRaw(bus);
   const auto inputStatus = decodeDriverInputStatus(inputRaw);
   const auto outputStatus = decodeDriverOutputStatus(outputRaw);
   const auto ioStatus = decodeDirectIoAndBrakeStatus(ioRaw);
-  const auto remoteIoStatus = decodeRemoteIoStatus(remoteInRaw, remoteOutRaw);
+  const auto remoteIoStatus = decodeRemoteIoStatus(inputRaw, outputRaw);
   SPDLOG_INFO(
       "Motor {} (slave {}) input flags: 0x{:04X} [{}], output flags: 0x{:04X} "
       "[{}], direct IO 00D4=0x{:04X} 00D5=0x{:04X} [{}], remote IO "
@@ -524,6 +535,8 @@ bool Motor::isDriverOutputFlagSet(const std::uint16_t raw,
 void Motor::pulseDriverInputFlag(ModbusClient& bus, const MotorInputFlag flag,
                                  const std::chrono::milliseconds hold) const {
   setDriverInputFlag(bus, flag, true);
+  // The caller must keep the shared Modbus bus locked across the hold. Allowing
+  // another request between assert/deassert can corrupt the AR-KD2 pulse.
   std::this_thread::sleep_for(hold);
   setDriverInputFlag(bus, flag, false);
 }
@@ -679,6 +692,22 @@ void Motor::setStopInputAction(ModbusClient& bus, const std::int32_t value) cons
 
 void Motor::setStartingSpeed(ModbusClient& bus, const std::int32_t speed) const {
   writeInt32(bus, _map.startingSpeed, speed, SlaveTarget::Device);
+}
+
+void Motor::configureHoming(ModbusClient& bus, const std::int32_t mode,
+                            const std::int32_t operatingSpeed,
+                            const std::int32_t acceleration,
+                            const std::int32_t startingSpeed,
+                            const std::int32_t startingDirection) const {
+  writeInt32(bus, _map.homeSeekingMode, mode, SlaveTarget::Device);
+  writeInt32(bus, _map.homeSeekingOperatingSpeed, operatingSpeed,
+             SlaveTarget::Device);
+  writeInt32(bus, _map.homeSeekingAcceleration, acceleration,
+             SlaveTarget::Device);
+  writeInt32(bus, _map.homeSeekingStartingSpeed, startingSpeed,
+             SlaveTarget::Device);
+  writeInt32(bus, _map.homeSeekingStartingDirection, startingDirection,
+             SlaveTarget::Device);
 }
 
 void Motor::setOverloadAlarm(ModbusClient& bus, const std::int32_t value) const {

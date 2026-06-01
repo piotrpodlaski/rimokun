@@ -30,7 +30,7 @@ void AuxControls::handleButtons() {
   const auto sender = QObject::sender();
   GuiCommand command;
   if (sender == _ui->enableButton) {
-    command.payload = GuiReconnectCommand{.component = utl::ERobotComponent::Contec};
+    command.payload = cmd::ReconnectCommand{.robotComponent = utl::ERobotComponent::Contec};
   }
   else if (sender == _ui->disableButton) {
     nlohmann::json raw{

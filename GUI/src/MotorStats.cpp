@@ -72,6 +72,9 @@ void MotorStats::setBrake(const utl::ELEDState value) const {
 void MotorStats::setEnabled(const utl::ELEDState value) const {
   _ui->enabledLED->setState(value);
 }
+void MotorStats::setHoming(const utl::ELEDState value) const {
+  _ui->homingLED->setState(value);
+}
 void MotorStats::setStatus(const utl::ELEDState value) const {
   _ui->statusLED->setState(value);
 }

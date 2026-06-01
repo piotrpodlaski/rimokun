@@ -291,7 +291,7 @@ void MotorPanelWindow::requestDiagnostics() {
     return;
   }
   GuiCommand command;
-  command.payload = GuiMotorDiagnosticsCommand{.motor = *motor};
+  command.payload = cmd::MotorDiagnosticsCommand{.motor = *motor};
   _pendingRequest = PendingRequest::Diagnostics;
   emit commandIssued(command);
 }
@@ -302,7 +302,7 @@ void MotorPanelWindow::requestResetAlarm() {
     return;
   }
   GuiCommand command;
-  command.payload = GuiResetMotorAlarmCommand{.motor = *motor};
+  command.payload = cmd::ResetMotorAlarmCommand{.motor = *motor};
   _pendingRequest = PendingRequest::ResetAlarm;
   emit commandIssued(command);
 }
@@ -314,7 +314,7 @@ void MotorPanelWindow::requestSetEnabled(const bool enabled) {
   }
   GuiCommand command;
   command.payload =
-      GuiSetMotorEnabledCommand{.motor = *motor, .enabled = enabled};
+      cmd::SetMotorEnabledCommand{.motor = *motor, .enabled = enabled};
   _pendingRequest =
       enabled ? PendingRequest::EnableMotor : PendingRequest::DisableMotor;
   emit commandIssued(command);

@@ -5,7 +5,7 @@
 TEST(GuiCommandJsonAdapterTests, ToolChangerCommandRoundTrip) {
   GuiCommand command;
   command.payload =
-      GuiToolChangerCommand{.arm = utl::EArm::Left,
+      cmd::ToolChangerCommand{.arm = utl::EArm::Left,
                             .action = utl::EToolChangerAction::Open};
 
   const auto json = GuiCommandJsonAdapter::toJson(command);
@@ -32,7 +32,7 @@ TEST(GuiCommandJsonAdapterTests, ResponseParsingKeepsMessageAndPayload) {
 
 TEST(GuiCommandJsonAdapterTests, MotorDiagnosticsCommandMapsToJson) {
   GuiCommand command;
-  command.payload = GuiMotorDiagnosticsCommand{.motor = utl::EMotor::YRight};
+  command.payload = cmd::MotorDiagnosticsCommand{.motor = utl::EMotor::YRight};
 
   const auto json = GuiCommandJsonAdapter::toJson(command);
   ASSERT_TRUE(json.contains("type"));
@@ -42,7 +42,7 @@ TEST(GuiCommandJsonAdapterTests, MotorDiagnosticsCommandMapsToJson) {
 
 TEST(GuiCommandJsonAdapterTests, ResetMotorAlarmCommandMapsToJson) {
   GuiCommand command;
-  command.payload = GuiResetMotorAlarmCommand{.motor = utl::EMotor::ZLeft};
+  command.payload = cmd::ResetMotorAlarmCommand{.motor = utl::EMotor::ZLeft};
 
   const auto json = GuiCommandJsonAdapter::toJson(command);
   ASSERT_TRUE(json.contains("type"));
@@ -52,7 +52,7 @@ TEST(GuiCommandJsonAdapterTests, ResetMotorAlarmCommandMapsToJson) {
 
 TEST(GuiCommandJsonAdapterTests, ContecDiagnosticsCommandMapsToJson) {
   GuiCommand command;
-  command.payload = GuiContecDiagnosticsCommand{};
+  command.payload = cmd::ContecDiagnosticsCommand{};
 
   const auto json = GuiCommandJsonAdapter::toJson(command);
   ASSERT_TRUE(json.contains("type"));
@@ -62,7 +62,7 @@ TEST(GuiCommandJsonAdapterTests, ContecDiagnosticsCommandMapsToJson) {
 TEST(GuiCommandJsonAdapterTests, SetMotorEnabledCommandMapsToJson) {
   GuiCommand command;
   command.payload =
-      GuiSetMotorEnabledCommand{.motor = utl::EMotor::XLeft, .enabled = false};
+      cmd::SetMotorEnabledCommand{.motor = utl::EMotor::XLeft, .enabled = false};
 
   const auto json = GuiCommandJsonAdapter::toJson(command);
   ASSERT_TRUE(json.contains("type"));
@@ -73,10 +73,20 @@ TEST(GuiCommandJsonAdapterTests, SetMotorEnabledCommandMapsToJson) {
 
 TEST(GuiCommandJsonAdapterTests, SetAllMotorsEnabledCommandMapsToJson) {
   GuiCommand command;
-  command.payload = GuiSetAllMotorsEnabledCommand{.enabled = true};
+  command.payload = cmd::SetAllMotorsEnabledCommand{.enabled = true};
 
   const auto json = GuiCommandJsonAdapter::toJson(command);
   ASSERT_TRUE(json.contains("type"));
   EXPECT_EQ(json["type"].get<std::string>(), "setAllMotorsEnabled");
   EXPECT_TRUE(json["enabled"].get<bool>());
+}
+
+TEST(GuiCommandJsonAdapterTests, HomingCommandMapsToJson) {
+  GuiCommand command;
+  command.payload = cmd::HomingCommand{.target = cmd::HomingTarget::Z};
+
+  const auto json = GuiCommandJsonAdapter::toJson(command);
+  ASSERT_TRUE(json.contains("type"));
+  EXPECT_EQ(json["type"].get<std::string>(), "homing");
+  EXPECT_EQ(json["target"].get<std::string>(), "Z");
 }

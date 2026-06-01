@@ -87,6 +87,8 @@ MainWindow::MainWindow(QWidget* parent)
           &MainWindow::openMotorPanel);
   connect(_ui->actionContec_monitor, &QAction::triggered, this,
           &MainWindow::openContecPanel);
+  connect(_ui->actionHoming, &QAction::triggered, this,
+          &MainWindow::openHomingPanel);
 }
 
 MainWindow::~MainWindow() {
@@ -144,6 +146,17 @@ void MainWindow::openContecPanel() {
   contecPanel->show();
   contecPanel->raise();
   contecPanel->activateWindow();
+}
+
+void MainWindow::openHomingPanel() {
+  if (homingPanel == nullptr) {
+    homingPanel = new HomingWindow(this);
+    connect(homingPanel, &HomingWindow::commandIssued, &_updater,
+            &Updater::sendCommand);
+  }
+  homingPanel->show();
+  homingPanel->raise();
+  homingPanel->activateWindow();
 }
 
 void MainWindow::onRobotStatusUpdate(const utl::RobotStatus& status) {

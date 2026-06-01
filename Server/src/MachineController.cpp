@@ -106,7 +106,7 @@ void MachineController::handleToolChangerCommand(
     utl::throwRuntimeError(
         "Contec is in error state. Not possible to alter tool changer state!");
   }
-  signal_map_t outputSignals;
+  utl::SignalMap outputSignals;
   if (command.arm == utl::EArm::Left) {
     outputSignals["toolChangerLeft"] =
         (command.action == utl::EToolChangerAction::Open);

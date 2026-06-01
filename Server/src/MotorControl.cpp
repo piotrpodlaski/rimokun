@@ -11,6 +11,7 @@
 #include <format>
 #include <string_view>
 #include <stdexcept>
+#include <utility>
 
 namespace {
 const Motor& requireMotor(const std::map<utl::EMotor, Motor>& motors,
@@ -25,6 +26,21 @@ const Motor& requireMotor(const std::map<utl::EMotor, Motor>& motors,
 }
 
 }  // namespace
+
+template <typename F>
+decltype(auto) MotorControl::withBus(const utl::EMotor motorId, F&& fn) {
+  const auto& motor = requireMotor(_motors, motorId);
+  auto rtIt = _runtime.find(motorId);
+  if (rtIt == _runtime.end()) {
+    utl::throwRuntimeError(std::format(
+        "Runtime state for motor {} is not available",
+        magic_enum::enum_name(motorId)));
+  }
+  auto& runtime = rtIt->second;
+  std::lock_guard<std::mutex> lock(_busMutex);
+  if (!_bus) utl::throwRuntimeError("MotorControl bus is not initialized");
+  return std::forward<F>(fn)(motor, runtime, *_bus);
+}
 
 namespace {
 constexpr std::int32_t kDefaultRunCurrent = 1000;
@@ -372,369 +388,285 @@ void MotorControl::reset() {
 
 void MotorControl::setMode(const utl::EMotor motorId, const MotorControlMode mode) {
   RIMO_TIMED_SCOPE("MotorControl::setMode");
-  const auto& motor = requireMotor(_motors, motorId);
-  auto rtIt = _runtime.find(motorId);
-  if (rtIt == _runtime.end()) {
-    utl::throwRuntimeError(std::format(
-        "Runtime state for motor {} is not available",
-        magic_enum::enum_name(motorId)));
-  }
-  auto& runtime = rtIt->second;
-  std::lock_guard<std::mutex> lock(_busMutex);
-  if (!_bus) utl::throwRuntimeError("MotorControl bus is not initialized");
-
-  runtime.mode = mode;
-  if (mode == MotorControlMode::Speed) {
-    if (!runtime.speedPairPrepared) {
-      motor.configureConstantSpeedPair(*_bus, runtime.speed, runtime.speed,
-                                       runtime.acceleration,
-                                       runtime.deceleration);
-      runtime.speedPairPrepared = true;
-    }
-  } else {
-    if (!runtime.positionPrepared) {
-      motor.setOperationMode(*_bus, 2, MotorOperationMode::Incremental);
-      motor.setOperationFunction(*_bus, 2, MotorOperationFunction::SingleMotion);
-      motor.setOperationSpeed(*_bus, 2, runtime.speed);
-      motor.setOperationAcceleration(*_bus, 2, runtime.acceleration);
-      motor.setOperationDeceleration(*_bus, 2, runtime.deceleration);
+  withBus(motorId, [mode](const Motor& motor, MotorRuntimeState& runtime,
+                          ModbusClient& bus) {
+    runtime.mode = mode;
+    if (mode == MotorControlMode::Speed) {
+      if (!runtime.speedPairPrepared) {
+        motor.configureConstantSpeedPair(bus, runtime.speed, runtime.speed,
+                                         runtime.acceleration,
+                                         runtime.deceleration);
+        runtime.speedPairPrepared = true;
+      }
+    } else if (!runtime.positionPrepared) {
+      motor.setOperationMode(bus, 2, MotorOperationMode::Incremental);
+      motor.setOperationFunction(bus, 2, MotorOperationFunction::SingleMotion);
+      motor.setOperationSpeed(bus, 2, runtime.speed);
+      motor.setOperationAcceleration(bus, 2, runtime.acceleration);
+      motor.setOperationDeceleration(bus, 2, runtime.deceleration);
       runtime.positionPrepared = true;
     }
-  }
+  });
 }
 
 void MotorControl::setSpeed(const utl::EMotor motorId, const std::int32_t speed) {
   RIMO_TIMED_SCOPE("MotorControl::setSpeed");
-  const auto& motor = requireMotor(_motors, motorId);
-  auto rtIt = _runtime.find(motorId);
-  if (rtIt == _runtime.end()) {
-    utl::throwRuntimeError(std::format(
-        "Runtime state for motor {} is not available",
-        magic_enum::enum_name(motorId)));
-  }
-  auto& runtime = rtIt->second;
-  runtime.speed = std::abs(speed);
-  std::lock_guard<std::mutex> lock(_busMutex);
-  if (!_bus) utl::throwRuntimeError("MotorControl bus is not initialized");
-
-  if (runtime.mode == MotorControlMode::Speed) {
-    if (!runtime.speedPairPrepared) {
-      motor.configureConstantSpeedPair(*_bus, runtime.speed, runtime.speed,
-                                       runtime.acceleration,
-                                       runtime.deceleration);
-      runtime.speedPairPrepared = true;
-    } else {
-      motor.updateConstantSpeedBuffered(*_bus, runtime.speed);
+  withBus(motorId, [speed](const Motor& motor, MotorRuntimeState& runtime,
+                           ModbusClient& bus) {
+    runtime.speed = std::abs(speed);
+    if (runtime.mode == MotorControlMode::Speed) {
+      if (!runtime.speedPairPrepared) {
+        motor.configureConstantSpeedPair(bus, runtime.speed, runtime.speed,
+                                         runtime.acceleration,
+                                         runtime.deceleration);
+        runtime.speedPairPrepared = true;
+      } else {
+        motor.updateConstantSpeedBuffered(bus, runtime.speed);
+      }
     }
-  }
+  });
 }
 
 void MotorControl::setAcceleration(const utl::EMotor motorId,
                                    const std::int32_t acceleration) {
   RIMO_TIMED_SCOPE("MotorControl::setAcceleration");
-  const auto& motor = requireMotor(_motors, motorId);
-  auto rtIt = _runtime.find(motorId);
-  if (rtIt == _runtime.end()) {
-    utl::throwRuntimeError(std::format(
-        "Runtime state for motor {} is not available",
-        magic_enum::enum_name(motorId)));
-  }
-  auto& runtime = rtIt->second;
-  if (runtime.acceleration == acceleration) {
-    return;
-  }
-  runtime.acceleration = acceleration;
-  std::lock_guard<std::mutex> lock(_busMutex);
-  if (!_bus) utl::throwRuntimeError("MotorControl bus is not initialized");
-
-  if (runtime.speedPairPrepared) {
-    motor.setOperationAcceleration(*_bus, 0, runtime.acceleration);
-    motor.setOperationAcceleration(*_bus, 1, runtime.acceleration);
-  }
-  if (runtime.positionPrepared) {
-    motor.setOperationAcceleration(*_bus, 2, runtime.acceleration);
-  }
+  withBus(motorId, [acceleration](const Motor& motor, MotorRuntimeState& runtime,
+                                  ModbusClient& bus) {
+    if (runtime.acceleration == acceleration) return;
+    runtime.acceleration = acceleration;
+    if (runtime.speedPairPrepared) {
+      motor.setOperationAcceleration(bus, 0, runtime.acceleration);
+      motor.setOperationAcceleration(bus, 1, runtime.acceleration);
+    }
+    if (runtime.positionPrepared) {
+      motor.setOperationAcceleration(bus, 2, runtime.acceleration);
+    }
+  });
 }
 
 void MotorControl::setDeceleration(const utl::EMotor motorId,
                                    const std::int32_t deceleration) {
   RIMO_TIMED_SCOPE("MotorControl::setDeceleration");
-  const auto& motor = requireMotor(_motors, motorId);
-  auto rtIt = _runtime.find(motorId);
-  if (rtIt == _runtime.end()) {
-    utl::throwRuntimeError(std::format(
-        "Runtime state for motor {} is not available",
-        magic_enum::enum_name(motorId)));
-  }
-  auto& runtime = rtIt->second;
-  if (runtime.deceleration == deceleration) {
-    return;
-  }
-  runtime.deceleration = deceleration;
-  std::lock_guard<std::mutex> lock(_busMutex);
-  if (!_bus) utl::throwRuntimeError("MotorControl bus is not initialized");
-
-  if (runtime.speedPairPrepared) {
-    motor.setOperationDeceleration(*_bus, 0, runtime.deceleration);
-    motor.setOperationDeceleration(*_bus, 1, runtime.deceleration);
-  }
-  if (runtime.positionPrepared) {
-    motor.setOperationDeceleration(*_bus, 2, runtime.deceleration);
-  }
+  withBus(motorId, [deceleration](const Motor& motor, MotorRuntimeState& runtime,
+                                  ModbusClient& bus) {
+    if (runtime.deceleration == deceleration) return;
+    runtime.deceleration = deceleration;
+    if (runtime.speedPairPrepared) {
+      motor.setOperationDeceleration(bus, 0, runtime.deceleration);
+      motor.setOperationDeceleration(bus, 1, runtime.deceleration);
+    }
+    if (runtime.positionPrepared) {
+      motor.setOperationDeceleration(bus, 2, runtime.deceleration);
+    }
+  });
 }
 
 void MotorControl::setPosition(const utl::EMotor motorId,
                                const std::int32_t position) {
   RIMO_TIMED_SCOPE("MotorControl::setPosition");
-  const auto& motor = requireMotor(_motors, motorId);
-  auto rtIt = _runtime.find(motorId);
-  if (rtIt == _runtime.end()) {
-    utl::throwRuntimeError(std::format(
-        "Runtime state for motor {} is not available",
-        magic_enum::enum_name(motorId)));
-  }
-  auto& runtime = rtIt->second;
-  runtime.position = position;
-  std::lock_guard<std::mutex> lock(_busMutex);
-  if (!_bus) utl::throwRuntimeError("MotorControl bus is not initialized");
-
-  if (runtime.mode == MotorControlMode::Position) {
-    if (!runtime.positionPrepared) {
-      motor.setOperationMode(*_bus, 2, MotorOperationMode::Incremental);
-      motor.setOperationFunction(*_bus, 2, MotorOperationFunction::SingleMotion);
-      motor.setOperationSpeed(*_bus, 2, runtime.speed);
-      motor.setOperationAcceleration(*_bus, 2, runtime.acceleration);
-      motor.setOperationDeceleration(*_bus, 2, runtime.deceleration);
-      runtime.positionPrepared = true;
+  withBus(motorId, [position](const Motor& motor, MotorRuntimeState& runtime,
+                              ModbusClient& bus) {
+    runtime.position = position;
+    if (runtime.mode == MotorControlMode::Position) {
+      if (!runtime.positionPrepared) {
+        motor.setOperationMode(bus, 2, MotorOperationMode::Incremental);
+        motor.setOperationFunction(bus, 2, MotorOperationFunction::SingleMotion);
+        motor.setOperationSpeed(bus, 2, runtime.speed);
+        motor.setOperationAcceleration(bus, 2, runtime.acceleration);
+        motor.setOperationDeceleration(bus, 2, runtime.deceleration);
+        runtime.positionPrepared = true;
+      }
+      motor.setOperationPosition(bus, 2, runtime.position);
     }
-    motor.setOperationPosition(*_bus, 2, runtime.position);
-  }
+  });
 }
 
 void MotorControl::setDirection(const utl::EMotor motorId,
                                 const MotorControlDirection direction) {
   RIMO_TIMED_SCOPE("MotorControl::setDirection");
-  const auto& motor = requireMotor(_motors, motorId);
-  auto rtIt = _runtime.find(motorId);
-  if (rtIt == _runtime.end()) {
-    utl::throwRuntimeError(std::format(
-        "Runtime state for motor {} is not available",
-        magic_enum::enum_name(motorId)));
-  }
-  auto& runtime = rtIt->second;
-  runtime.direction = direction;
-  std::lock_guard<std::mutex> lock(_busMutex);
-  if (!_bus) utl::throwRuntimeError("MotorControl bus is not initialized");
-
-  if (direction == MotorControlDirection::Forward) {
-    motor.setReverse(*_bus, false);
-    motor.setForward(*_bus, true);
-  } else {
-    motor.setForward(*_bus, false);
-    motor.setReverse(*_bus, true);
-  }
+  withBus(motorId, [direction](const Motor& motor, MotorRuntimeState& runtime,
+                               ModbusClient& bus) {
+    runtime.direction = direction;
+    if (direction == MotorControlDirection::Forward) {
+      motor.setReverse(bus, false);
+      motor.setForward(bus, true);
+    } else {
+      motor.setForward(bus, false);
+      motor.setReverse(bus, true);
+    }
+  });
 }
 
 void MotorControl::startMovement(const utl::EMotor motorId) {
   RIMO_TIMED_SCOPE("MotorControl::startMovement");
-  const auto& motor = requireMotor(_motors, motorId);
-  auto rtIt = _runtime.find(motorId);
-  if (rtIt == _runtime.end()) {
-    utl::throwRuntimeError(std::format(
-        "Runtime state for motor {} is not available",
-        magic_enum::enum_name(motorId)));
-  }
-  auto& runtime = rtIt->second;
-  if (!runtime.enabled) {
-    SPDLOG_WARN("Ignoring startMovement for disabled motor {}",
-                magic_enum::enum_name(motorId));
-    return;
-  }
-  std::lock_guard<std::mutex> lock(_busMutex);
-  if (!_bus) utl::throwRuntimeError("MotorControl bus is not initialized");
-
-  if (runtime.mode == MotorControlMode::Speed) {
-    if (!runtime.speedPairPrepared) {
-      motor.configureConstantSpeedPair(*_bus, runtime.speed, runtime.speed,
-                                       runtime.acceleration,
-                                       runtime.deceleration);
-      runtime.speedPairPrepared = true;
+  withBus(motorId, [motorId](const Motor& motor, MotorRuntimeState& runtime,
+                             ModbusClient& bus) {
+    if (!runtime.enabled) {
+      SPDLOG_WARN("Ignoring startMovement for disabled motor {}",
+                  magic_enum::enum_name(motorId));
+      return;
     }
-    if (runtime.direction == MotorControlDirection::Forward) {
-      motor.setReverse(*_bus, false);
-      motor.setForward(*_bus, true);
+    if (runtime.mode == MotorControlMode::Speed) {
+      if (!runtime.speedPairPrepared) {
+        motor.configureConstantSpeedPair(bus, runtime.speed, runtime.speed,
+                                         runtime.acceleration,
+                                         runtime.deceleration);
+        runtime.speedPairPrepared = true;
+      }
+      if (runtime.direction == MotorControlDirection::Forward) {
+        motor.setReverse(bus, false);
+        motor.setForward(bus, true);
+      } else {
+        motor.setForward(bus, false);
+        motor.setReverse(bus, true);
+      }
+      return;
     } else {
-      motor.setForward(*_bus, false);
-      motor.setReverse(*_bus, true);
+      if (!runtime.positionPrepared) {
+        motor.setOperationMode(bus, 2, MotorOperationMode::Incremental);
+        motor.setOperationFunction(bus, 2, MotorOperationFunction::SingleMotion);
+        motor.setOperationSpeed(bus, 2, runtime.speed);
+        motor.setOperationAcceleration(bus, 2, runtime.acceleration);
+        motor.setOperationDeceleration(bus, 2, runtime.deceleration);
+        runtime.positionPrepared = true;
+      }
+      motor.setOperationPosition(bus, 2, runtime.position);
+      motor.setSelectedOperationId(bus, 2);
     }
-    return;
-  } else {
-    if (!runtime.positionPrepared) {
-      motor.setOperationMode(*_bus, 2, MotorOperationMode::Incremental);
-      motor.setOperationFunction(*_bus, 2, MotorOperationFunction::SingleMotion);
-      motor.setOperationSpeed(*_bus, 2, runtime.speed);
-      motor.setOperationAcceleration(*_bus, 2, runtime.acceleration);
-      motor.setOperationDeceleration(*_bus, 2, runtime.deceleration);
-      runtime.positionPrepared = true;
-    }
-    motor.setOperationPosition(*_bus, 2, runtime.position);
-    motor.setSelectedOperationId(*_bus, 2);
-  }
-  motor.pulseStart(*_bus);
+    motor.pulseStart(bus);
+  });
 }
 
 void MotorControl::stopMovement(const utl::EMotor motorId) {
   RIMO_TIMED_SCOPE("MotorControl::stopMovement");
-  const auto& motor = requireMotor(_motors, motorId);
-  auto rtIt = _runtime.find(motorId);
-  if (rtIt == _runtime.end()) {
-    utl::throwRuntimeError(std::format(
-        "Runtime state for motor {} is not available",
-        magic_enum::enum_name(motorId)));
-  }
-  const auto& runtime = rtIt->second;
-  std::lock_guard<std::mutex> lock(_busMutex);
-  if (!_bus) utl::throwRuntimeError("MotorControl bus is not initialized");
-  if (runtime.mode == MotorControlMode::Speed) {
-    // AR-KD2 speed mode: stop by deasserting direction bits only.
-    // Do not clear the whole register because that would overwrite C-ON and other inputs.
-    motor.setForward(*_bus, false);
-    motor.setReverse(*_bus, false);
-    return;
-  }
-  motor.pulseStop(*_bus);
+  withBus(motorId, [](const Motor& motor, MotorRuntimeState& runtime,
+                      ModbusClient& bus) {
+    if (runtime.mode == MotorControlMode::Speed) {
+      // AR-KD2 speed mode: stop by deasserting direction bits only.
+      // Do not clear the whole register because that would overwrite C-ON and other inputs.
+      motor.setForward(bus, false);
+      motor.setReverse(bus, false);
+      return;
+    }
+    motor.pulseStop(bus);
+  });
 }
 
 void MotorControl::pulseStart(const utl::EMotor motorId) {
-  const auto& motor = requireMotor(_motors, motorId);
-  const auto rtIt = _runtime.find(motorId);
-  if (rtIt == _runtime.end()) {
-    utl::throwRuntimeError(std::format(
-        "Runtime state for motor {} is not available",
-        magic_enum::enum_name(motorId)));
-  }
-  if (!rtIt->second.enabled) {
-    SPDLOG_WARN("Ignoring pulseStart for disabled motor {}",
-                magic_enum::enum_name(motorId));
-    return;
-  }
-  std::lock_guard<std::mutex> lock(_busMutex);
-  if (!_bus) utl::throwRuntimeError("MotorControl bus is not initialized");
-  motor.pulseStart(*_bus);
+  withBus(motorId, [motorId](const Motor& motor, MotorRuntimeState& runtime,
+                             ModbusClient& bus) {
+    if (!runtime.enabled) {
+      SPDLOG_WARN("Ignoring pulseStart for disabled motor {}",
+                  magic_enum::enum_name(motorId));
+      return;
+    }
+    motor.pulseStart(bus);
+  });
 }
 
 void MotorControl::pulseStop(const utl::EMotor motorId) {
-  const auto& motor = requireMotor(_motors, motorId);
-  std::lock_guard<std::mutex> lock(_busMutex);
-  if (!_bus) utl::throwRuntimeError("MotorControl bus is not initialized");
-  motor.pulseStop(*_bus);
+  withBus(motorId, [](const Motor& motor, MotorRuntimeState&, ModbusClient& bus) {
+    motor.pulseStop(bus);
+  });
 }
 
 void MotorControl::pulseHome(const utl::EMotor motorId) {
-  const auto& motor = requireMotor(_motors, motorId);
-  std::lock_guard<std::mutex> lock(_busMutex);
-  if (!_bus) utl::throwRuntimeError("MotorControl bus is not initialized");
-  motor.pulseHome(*_bus);
+  withBus(motorId, [](const Motor& motor, MotorRuntimeState&, ModbusClient& bus) {
+    motor.pulseHome(bus);
+  });
 }
 
 void MotorControl::setForward(const utl::EMotor motorId, const bool enabled) {
-  const auto& motor = requireMotor(_motors, motorId);
-  const auto rtIt = _runtime.find(motorId);
-  if (rtIt == _runtime.end()) {
-    utl::throwRuntimeError(std::format(
-        "Runtime state for motor {} is not available",
-        magic_enum::enum_name(motorId)));
-  }
-  if (!rtIt->second.enabled) {
-    SPDLOG_WARN("Ignoring setForward for disabled motor {}",
-                magic_enum::enum_name(motorId));
-    return;
-  }
-  std::lock_guard<std::mutex> lock(_busMutex);
-  if (!_bus) utl::throwRuntimeError("MotorControl bus is not initialized");
-  motor.setForward(*_bus, enabled);
+  withBus(motorId, [motorId, enabled](const Motor& motor,
+                                      MotorRuntimeState& runtime,
+                                      ModbusClient& bus) {
+    if (!runtime.enabled) {
+      SPDLOG_WARN("Ignoring setForward for disabled motor {}",
+                  magic_enum::enum_name(motorId));
+      return;
+    }
+    motor.setForward(bus, enabled);
+  });
 }
 
 void MotorControl::setReverse(const utl::EMotor motorId, const bool enabled) {
-  const auto& motor = requireMotor(_motors, motorId);
-  const auto rtIt = _runtime.find(motorId);
-  if (rtIt == _runtime.end()) {
-    utl::throwRuntimeError(std::format(
-        "Runtime state for motor {} is not available",
-        magic_enum::enum_name(motorId)));
-  }
-  if (!rtIt->second.enabled) {
-    SPDLOG_WARN("Ignoring setReverse for disabled motor {}",
-                magic_enum::enum_name(motorId));
-    return;
-  }
-  std::lock_guard<std::mutex> lock(_busMutex);
-  if (!_bus) utl::throwRuntimeError("MotorControl bus is not initialized");
-  motor.setReverse(*_bus, enabled);
+  withBus(motorId, [motorId, enabled](const Motor& motor,
+                                      MotorRuntimeState& runtime,
+                                      ModbusClient& bus) {
+    if (!runtime.enabled) {
+      SPDLOG_WARN("Ignoring setReverse for disabled motor {}",
+                  magic_enum::enum_name(motorId));
+      return;
+    }
+    motor.setReverse(bus, enabled);
+  });
 }
 
 void MotorControl::setJogPlus(const utl::EMotor motorId, const bool enabled) {
-  const auto& motor = requireMotor(_motors, motorId);
-  const auto rtIt = _runtime.find(motorId);
-  if (rtIt == _runtime.end()) {
-    utl::throwRuntimeError(std::format(
-        "Runtime state for motor {} is not available",
-        magic_enum::enum_name(motorId)));
-  }
-  if (!rtIt->second.enabled) {
-    SPDLOG_WARN("Ignoring setJogPlus for disabled motor {}",
-                magic_enum::enum_name(motorId));
-    return;
-  }
-  std::lock_guard<std::mutex> lock(_busMutex);
-  if (!_bus) utl::throwRuntimeError("MotorControl bus is not initialized");
-  motor.setJogPlus(*_bus, enabled);
+  withBus(motorId, [motorId, enabled](const Motor& motor,
+                                      MotorRuntimeState& runtime,
+                                      ModbusClient& bus) {
+    if (!runtime.enabled) {
+      SPDLOG_WARN("Ignoring setJogPlus for disabled motor {}",
+                  magic_enum::enum_name(motorId));
+      return;
+    }
+    motor.setJogPlus(bus, enabled);
+  });
 }
 
 void MotorControl::setJogMinus(const utl::EMotor motorId, const bool enabled) {
-  const auto& motor = requireMotor(_motors, motorId);
-  const auto rtIt = _runtime.find(motorId);
-  if (rtIt == _runtime.end()) {
-    utl::throwRuntimeError(std::format(
-        "Runtime state for motor {} is not available",
-        magic_enum::enum_name(motorId)));
-  }
-  if (!rtIt->second.enabled) {
-    SPDLOG_WARN("Ignoring setJogMinus for disabled motor {}",
-                magic_enum::enum_name(motorId));
-    return;
-  }
-  std::lock_guard<std::mutex> lock(_busMutex);
-  if (!_bus) utl::throwRuntimeError("MotorControl bus is not initialized");
-  motor.setJogMinus(*_bus, enabled);
+  withBus(motorId, [motorId, enabled](const Motor& motor,
+                                      MotorRuntimeState& runtime,
+                                      ModbusClient& bus) {
+    if (!runtime.enabled) {
+      SPDLOG_WARN("Ignoring setJogMinus for disabled motor {}",
+                  magic_enum::enum_name(motorId));
+      return;
+    }
+    motor.setJogMinus(bus, enabled);
+  });
 }
 
 void MotorControl::setEnabled(const utl::EMotor motorId, const bool enabled) {
-  const auto& motor = requireMotor(_motors, motorId);
-  auto rtIt = _runtime.find(motorId);
-  if (rtIt == _runtime.end()) {
-    utl::throwRuntimeError(std::format(
-        "Runtime state for motor {} is not available",
-        magic_enum::enum_name(motorId)));
-  }
-  if (!rtIt->second.enableControllable) {
-    SPDLOG_WARN(
-        "Ignoring enable change for motor {} because C-ON mapping is unavailable",
-        magic_enum::enum_name(motorId));
-    return;
-  }
-  if (rtIt->second.enabled == enabled) {
-    return;
-  }
-  std::lock_guard<std::mutex> lock(_busMutex);
-  if (!_bus) utl::throwRuntimeError("MotorControl bus is not initialized");
-  motor.setEnabled(*_bus, enabled);
-  rtIt->second.enabled = enabled;
+  withBus(motorId, [motorId, enabled](const Motor& motor,
+                                      MotorRuntimeState& runtime,
+                                      ModbusClient& bus) {
+    if (!runtime.enableControllable) {
+      SPDLOG_WARN(
+          "Ignoring enable change for motor {} because C-ON mapping is unavailable",
+          magic_enum::enum_name(motorId));
+      return;
+    }
+    if (runtime.enabled == enabled) {
+      return;
+    }
+    motor.setEnabled(bus, enabled);
+    runtime.enabled = enabled;
+  });
 }
 
 void MotorControl::setAllEnabled(const bool enabled) {
-  for (const auto& [motorId, _] : _motors) {
-    setEnabled(motorId, enabled);
+  std::lock_guard<std::mutex> lock(_busMutex);
+  if (!_bus) utl::throwRuntimeError("MotorControl bus is not initialized");
+  for (const auto& [motorId, motor] : _motors) {
+    auto rtIt = _runtime.find(motorId);
+    if (rtIt == _runtime.end()) {
+      utl::throwRuntimeError(std::format(
+          "Runtime state for motor {} is not available",
+          magic_enum::enum_name(motorId)));
+    }
+    if (!rtIt->second.enableControllable) {
+      SPDLOG_WARN(
+          "Ignoring enable change for motor {} because C-ON mapping is unavailable",
+          magic_enum::enum_name(motorId));
+      continue;
+    }
+    if (rtIt->second.enabled == enabled) {
+      continue;
+    }
+    motor.setEnabled(*_bus, enabled);
+    rtIt->second.enabled = enabled;
   }
 }
 
@@ -878,6 +810,19 @@ void MotorControl::setStopCurrent(const utl::EMotor motorId,
   std::lock_guard<std::mutex> lock(_busMutex);
   if (!_bus) utl::throwRuntimeError("MotorControl bus is not initialized");
   motor.setStopCurrent(*_bus, current);
+}
+
+void MotorControl::configureHoming(const utl::EMotor motorId,
+                                   const std::int32_t mode,
+                                   const std::int32_t operatingSpeed,
+                                   const std::int32_t acceleration,
+                                   const std::int32_t startingSpeed,
+                                   const std::int32_t startingDirection) {
+  const auto& motor = requireMotor(_motors, motorId);
+  std::lock_guard<std::mutex> lock(_busMutex);
+  if (!_bus) utl::throwRuntimeError("MotorControl bus is not initialized");
+  motor.configureHoming(*_bus, mode, operatingSpeed, acceleration,
+                        startingSpeed, startingDirection);
 }
 
 void MotorControl::configureConstantSpeedPair(const utl::EMotor motorId,

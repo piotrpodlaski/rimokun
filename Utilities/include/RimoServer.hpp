@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <thread>
 #include <vector>
 #include <zmq.hpp>
@@ -34,10 +35,10 @@ class RimoServer {
     _commandSocket.set(zmq::sockopt::rcvtimeo, 1000);
   }
   ~RimoServer() = default;
-  void publish(const T &robot) {
-    const auto json = nlohmann::json(robot);
-    const auto payload = nlohmann::json::to_msgpack(json);
-    _statusSocket.send(zmq::buffer(payload), zmq::send_flags::none);
+  void publish(const T& robot) {
+    _statusPayload.clear();
+    nlohmann::json::to_msgpack(nlohmann::json(robot), _statusPayload);
+    _statusSocket.send(zmq::buffer(_statusPayload), zmq::send_flags::none);
   }
 
   std::optional<nlohmann::json> receiveCommand() {
@@ -72,6 +73,7 @@ class RimoServer {
   zmq::context_t _context;
   zmq::socket_t _statusSocket;
   zmq::socket_t _commandSocket;
+  std::vector<std::uint8_t> _statusPayload;
   std::string _statusAddress = "ipc:///tmp/rimoStatus";
   std::string _commandAddress = "ipc:///tmp/rimoCommand";
 };

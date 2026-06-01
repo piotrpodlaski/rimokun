@@ -70,7 +70,7 @@ void RimoTransportWorker::runner() {
       continue;
     }
     if (_onStatus) {
-      _onStatus(*status);
+      _onStatus(std::make_shared<const utl::RobotStatus>(std::move(*status)));
     }
     processPendingCommands();
   }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -52,14 +53,14 @@ class TimingMetricsRegistry {
   }
 
   void maybeReport(const std::uint64_t nowNs) {
-    if (nowNs < _nextReportNs) {
+    if (nowNs < _nextReportNs.load(std::memory_order_acquire)) {
       return;
     }
     std::lock_guard<std::mutex> lock(_reportMutex);
-    if (nowNs < _nextReportNs) {
+    if (nowNs < _nextReportNs.load(std::memory_order_relaxed)) {
       return;
     }
-    _nextReportNs = nowNs + kReportEveryNs;
+    _nextReportNs.store(nowNs + kReportEveryNs, std::memory_order_release);
     reportAndReset();
   }
 
@@ -104,7 +105,7 @@ class TimingMetricsRegistry {
   std::mutex _mutex;
   std::unordered_map<std::string, Stat> _stats;
   std::mutex _reportMutex;
-  std::uint64_t _nextReportNs{0};
+  std::atomic<std::uint64_t> _nextReportNs{0};
 };
 
 class ScopedTiming {

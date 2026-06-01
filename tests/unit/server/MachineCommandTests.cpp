@@ -84,6 +84,8 @@ class CommandTestMachine final : public Machine {
       : Machine(clock) {}
 
   int reconnectCalls{0};
+  int homingCalls{0};
+  cmd::HomingTarget lastHomingTarget{cmd::HomingTarget::All};
 
  protected:
   void controlLoopTasks() override {}
@@ -92,6 +94,10 @@ class CommandTestMachine final : public Machine {
     ++reconnectCalls;
   }
   void handleToolChangerCommand(const cmd::ToolChangerCommand&) override {}
+  void handleHomingCommand(const cmd::HomingCommand& command) override {
+    ++homingCalls;
+    lastHomingTarget = command.target;
+  }
 };
 
 class FlakyCommandTestMachine final : public Machine {
@@ -150,6 +156,29 @@ TEST(MachineCommandTests, ValidCommandReturnsOkResponse) {
   ASSERT_EQ(resultFuture.wait_for(50ms), std::future_status::ready);
   EXPECT_EQ(resultFuture.get(), "");
   EXPECT_EQ(machine.reconnectCalls, 1);
+
+  std::filesystem::remove(configPath);
+}
+
+TEST(MachineCommandTests, HomingCommandIsDispatchedByRunOneCycle) {
+  const auto configPath = writeTempConfig();
+  utl::Config::instance().setConfigPath(configPath.string());
+
+  auto fakeClock = std::make_shared<FakeClock>();
+  CommandTestMachine machine(fakeClock);
+  machine.wire();
+  Machine::LoopState state{};
+
+  cmd::Command command;
+  command.payload = cmd::HomingCommand{.target = cmd::HomingTarget::All};
+  auto resultFuture = command.reply.get_future();
+  ASSERT_TRUE(machine.submitCommand(std::move(command)));
+
+  machine.runOneCycle(state);
+  ASSERT_EQ(resultFuture.wait_for(50ms), std::future_status::ready);
+  EXPECT_EQ(resultFuture.get(), "");
+  EXPECT_EQ(machine.homingCalls, 1);
+  EXPECT_EQ(machine.lastHomingTarget, cmd::HomingTarget::All);
 
   std::filesystem::remove(configPath);
 }

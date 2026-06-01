@@ -61,6 +61,30 @@ bool anyMotorInAlarm(const utl::RobotStatus& status) {
                      [](const auto& kv) { return isMotorInAlarm(kv.second); });
 }
 
+std::vector<IRobotControlPolicy::MotorIntent> stopAllMotors(
+    const utl::RobotStatus& status) {
+  std::vector<IRobotControlPolicy::MotorIntent> intents;
+  intents.reserve(status.motors.size());
+  for (const auto& [motorId, _] : status.motors) {
+    IRobotControlPolicy::MotorIntent intent;
+    intent.motorId = motorId;
+    intent.speed = 0;
+    intent.stopMovement = true;
+    intents.push_back(intent);
+  }
+  return intents;
+}
+
+std::map<utl::EMotor, IRobotControlPolicy::MotorSpeedCommand>
+zeroMotorSpeedCommands(const utl::RobotStatus& status) {
+  std::map<utl::EMotor, IRobotControlPolicy::MotorSpeedCommand> commands;
+  for (const auto& [motorId, _] : status.motors) {
+    commands[motorId] = {.speedCommandPercent = 0.0,
+                         .modeMaxLinearSpeedMmPerSec = 0.0};
+  }
+  return commands;
+}
+
 utl::EAxisState cycleAxisState(const utl::EAxisState state) {
   switch (state) {
     case utl::EAxisState::Locked: return utl::EAxisState::Slow;
@@ -191,21 +215,24 @@ IRobotControlPolicy::ControlDecision RimoKunControlPolicy::decide(
              "Robot status does not include Contec state yet. "
              "Control policy is waiting for component initialization.");
   } else {
-    setWarningFlag(_warningState.missingContecStatus, false);
+    setWarningFlag(_warningState.missingContecStatus, false,
+                   "missing Contec status");
   }
   if (!motorControlStatus.has_value()) {
     warnOnce(_warningState.missingMotorControlStatus,
              "Robot status does not include MotorControl state yet. "
              "Motor commands are suspended.");
   } else {
-    setWarningFlag(_warningState.missingMotorControlStatus, false);
+    setWarningFlag(_warningState.missingMotorControlStatus, false,
+                   "missing MotorControl status");
   }
   if (!controlPanelStatus.has_value()) {
     warnOnce(_warningState.missingControlPanelStatus,
              "Robot status does not include ControlPanel state yet. "
              "Joystick-driven control is suspended.");
   } else {
-    setWarningFlag(_warningState.missingControlPanelStatus, false);
+    setWarningFlag(_warningState.missingControlPanelStatus, false,
+                   "missing ControlPanel status");
   }
 
   const bool contecAvailable =
@@ -217,7 +244,7 @@ IRobotControlPolicy::ControlDecision RimoKunControlPolicy::decide(
     return {.outputs = std::nullopt, .setToolChangerErrorBlinking = true,
             .armStates = _armStates};
   }
-  setWarningFlag(_warningState.contecUnavailable, false);
+  setWarningFlag(_warningState.contecUnavailable, false, "Contec unavailable");
 
   if (!inputs || !inputs->contains("button1") || !inputs->contains("button2")) {
     warnOnce(_warningState.missingInputSignals,
@@ -226,7 +253,8 @@ IRobotControlPolicy::ControlDecision RimoKunControlPolicy::decide(
     return {.outputs = std::nullopt, .setToolChangerErrorBlinking = false,
             .armStates = _armStates};
   }
-  setWarningFlag(_warningState.missingInputSignals, false);
+  setWarningFlag(_warningState.missingInputSignals, false,
+                 "missing input signals");
 
   SignalMap ioOutputs;
   ioOutputs["light1"] = inputs->at("button1");
@@ -239,13 +267,15 @@ IRobotControlPolicy::ControlDecision RimoKunControlPolicy::decide(
     warnOnce(_warningState.motorControlUnavailable,
              "MotorControl is unavailable. Motor commands are suspended.");
   } else {
-    setWarningFlag(_warningState.motorControlUnavailable, false);
+    setWarningFlag(_warningState.motorControlUnavailable, false,
+                   "MotorControl unavailable");
   }
   if (!controlPanelAvailable) {
     warnOnce(_warningState.controlPanelUnavailable,
              "ControlPanel is unavailable. Joystick-driven control is suspended.");
   } else {
-    setWarningFlag(_warningState.controlPanelUnavailable, false);
+    setWarningFlag(_warningState.controlPanelUnavailable, false,
+                   "ControlPanel unavailable");
   }
 
   if (!motorControlAvailable || !controlPanelAvailable) {
@@ -258,12 +288,25 @@ IRobotControlPolicy::ControlDecision RimoKunControlPolicy::decide(
   if (anyMotorInAlarm(robotStatus)) {
     warnOnce(_warningState.motorAlarmActive,
              "At least one motor is in alarm state. Motor commands are disabled.");
+    auto motorIntents = stopAllMotors(robotStatus);
+    for (const auto& [motorId, runtime] : _motorRuntime) {
+      if (!runtime.wasActive || robotStatus.motors.contains(motorId)) {
+        continue;
+      }
+      MotorIntent intent;
+      intent.motorId = motorId;
+      intent.speed = 0;
+      intent.stopMovement = true;
+      motorIntents.push_back(intent);
+    }
+    _motorRuntime.clear();
     return {.outputs = std::move(ioOutputs),
-            .motorIntents = {},
+            .motorIntents = std::move(motorIntents),
             .setToolChangerErrorBlinking = false,
-            .armStates = _armStates};
+            .armStates = _armStates,
+            .motorSpeedCommands = zeroMotorSpeedCommands(robotStatus)};
   }
-  setWarningFlag(_warningState.motorAlarmActive, false);
+  setWarningFlag(_warningState.motorAlarmActive, false, "motor alarm active");
 
   // Process joystick button presses to cycle arm states (Locked → Slow → Fast → Locked)
   const auto leftJs = joystickOrNeutral(robotStatus, utl::EArm::Left);
@@ -433,7 +476,7 @@ IRobotControlPolicy::ControlDecision RimoKunControlPolicy::decide(
           .motorSpeedCommands = std::move(motorSpeedCommands)};
 }
 
-void RimoKunControlPolicy::warnOnce(bool& flag, const std::string& message) {
+void RimoKunControlPolicy::warnOnce(bool& flag, const std::string_view message) {
   if (flag) {
     return;
   }
@@ -441,6 +484,10 @@ void RimoKunControlPolicy::warnOnce(bool& flag, const std::string& message) {
   SPDLOG_WARN("{}", message);
 }
 
-void RimoKunControlPolicy::setWarningFlag(bool& flag, const bool value) {
+void RimoKunControlPolicy::setWarningFlag(bool& flag, const bool value,
+                                          const std::string_view condition) {
+  if (flag && !value) {
+    SPDLOG_INFO("Control warning condition cleared: {}", condition);
+  }
   flag = value;
 }

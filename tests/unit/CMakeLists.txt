@@ -95,6 +95,7 @@ add_executable(gui_glue_unit_tests
 target_include_directories(gui_glue_unit_tests
         PRIVATE
         ${CMAKE_SOURCE_DIR}/GUI/include
+        ${CMAKE_SOURCE_DIR}/Server/include
         ${CMAKE_SOURCE_DIR}/Utilities/include
         ${CMAKE_CURRENT_SOURCE_DIR}
 )
@@ -129,6 +130,7 @@ set_target_properties(gui_state_store_qt_tests PROPERTIES
 target_include_directories(gui_state_store_qt_tests
         PRIVATE
         ${CMAKE_SOURCE_DIR}/GUI/include
+        ${CMAKE_SOURCE_DIR}/Server/include
         ${CMAKE_SOURCE_DIR}/Utilities/include
         ${CMAKE_CURRENT_SOURCE_DIR}
 )
@@ -167,6 +169,7 @@ set_target_properties(tool_changer_presenter_qt_tests PROPERTIES
 target_include_directories(tool_changer_presenter_qt_tests
         PRIVATE
         ${CMAKE_SOURCE_DIR}/GUI/include
+        ${CMAKE_SOURCE_DIR}/Server/include
         ${CMAKE_SOURCE_DIR}/Utilities/include
         ${CMAKE_CURRENT_SOURCE_DIR}
 )
@@ -187,11 +190,13 @@ add_executable(reset_controls_presenter_qt_tests
         ${CMAKE_SOURCE_DIR}/GUI/src/GuiStateStore.cpp
         ${CMAKE_SOURCE_DIR}/GUI/src/ResetControlsPresenter.cpp
         ${CMAKE_SOURCE_DIR}/GUI/src/ResetControls.cpp
+        ${CMAKE_SOURCE_DIR}/GUI/src/HomingWindow.cpp
         ${CMAKE_SOURCE_DIR}/GUI/src/RobotStatusViewModel.cpp
         ${CMAKE_SOURCE_DIR}/GUI/src/LedIndicator.cpp
         ${CMAKE_SOURCE_DIR}/GUI/include/GuiStateStore.hpp
         ${CMAKE_SOURCE_DIR}/GUI/include/ResetControlsPresenter.hpp
         ${CMAKE_SOURCE_DIR}/GUI/include/ResetControls.hpp
+        ${CMAKE_SOURCE_DIR}/GUI/include/HomingWindow.hpp
         ${CMAKE_SOURCE_DIR}/GUI/include/LedIndicator.hpp
 )
 
@@ -205,6 +210,7 @@ set_target_properties(reset_controls_presenter_qt_tests PROPERTIES
 target_include_directories(reset_controls_presenter_qt_tests
         PRIVATE
         ${CMAKE_SOURCE_DIR}/GUI/include
+        ${CMAKE_SOURCE_DIR}/Server/include
         ${CMAKE_SOURCE_DIR}/Utilities/include
         ${CMAKE_CURRENT_SOURCE_DIR}
 )

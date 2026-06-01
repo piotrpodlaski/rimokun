@@ -392,3 +392,44 @@ TEST(MachineCommandProcessorTests, SetAllMotorsEnabledCommandParsesAndDispatches
   EXPECT_TRUE(dispatched);
   EXPECT_EQ(response["status"].get<std::string>(), "OK");
 }
+
+TEST(MachineCommandProcessorTests, HomingCommandParsesAndDispatches) {
+  nlohmann::json command{
+      {"type", "homing"},
+      {"target", "Z"},
+  };
+
+  bool dispatched = false;
+  const auto response = cmd::processCommand(
+      command, [&](cmd::Command c, const std::chrono::milliseconds timeout) {
+        dispatched = true;
+        EXPECT_EQ(timeout, 2s);
+        EXPECT_TRUE(std::holds_alternative<cmd::HomingCommand>(c.payload));
+        if (std::holds_alternative<cmd::HomingCommand>(c.payload)) {
+          const auto payload = std::get<cmd::HomingCommand>(c.payload);
+          EXPECT_EQ(payload.target, cmd::HomingTarget::Z);
+        }
+        return std::string{};
+      });
+
+  EXPECT_TRUE(dispatched);
+  EXPECT_EQ(response["status"].get<std::string>(), "OK");
+}
+
+TEST(MachineCommandProcessorTests, HomingMissingTargetReturnsErrorWithoutDispatch) {
+  nlohmann::json command{
+      {"type", "homing"},
+  };
+
+  bool dispatched = false;
+  const auto response = cmd::processCommand(
+      command, [&](cmd::Command, std::chrono::milliseconds) {
+        dispatched = true;
+        return std::string{};
+      });
+
+  EXPECT_FALSE(dispatched);
+  EXPECT_EQ(response["status"].get<std::string>(), "Error");
+  EXPECT_TRUE(response["message"].get<std::string>().find("'target'") !=
+              std::string::npos);
+}

@@ -6,6 +6,7 @@
 #include "CommonDefinitions.hpp"
 #include "ControlPanel.hpp"
 #include "MachineComponent.hpp"
+#include "MotorControl.hpp"
 
 class MachineStatusBuilder {
  public:
@@ -15,6 +16,13 @@ class MachineStatusBuilder {
   using ReadSignalsFn = std::function<std::optional<utl::SignalMap>()>;
   using PublishFn = std::function<void(const utl::RobotStatus&)>;
 
+  void updateAndPublish(utl::RobotStatus& status,
+                        const ComponentsMap& components,
+                        MotorControl* motorControl,
+                        const SnapshotFn& readJoystickSnapshot,
+                        const ReadSignalsFn& readInputSignals,
+                        const ReadSignalsFn& readOutputSignals,
+                        const PublishFn& publish) const;
   void updateAndPublish(utl::RobotStatus& status,
                         const ComponentsMap& components,
                         const SnapshotFn& readJoystickSnapshot,

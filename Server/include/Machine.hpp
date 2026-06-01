@@ -12,6 +12,7 @@
 #include <chrono>
 #include <cstddef>
 #include <map>
+#include <vector>
 #include <atomic>
 #include <future>
 #include <memory>
@@ -28,13 +29,13 @@ class Machine {
 
   Machine();
   explicit Machine(std::shared_ptr<IClock> clock);
-  ~Machine() = default;
+  ~Machine();
 
   void wire();
 
-  std::optional<signal_map_t> readInputSignals();
-  void setOutputs(const signal_map_t& signals);
-  std::optional<signal_map_t> readOutputSignals();
+  std::optional<utl::SignalMap> readInputSignals();
+  void setOutputs(const utl::SignalMap& signals);
+  std::optional<utl::SignalMap> readOutputSignals();
   void runOneCycle(LoopState& state);
   bool submitCommand(cmd::Command command);
   std::string dispatchCommandAndWait(cmd::Command command,
@@ -60,6 +61,7 @@ class Machine {
   virtual void handleSetMotorEnabledCommand(const cmd::SetMotorEnabledCommand& c);
   virtual void handleSetAllMotorsEnabledCommand(
       const cmd::SetAllMotorsEnabledCommand& c);
+  virtual void handleHomingCommand(const cmd::HomingCommand& c);
   virtual nlohmann::json handleContecDiagnosticsCommand(
       const cmd::ContecDiagnosticsCommand& c);
   virtual void handleEmergencyStopCommand(const cmd::EmergencyStopCommand& c);
@@ -67,14 +69,25 @@ class Machine {
   struct IoSignalCache {
     std::uint64_t cycle{0};
     bool valid{false};
-    std::optional<signal_map_t> value;
+    std::optional<utl::SignalMap> value;
   };
 
-  void cacheInputSignals(std::optional<signal_map_t> value);
-  void cacheOutputSignals(std::optional<signal_map_t> value);
+  struct HomingAxisConfig {
+    utl::EMotor motorId;
+    std::int32_t speedStepsPerSec{0};
+    std::int32_t acceleration{0};
+    std::int32_t startingDirection{0};
+  };
+
+  void cacheInputSignals(std::optional<utl::SignalMap> value);
+  void cacheOutputSignals(std::optional<utl::SignalMap> value);
 
   void initializeComponents();
   std::string reconnectComponent(utl::ERobotComponent component);
+  std::vector<cmd::HomingTarget> loadHomingOrder() const;
+  std::map<cmd::HomingTarget, HomingAxisConfig> loadHomingAxisConfigs() const;
+  void homeAxesInOrder(const std::vector<cmd::HomingTarget>& axes);
+  void homeSingleAxis(cmd::HomingTarget axis);
 
   void makeDummyStatus();
 
@@ -82,8 +95,8 @@ class Machine {
   ControlPanel _controlPanel;
   MotorControl _motorControl;
   std::map<utl::ERobotComponent, MachineComponent*> _components;
-  std::map<std::string, unsigned int> _inputMapping;
-  std::map<std::string, unsigned int> _outputMapping;
+  std::map<std::string, unsigned int, std::less<>> _inputMapping;
+  std::map<std::string, unsigned int, std::less<>> _outputMapping;
   utl::RobotStatus _robotStatus;
   cmd::CommandQueue _commandQueue;
   std::atomic<bool> _isRunning{false};
@@ -96,8 +109,13 @@ class Machine {
   std::thread _processThread;
   std::mutex _lifecycleMutex;
   std::uint64_t _ioCacheCycle{0};
+  std::vector<cmd::HomingTarget> _homingOrder;
+  std::map<cmd::HomingTarget, HomingAxisConfig> _homingAxisConfigs;
+  std::map<utl::EMotor, bool> _homingRequested;
   IoSignalCache _inputSignalsCache;
   IoSignalCache _outputSignalsCache;
+  utl::SignalMap _inputSignals;
+  utl::SignalMap _outputSignals;
   std::unique_ptr<ControlLoopRunner> _loopRunner;
   std::unique_ptr<MachineController> _controller;
   std::unique_ptr<MachineStatusBuilder> _statusBuilder;

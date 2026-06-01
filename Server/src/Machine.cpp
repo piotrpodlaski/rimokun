@@ -8,15 +8,17 @@
 
 #include <chrono>
 #include <array>
+#include <cmath>
 #include <future>
+#include <vector>
 
 using namespace std::chrono_literals;
 
 namespace {
 unsigned int requireMappingIndex(
-    const std::map<std::string, unsigned int>& mapping,
+    const std::map<std::string, unsigned int, std::less<>>& mapping,
     const std::string_view key) {
-  const auto it = mapping.find(std::string(key));
+  const auto it = mapping.find(key);
   if (it == mapping.end()) {
     utl::throwRuntimeError(
         std::format("Missing required signal mapping key '{}'", key));
@@ -25,7 +27,8 @@ unsigned int requireMappingIndex(
 }
 
 template <typename ESignal>
-void validateSignalMappingKeys(const std::map<std::string, unsigned int>& mapping,
+void validateSignalMappingKeys(
+    const std::map<std::string, unsigned int, std::less<>>& mapping,
                                 std::string_view mappingName) {
   for (const auto& [key, index] : mapping) {
     if (!magic_enum::enum_cast<ESignal>(key).has_value()) {
@@ -60,73 +63,31 @@ nlohmann::json makeDefaultIoAssignmentResponse(const utl::EMotor motor) {
       {"warning", nlohmann::json::object()},
   };
 
-  response["ioOutputAssignments"].push_back(
-      {{"channel", "OUT0"}, {"function", "HOME-P"}, {"functionCode", 70}, {"active", false}});
-  response["ioOutputAssignments"].push_back(
-      {{"channel", "OUT1"}, {"function", "END"}, {"functionCode", 69}, {"active", false}});
-  response["ioOutputAssignments"].push_back(
-      {{"channel", "OUT2"}, {"function", "AREA1"}, {"functionCode", 73}, {"active", false}});
-  response["ioOutputAssignments"].push_back(
-      {{"channel", "OUT3"}, {"function", "READY"}, {"functionCode", 67}, {"active", false}});
-  response["ioOutputAssignments"].push_back(
-      {{"channel", "OUT4"}, {"function", "WNG"}, {"functionCode", 66}, {"active", false}});
-  response["ioOutputAssignments"].push_back(
-      {{"channel", "OUT5"}, {"function", "ALM"}, {"functionCode", 65}, {"active", false}});
-  response["ioOutputAssignments"].push_back(
-      {{"channel", "MB"}, {"function", "MB"}, {"functionCode", 0}, {"active", false}});
-
-  response["ioInputAssignments"].push_back(
-      {{"channel", "IN0"}, {"function", "HOME"}, {"functionCode", 3}, {"active", false}});
-  response["ioInputAssignments"].push_back(
-      {{"channel", "IN1"}, {"function", "START"}, {"functionCode", 4}, {"active", false}});
-  response["ioInputAssignments"].push_back(
-      {{"channel", "IN2"}, {"function", "M0"}, {"functionCode", 48}, {"active", false}});
-  response["ioInputAssignments"].push_back(
-      {{"channel", "IN3"}, {"function", "M1"}, {"functionCode", 49}, {"active", false}});
-  response["ioInputAssignments"].push_back(
-      {{"channel", "IN4"}, {"function", "M2"}, {"functionCode", 50}, {"active", false}});
-  response["ioInputAssignments"].push_back(
-      {{"channel", "IN5"}, {"function", "FREE"}, {"functionCode", 16}, {"active", false}});
-  response["ioInputAssignments"].push_back(
-      {{"channel", "IN6"}, {"function", "STOP"}, {"functionCode", 18}, {"active", false}});
-  response["ioInputAssignments"].push_back(
-      {{"channel", "IN7"}, {"function", "ALM-RST"}, {"functionCode", 24}, {"active", false}});
-  response["ioInputAssignments"].push_back(
-      {{"channel", "+LS"}, {"function", "+LS"}, {"functionCode", 0}, {"active", false}});
-  response["ioInputAssignments"].push_back(
-      {{"channel", "-LS"}, {"function", "-LS"}, {"functionCode", 0}, {"active", false}});
-  response["ioInputAssignments"].push_back(
-      {{"channel", "HOMES"}, {"function", "HOMES"}, {"functionCode", 0}, {"active", false}});
-  response["ioInputAssignments"].push_back(
-      {{"channel", "SLIT"}, {"function", "SLIT"}, {"functionCode", 0}, {"active", false}});
-
-  const std::array<std::pair<const char*, unsigned int>, 16> defaultNetIn{
-      {{"M0", 48},       {"M1", 49},      {"M2", 50},      {"START", 4},
-       {"HOME", 3},      {"STOP", 18},    {"FREE", 16},    {"not used", 0},
-       {"MS0", 8},       {"MS1", 9},      {"MS2", 10},     {"SSTART", 5},
-       {"+JOG", 6},      {"-JOG", 7},     {"FWD", 1},      {"RVS", 2}}};
-  const std::array<std::pair<const char*, unsigned int>, 16> defaultNetOut{
-      {{"M0_R", 48},     {"M1_R", 49},    {"M2_R", 50},    {"START_R", 4},
-       {"HOME-P", 70},   {"READY", 67},   {"WNG", 66},     {"ALM", 65},
-       {"S-BSY", 80},    {"AREA1", 73},   {"AREA2", 74},   {"AREA3", 75},
-       {"TIM", 72},      {"MOVE", 68},    {"END", 69},     {"TLC", 71}}};
-  for (int i = 0; i < 16; ++i) {
-    response["netInputAssignments"].push_back(
-        {{"channel", std::format("NET-IN{}", i)},
-         {"function", defaultNetIn[static_cast<std::size_t>(i)].first},
-         {"functionCode", defaultNetIn[static_cast<std::size_t>(i)].second},
-         {"active", false}});
-    response["netOutputAssignments"].push_back(
-        {{"channel", std::format("NET-OUT{}", i)},
-         {"function", defaultNetOut[static_cast<std::size_t>(i)].first},
-         {"functionCode", defaultNetOut[static_cast<std::size_t>(i)].second},
-         {"active", false}});
+  const auto appendAssignment = [](nlohmann::json& target,
+                                   const MotorIoAssignmentDefault assignment) {
+    target.push_back({{"channel", std::string(assignment.channel)},
+                      {"function", std::string(assignment.function)},
+                      {"functionCode", assignment.functionCode},
+                      {"active", false}});
+  };
+  for (const auto assignment : motor_io_defaults::ioOutput) {
+    appendAssignment(response["ioOutputAssignments"], assignment);
+  }
+  for (const auto assignment : motor_io_defaults::ioInput) {
+    appendAssignment(response["ioInputAssignments"], assignment);
+  }
+  for (const auto assignment : motor_io_defaults::netInput) {
+    appendAssignment(response["netInputAssignments"], assignment);
+  }
+  for (const auto assignment : motor_io_defaults::netOutput) {
+    appendAssignment(response["netOutputAssignments"], assignment);
   }
   return response;
 }
 
 std::vector<std::string> buildContecChannelNames(
-    const std::map<std::string, unsigned int>& mapping, const std::size_t count) {
+    const std::map<std::string, unsigned int, std::less<>>& mapping,
+    const std::size_t count) {
   std::vector<std::string> names(count);
   for (const auto& [signal, index] : mapping) {
     if (index < names.size() && names[index].empty()) {
@@ -136,7 +97,33 @@ std::vector<std::string> buildContecChannelNames(
   return names;
 }
 
+std::string_view axisConfigKey(const cmd::HomingTarget target) {
+  switch (target) {
+    case cmd::HomingTarget::XLeft: return "leftArmX";
+    case cmd::HomingTarget::YLeft: return "leftArmY";
+    case cmd::HomingTarget::XRight: return "rightArmX";
+    case cmd::HomingTarget::YRight: return "rightArmY";
+    case cmd::HomingTarget::Z: return "gantryZ";
+    case cmd::HomingTarget::All: break;
+  }
+  utl::throwRuntimeError("Homing target 'All' does not map to a single axis.");
+}
+
+utl::EMotor motorForHomingTarget(const cmd::HomingTarget target) {
+  switch (target) {
+    case cmd::HomingTarget::XLeft: return utl::EMotor::XLeft;
+    case cmd::HomingTarget::YLeft: return utl::EMotor::YLeft;
+    case cmd::HomingTarget::XRight: return utl::EMotor::XRight;
+    case cmd::HomingTarget::YRight: return utl::EMotor::YRight;
+    case cmd::HomingTarget::Z: return utl::EMotor::ZLeft;
+    case cmd::HomingTarget::All: break;
+  }
+  utl::throwRuntimeError("Homing target 'All' does not map to a single motor.");
+}
+
 }  // namespace
+
+Machine::~Machine() { shutdown(); }
 
 Machine::Machine() : Machine(std::make_shared<SteadyClockAdapter>()) {}
 
@@ -145,10 +132,18 @@ Machine::Machine(std::shared_ptr<IClock> clock) : _clock(std::move(clock)) {
     utl::throwRuntimeError("Machine requires a non-null clock instance.");
   }
   auto& cfg = utl::Config::instance();
-  _inputMapping = cfg.getRequired<std::map<std::string, unsigned int>>(
+  const auto inputMapping = cfg.getRequired<std::map<std::string, unsigned int>>(
       "Machine", "inputMapping");
-  _outputMapping = cfg.getRequired<std::map<std::string, unsigned int>>(
+  const auto outputMapping = cfg.getRequired<std::map<std::string, unsigned int>>(
       "Machine", "outputMapping");
+  _inputMapping.insert(inputMapping.begin(), inputMapping.end());
+  _outputMapping.insert(outputMapping.begin(), outputMapping.end());
+  for (const auto& [signal, _] : _inputMapping) {
+    _inputSignals.emplace(signal, false);
+  }
+  for (const auto& [signal, _] : _outputMapping) {
+    _outputSignals.emplace(signal, false);
+  }
   validateSignalMappingKeys<utl::EInputSignal>(_inputMapping, "input");
   validateSignalMappingKeys<utl::EOutputSignal>(_outputMapping, "output");
   const auto loopIntervalMS = cfg.getOptional<int>(
@@ -159,6 +154,8 @@ Machine::Machine(std::shared_ptr<IClock> clock) : _clock(std::move(clock)) {
       cfg.getOptional<int>("Machine", "statusPublishPeriodMS", 50));
   _statusUpdatesEnabled =
       cfg.getOptional<bool>("Machine", "statusUpdatesEnabled", true);
+  _homingOrder = loadHomingOrder();
+  _homingAxisConfigs = loadHomingAxisConfigs();
 
   _loopInterval = std::chrono::milliseconds{std::max(1, loopIntervalMS)};
   _updateInterval = std::chrono::milliseconds{std::max(1, updateIntervalMS)};
@@ -179,7 +176,7 @@ Machine::Machine(std::shared_ptr<IClock> clock) : _clock(std::move(clock)) {
   (void)requireMappingIndex(_outputMapping, "light2");
 }
 
-std::optional<signal_map_t> Machine::readInputSignals() {
+std::optional<utl::SignalMap> Machine::readInputSignals() {
   if (_inputSignalsCache.valid && _inputSignalsCache.cycle == _ioCacheCycle) {
     return _inputSignalsCache.value;
   }
@@ -187,23 +184,22 @@ std::optional<signal_map_t> Machine::readInputSignals() {
     cacheInputSignals(std::nullopt);
     return std::nullopt;
   }
-  signal_map_t inputSignals;
   try {
     auto inputs = _contec.readInputs();
     for (const auto& [signal, index] : _inputMapping) {
       validateMappedIndex(signal, index, inputs.size(), "input");
-      inputSignals[signal] = inputs[index];
+      _inputSignals[signal] = inputs[index];
     }
-    cacheInputSignals(inputSignals);
+    cacheInputSignals(_inputSignals);
   } catch (const std::exception& e) {
     SPDLOG_ERROR("Exception caught in 'readInputSignals'! {}", e.what());
     cacheInputSignals(std::nullopt);
     return std::nullopt;
   }
-  return inputSignals;
+  return _inputSignals;
 }
 
-void Machine::setOutputs(const signal_map_t& signals) {
+void Machine::setOutputs(const utl::SignalMap& signals) {
   if (_contec.state() == MachineComponent::State::Error) {
     return;
   }
@@ -220,19 +216,18 @@ void Machine::setOutputs(const signal_map_t& signals) {
     }
     _contec.setOutputs(outputs);
 
-    signal_map_t outputSignals;
     for (const auto& [signal, index] : _outputMapping) {
       validateMappedIndex(signal, index, outputs.size(), "output");
-      outputSignals[signal] = outputs[index];
+      _outputSignals[signal] = outputs[index];
     }
-    cacheOutputSignals(std::move(outputSignals));
+    cacheOutputSignals(_outputSignals);
   } catch (const std::exception& e) {
     SPDLOG_ERROR("Exception caught in 'setOutputs'! {}", e.what());
     cacheOutputSignals(std::nullopt);
   }
 }
 
-std::optional<signal_map_t> Machine::readOutputSignals() {
+std::optional<utl::SignalMap> Machine::readOutputSignals() {
   if (_outputSignalsCache.valid && _outputSignalsCache.cycle == _ioCacheCycle) {
     return _outputSignalsCache.value;
   }
@@ -242,13 +237,12 @@ std::optional<signal_map_t> Machine::readOutputSignals() {
   }
   try {
     auto output = _contec.readOutputs();
-    signal_map_t outputSignals;
     for (auto& [signal, index] : _outputMapping) {
       validateMappedIndex(signal, index, output.size(), "output");
-      outputSignals[signal] = output[index];
+      _outputSignals[signal] = output[index];
     }
-    cacheOutputSignals(outputSignals);
-    return outputSignals;
+    cacheOutputSignals(_outputSignals);
+    return _outputSignals;
   } catch (const std::exception& e) {
     SPDLOG_WARN("Exception caught in 'readOutputSignals'! {}", e.what());
     cacheOutputSignals(std::nullopt);
@@ -280,6 +274,16 @@ void Machine::runOneCycle(LoopState& state) {
   if (!_loopRunner) {
     utl::throwRuntimeError("Machine is not wired. Call wire() first.");
   }
+  const auto resetComponentsToError = [this]() {
+    const auto resetIfNeeded = [](MachineComponent& component) {
+      if (component.state() != MachineComponent::State::Error) {
+        component.reset();
+      }
+    };
+    resetIfNeeded(_motorControl);
+    resetIfNeeded(_contec);
+    resetIfNeeded(_controlPanel);
+  };
   try {
     ++_ioCacheCycle;
     _inputSignalsCache.valid = false;
@@ -311,6 +315,9 @@ void Machine::runOneCycle(LoopState& state) {
                                         const cmd::SetAllMotorsEnabledCommand& c) {
                                       handleSetAllMotorsEnabledCommand(c);
                                     },
+                                    [this](const cmd::HomingCommand& c) {
+                                      handleHomingCommand(c);
+                                    },
                                     [this, &responsePayload](
                                         const cmd::ContecDiagnosticsCommand& c) {
                                       responsePayload =
@@ -341,38 +348,22 @@ void Machine::runOneCycle(LoopState& state) {
         "Unhandled exception in machine loop cycle: {}. "
         "Forcing components into error state.",
         e.what());
-    if (_motorControl.state() != MachineComponent::State::Error) {
-      _motorControl.reset();
-    }
-    if (_contec.state() != MachineComponent::State::Error) {
-      _contec.reset();
-    }
-    if (_controlPanel.state() != MachineComponent::State::Error) {
-      _controlPanel.reset();
-    }
+    resetComponentsToError();
   } catch (...) {
     SPDLOG_ERROR(
         "Unhandled unknown exception in machine loop cycle. "
         "Forcing components into error state.");
-    if (_motorControl.state() != MachineComponent::State::Error) {
-      _motorControl.reset();
-    }
-    if (_contec.state() != MachineComponent::State::Error) {
-      _contec.reset();
-    }
-    if (_controlPanel.state() != MachineComponent::State::Error) {
-      _controlPanel.reset();
-    }
+    resetComponentsToError();
   }
 }
 
-void Machine::cacheInputSignals(std::optional<signal_map_t> value) {
+void Machine::cacheInputSignals(std::optional<utl::SignalMap> value) {
   _inputSignalsCache.cycle = _ioCacheCycle;
   _inputSignalsCache.valid = true;
   _inputSignalsCache.value = std::move(value);
 }
 
-void Machine::cacheOutputSignals(std::optional<signal_map_t> value) {
+void Machine::cacheOutputSignals(std::optional<utl::SignalMap> value) {
   _outputSignalsCache.cycle = _ioCacheCycle;
   _outputSignalsCache.valid = true;
   _outputSignalsCache.value = std::move(value);
@@ -431,7 +422,7 @@ void Machine::wire() {
     _controller = std::make_unique<MachineController>(
         MachineController::IoOps{
             .readInputs = [this]() { return readInputSignals(); },
-            .setOutputs = [this](const signal_map_t& outputs) { setOutputs(outputs); },
+            .setOutputs = [this](const utl::SignalMap& outputs) { setOutputs(outputs); },
             .readOutputs = [this]() { return readOutputSignals(); },
             .contecState = [this]() { return _contec.state(); },
         },
@@ -532,6 +523,103 @@ std::string Machine::reconnectComponent(const utl::ERobotComponent component) {
   return "";
 }
 
+std::vector<cmd::HomingTarget> Machine::loadHomingOrder() const {
+  constexpr std::array defaultOrder{
+      cmd::HomingTarget::Z,
+      cmd::HomingTarget::XLeft,
+      cmd::HomingTarget::XRight,
+      cmd::HomingTarget::YLeft,
+      cmd::HomingTarget::YRight,
+  };
+
+  std::vector<cmd::HomingTarget> order(defaultOrder.begin(), defaultOrder.end());
+  try {
+    const auto machineCfg = utl::Config::instance().getClassConfig("Machine");
+    const auto homingCfg = machineCfg["homing"];
+    if (!homingCfg || !homingCfg.IsMap()) {
+      return order;
+    }
+    const auto orderCfg = homingCfg["order"];
+    if (!orderCfg || !orderCfg.IsSequence()) {
+      return order;
+    }
+    order.clear();
+    for (const auto& node : orderCfg) {
+      const auto value = node.as<std::string>();
+      const auto parsed = magic_enum::enum_cast<cmd::HomingTarget>(value);
+      if (!parsed.has_value()) {
+        utl::throwRuntimeError(std::format(
+            "Unknown Machine.homing.order target '{}'", value));
+      }
+      if (*parsed == cmd::HomingTarget::All) {
+        utl::throwRuntimeError(
+            "Machine.homing.order must list single axes, not 'All'.");
+      }
+      order.push_back(*parsed);
+    }
+  } catch (const std::exception& e) {
+    SPDLOG_WARN("Using default homing order: {}", e.what());
+    order.assign(defaultOrder.begin(), defaultOrder.end());
+  }
+  return order;
+}
+
+std::map<cmd::HomingTarget, Machine::HomingAxisConfig>
+Machine::loadHomingAxisConfigs() const {
+  std::map<cmd::HomingTarget, HomingAxisConfig> configs;
+  try {
+    const auto machineCfg = utl::Config::instance().getClassConfig("Machine");
+    const auto axesCfg = machineCfg["motion"]["axes"];
+    const auto directionCfg = machineCfg["homing"]["startingDirection"];
+    if (!axesCfg || !axesCfg.IsMap()) {
+      return configs;
+    }
+    if (!directionCfg || !directionCfg.IsMap()) {
+      return configs;
+    }
+
+    for (const auto axis : {cmd::HomingTarget::XLeft, cmd::HomingTarget::YLeft,
+                           cmd::HomingTarget::XRight, cmd::HomingTarget::YRight,
+                           cmd::HomingTarget::Z}) {
+      const auto axisKey = axisConfigKey(axis);
+      const auto axisCfg = axesCfg[std::string(axisKey)];
+      if (!axisCfg || !axisCfg.IsMap()) {
+        utl::throwRuntimeError(std::format(
+            "Missing Machine.motion.axes.{} config for homing.", axisKey));
+      }
+      const auto directionNode =
+          directionCfg[std::string(magic_enum::enum_name(axis))];
+      if (!directionNode) {
+        utl::throwRuntimeError(std::format(
+            "Missing Machine.homing.startingDirection.{} config.",
+            magic_enum::enum_name(axis)));
+      }
+      const auto startingDirection = directionNode.as<std::int32_t>();
+      if (startingDirection != 0 && startingDirection != 1) {
+        utl::throwRuntimeError(std::format(
+            "Machine.homing.startingDirection.{} must be 0 or 1.",
+            magic_enum::enum_name(axis)));
+      }
+      const auto slowSpeedMmPerSec =
+          axisCfg["slowMaxLinearSpeedMmPerSec"].as<double>();
+      const auto stepsPerMm = axisCfg["stepsPerMm"].as<double>();
+      configs.emplace(
+          axis, HomingAxisConfig{
+                    .motorId = motorForHomingTarget(axis),
+                    .speedStepsPerSec = static_cast<std::int32_t>(
+                        std::llround(slowSpeedMmPerSec * stepsPerMm)),
+                    .acceleration =
+                        axisCfg["slowAcceleration001MsPerKHz"].as<std::int32_t>(),
+                    .startingDirection = startingDirection,
+                });
+    }
+  } catch (const std::exception& e) {
+    SPDLOG_WARN("Homing axis config cache is incomplete: {}", e.what());
+    configs.clear();
+  }
+  return configs;
+}
+
 nlohmann::json Machine::handleMotorDiagnosticsCommand(
     const cmd::MotorDiagnosticsCommand& c) {
   auto response = makeDefaultIoAssignmentResponse(c.motor);
@@ -626,6 +714,38 @@ void Machine::handleSetAllMotorsEnabledCommand(
   _motorControl.setAllEnabled(c.enabled);
 }
 
+void Machine::handleHomingCommand(const cmd::HomingCommand& c) {
+  if (c.target == cmd::HomingTarget::All) {
+    homeAxesInOrder(_homingOrder);
+    return;
+  }
+  homeSingleAxis(c.target);
+}
+
+void Machine::homeAxesInOrder(const std::vector<cmd::HomingTarget>& axes) {
+  for (const auto axis : axes) {
+    homeSingleAxis(axis);
+  }
+}
+
+void Machine::homeSingleAxis(const cmd::HomingTarget axis) {
+  const auto cfgIt = _homingAxisConfigs.find(axis);
+  if (cfgIt == _homingAxisConfigs.end()) {
+    utl::throwRuntimeError(std::format("Missing cached homing config for {}.",
+                                       magic_enum::enum_name(axis)));
+  }
+  const auto& cfg = cfgIt->second;
+
+  SPDLOG_INFO("Starting homing for {}: speed={} steps/s, accel={}, direction={}",
+              magic_enum::enum_name(axis), cfg.speedStepsPerSec, cfg.acceleration,
+              cfg.startingDirection);
+  _motorControl.configureHoming(cfg.motorId, 0, cfg.speedStepsPerSec,
+                                cfg.acceleration, cfg.speedStepsPerSec,
+                                cfg.startingDirection);
+  _motorControl.pulseHome(cfg.motorId);
+  _homingRequested[cfg.motorId] = true;
+}
+
 nlohmann::json Machine::handleContecDiagnosticsCommand(
     const cmd::ContecDiagnosticsCommand&) {
   nlohmann::json response{
@@ -706,7 +826,8 @@ void Machine::makeDummyStatus() {
         .flags = {{EMotorStatusFlags::BrakeApplied, ELEDState::Off},
                   {EMotorStatusFlags::Enabled, ELEDState::Off},
                   {EMotorStatusFlags::Warning, ELEDState::Off},
-                  {EMotorStatusFlags::Alarm, ELEDState::Off}}};
+                  {EMotorStatusFlags::Alarm, ELEDState::Off},
+                  {EMotorStatusFlags::Homing, ELEDState::Off}}};
   }
   _robotStatus.toolChangers[EArm::Left] = {
       .flags = {{EToolChangerStatusFlags::ProxSen, ELEDState::Off},
@@ -725,9 +846,24 @@ void Machine::makeDummyStatus() {
 void Machine::updateStatus() {
   RIMO_TIMED_SCOPE("Machine::updateStatus");
   _statusBuilder->updateAndPublish(
-      _robotStatus, _components,
+      _robotStatus, _components, &_motorControl,
       [this]() { return _controlPanel.getSnapshot(); },
       [this]() { return readInputSignals(); },
       [this]() { return readOutputSignals(); },
-      [this](const utl::RobotStatus& status) { _robotServer.publish(status); });
+      [this](const utl::RobotStatus&) {
+        for (auto& [motorId, requested] : _homingRequested) {
+          auto motorIt = _robotStatus.motors.find(motorId);
+          if (motorIt == _robotStatus.motors.end()) {
+            continue;
+          }
+          auto& homingLed =
+              motorIt->second.flags[utl::EMotorStatusFlags::Homing];
+          if (homingLed == utl::ELEDState::On) {
+            requested = false;
+          } else if (requested) {
+            homingLed = utl::ELEDState::Warning;
+          }
+        }
+        _robotServer.publish(_robotStatus);
+      });
 }

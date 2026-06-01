@@ -83,15 +83,15 @@ void ResetControlsPresenterQtTests::forwardsViewCommand() {
                      captured = command;
                    });
 
-  GuiCommand cmd;
-  cmd.payload =
-      GuiReconnectCommand{.component = utl::ERobotComponent::MotorControl};
-  view.emitButton(cmd);
+  GuiCommand command;
+  command.payload =
+      cmd::ReconnectCommand{.robotComponent = utl::ERobotComponent::MotorControl};
+  view.emitButton(command);
 
   QCOMPARE(callCount, 1);
-  const auto* reconnect = std::get_if<GuiReconnectCommand>(&captured.payload);
+  const auto* reconnect = std::get_if<cmd::ReconnectCommand>(&captured.payload);
   QVERIFY(reconnect != nullptr);
-  QCOMPARE(reconnect->component, utl::ERobotComponent::MotorControl);
+  QCOMPARE(reconnect->robotComponent, utl::ERobotComponent::MotorControl);
 }
 
 QTEST_MAIN(ResetControlsPresenterQtTests)

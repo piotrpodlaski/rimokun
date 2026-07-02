@@ -29,7 +29,7 @@ struct HomingVisualState {
   const char* summaryText;
 };
 
-constexpr std::array kSpinnerFrames{"|", "/", "-", "\\"};
+constexpr std::array kPulseFrames{"", ".", "..", "..."};
 
 constexpr std::array kAxisButtons{
     AxisButtonSpec{"Home all", cmd::HomingTarget::All, 0, 0, 1, 2, true},
@@ -93,7 +93,7 @@ HomingVisualState visualState(const utl::EHomingState state) {
               .summaryText = "Preparing"};
     case utl::EHomingState::Running:
       return {.foreground = "#0057d8",
-              .spinnerText = "|",
+              .spinnerText = "",
               .summaryText = "Homing in progress"};
     case utl::EHomingState::Succeeded:
       return {.foreground = "#0f8a2b",
@@ -116,6 +116,16 @@ QString detailText(const utl::HomingSessionStatus& session) {
     return "No homing session started.";
   }
   return QString::fromStdString(session.message);
+}
+
+QString normalizedStatusText(QString text) {
+  text = text.trimmed().toLower();
+  while (!text.isEmpty() &&
+         (text.endsWith('.') || text.endsWith('!') || text.endsWith(':'))) {
+    text.chop(1);
+    text = text.trimmed();
+  }
+  return text;
 }
 }  // namespace
 
@@ -292,8 +302,8 @@ void HomingWindow::setSpinnerForState(const utl::EHomingState state) {
 }
 
 void HomingWindow::refreshAnimation() {
-  _spinnerIndex = (_spinnerIndex + 1) % static_cast<int>(kSpinnerFrames.size());
-  _spinnerLabel->setText(kSpinnerFrames[static_cast<std::size_t>(_spinnerIndex)]);
+  _spinnerIndex = (_spinnerIndex + 1) % static_cast<int>(kPulseFrames.size());
+  _spinnerLabel->setText(kPulseFrames[static_cast<std::size_t>(_spinnerIndex)]);
 }
 
 QString HomingWindow::stateChipStyle(const utl::EHomingState state) {
@@ -321,7 +331,10 @@ QString HomingWindow::stateText(const utl::HomingAxisStatus& axisStatus) {
       axisStatus.state != utl::EHomingState::Running &&
       axisStatus.state != utl::EHomingState::Pending &&
       axisStatus.state != utl::EHomingState::Idle) {
-    state += QString(" (%1)").arg(QString::fromStdString(axisStatus.message));
+    const auto message = QString::fromStdString(axisStatus.message);
+    if (normalizedStatusText(message) != normalizedStatusText(state)) {
+      state += QString(" (%1)").arg(message);
+    }
   }
   return state;
 }

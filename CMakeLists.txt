@@ -24,12 +24,6 @@ FetchContent_Declare(
         GIT_TAG 8a666a0c1e9d4f5662f780efc1689c9ff9c634e2  # yaml-cpp 0.9.0-dev (HEAD at time of pin)
 )
 FetchContent_Declare(
-        magic_enum
-        GIT_REPOSITORY https://github.com/Neargye/magic_enum.git
-        GIT_TAG v0.9.7
-)
-
-FetchContent_Declare(
         cppzmq
         GIT_REPOSITORY https://github.com/zeromq/cppzmq.git
         GIT_TAG v4.10.0
@@ -63,7 +57,7 @@ if (BUILD_TESTING)
     )
     set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
 endif()
-FetchContent_MakeAvailable(yaml-cpp magic_enum cppzmq spdlog argparse)
+FetchContent_MakeAvailable(yaml-cpp cppzmq spdlog argparse)
 if (NOT nlohmann_json_FOUND)
     FetchContent_MakeAvailable(nlohmann_json)
 endif ()

@@ -1,10 +1,9 @@
 #include <Config.hpp>
+#include <EnumStrings.hpp>
 #include <ExceptionUtils.hpp>
 #include <JsonExtensions.hpp>
 #include <Machine.hpp>
 #include <TimingMetrics.hpp>
-
-#include <magic_enum/magic_enum.hpp>
 
 #include <chrono>
 #include <array>
@@ -15,6 +14,28 @@
 using namespace std::chrono_literals;
 
 namespace {
+std::string_view homingTargetName(const cmd::HomingTarget target) {
+  switch (target) {
+    case cmd::HomingTarget::All: return "All";
+    case cmd::HomingTarget::XLeft: return "XLeft";
+    case cmd::HomingTarget::YLeft: return "YLeft";
+    case cmd::HomingTarget::XRight: return "XRight";
+    case cmd::HomingTarget::YRight: return "YRight";
+    case cmd::HomingTarget::Z: return "Z";
+  }
+  return "Unknown";
+}
+
+std::optional<cmd::HomingTarget> parseHomingTarget(const std::string_view value) {
+  if (value == "All") return cmd::HomingTarget::All;
+  if (value == "XLeft") return cmd::HomingTarget::XLeft;
+  if (value == "YLeft") return cmd::HomingTarget::YLeft;
+  if (value == "XRight") return cmd::HomingTarget::XRight;
+  if (value == "YRight") return cmd::HomingTarget::YRight;
+  if (value == "Z") return cmd::HomingTarget::Z;
+  return std::nullopt;
+}
+
 unsigned int requireMappingIndex(
     const std::map<std::string, unsigned int, std::less<>>& mapping,
     const std::string_view key) {
@@ -29,17 +50,12 @@ unsigned int requireMappingIndex(
 template <typename ESignal>
 void validateSignalMappingKeys(
     const std::map<std::string, unsigned int, std::less<>>& mapping,
-                                std::string_view mappingName) {
-  for (const auto& [key, index] : mapping) {
-    if (!magic_enum::enum_cast<ESignal>(key).has_value()) {
-      std::string known;
-      for (const auto name : magic_enum::enum_names<ESignal>()) {
-        if (!known.empty()) known += ", ";
-        known += name;
-      }
+    std::string_view mappingName) {
+  for (const auto& [key, _] : mapping) {
+    if (!utl::tryEnumFromString<ESignal>(key).has_value()) {
       utl::throwRuntimeError(std::format(
           "Unknown {} signal '{}' in config. Known values: [{}]",
-          mappingName, key, known));
+          mappingName, key, utl::knownEnumNames<ESignal>()));
     }
   }
 }
@@ -496,7 +512,7 @@ void Machine::initializeComponents() {
       component->initialize();
     } catch (const std::exception& e) {
       SPDLOG_ERROR("{} initialization failed: {}",
-                   magic_enum::enum_name(componentType), e.what());
+                   utl::enumToStringView(componentType), e.what());
     }
   }
 }
@@ -505,20 +521,20 @@ std::string Machine::reconnectComponent(const utl::ERobotComponent component) {
   const auto it = _components.find(component);
   if (it == _components.end() || !it->second) {
     return std::format("Resetting of '{}' is not implemented!",
-                       magic_enum::enum_name(component));
+                       utl::enumToStringView(component));
   }
   auto* comp = it->second;
-  SPDLOG_INFO("Reconnecting {}...", magic_enum::enum_name(component));
+  SPDLOG_INFO("Reconnecting {}...", utl::enumToStringView(component));
   comp->reset();
   try {
     comp->initialize();
   } catch (const std::exception& e) {
     return std::format("Resetting '{}' failed: {}",
-                       magic_enum::enum_name(component), e.what());
+                       utl::enumToStringView(component), e.what());
   }
   if (comp->state() == MachineComponent::State::Error) {
     return std::format("Resetting '{}' was unsuccessful!",
-                       magic_enum::enum_name(component));
+                       utl::enumToStringView(component));
   }
   return "";
 }
@@ -546,7 +562,7 @@ std::vector<cmd::HomingTarget> Machine::loadHomingOrder() const {
     order.clear();
     for (const auto& node : orderCfg) {
       const auto value = node.as<std::string>();
-      const auto parsed = magic_enum::enum_cast<cmd::HomingTarget>(value);
+      const auto parsed = parseHomingTarget(value);
       if (!parsed.has_value()) {
         utl::throwRuntimeError(std::format(
             "Unknown Machine.homing.order target '{}'", value));
@@ -588,17 +604,17 @@ Machine::loadHomingAxisConfigs() const {
             "Missing Machine.motion.axes.{} config for homing.", axisKey));
       }
       const auto directionNode =
-          directionCfg[std::string(magic_enum::enum_name(axis))];
+          directionCfg[std::string(homingTargetName(axis))];
       if (!directionNode) {
         utl::throwRuntimeError(std::format(
             "Missing Machine.homing.startingDirection.{} config.",
-            magic_enum::enum_name(axis)));
+            homingTargetName(axis)));
       }
       const auto startingDirection = directionNode.as<std::int32_t>();
       if (startingDirection != 0 && startingDirection != 1) {
         utl::throwRuntimeError(std::format(
             "Machine.homing.startingDirection.{} must be 0 or 1.",
-            magic_enum::enum_name(axis)));
+            homingTargetName(axis)));
       }
       const auto slowSpeedMmPerSec =
           axisCfg["slowMaxLinearSpeedMmPerSec"].as<double>();
@@ -732,12 +748,12 @@ void Machine::homeSingleAxis(const cmd::HomingTarget axis) {
   const auto cfgIt = _homingAxisConfigs.find(axis);
   if (cfgIt == _homingAxisConfigs.end()) {
     utl::throwRuntimeError(std::format("Missing cached homing config for {}.",
-                                       magic_enum::enum_name(axis)));
+                                       homingTargetName(axis)));
   }
   const auto& cfg = cfgIt->second;
 
   SPDLOG_INFO("Starting homing for {}: speed={} steps/s, accel={}, direction={}",
-              magic_enum::enum_name(axis), cfg.speedStepsPerSec, cfg.acceleration,
+              homingTargetName(axis), cfg.speedStepsPerSec, cfg.acceleration,
               cfg.startingDirection);
   _motorControl.configureHoming(cfg.motorId, 0, cfg.speedStepsPerSec,
                                 cfg.acceleration, cfg.speedStepsPerSec,

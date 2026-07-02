@@ -21,6 +21,16 @@ nlohmann::json errorResponse(const std::string& message) {
   return nlohmann::json{{"status", "Error"}, {"message", message}};
 }
 
+std::optional<cmd::HomingTarget> parseHomingTarget(const std::string_view value) {
+  if (value == "All") return cmd::HomingTarget::All;
+  if (value == "XLeft") return cmd::HomingTarget::XLeft;
+  if (value == "YLeft") return cmd::HomingTarget::YLeft;
+  if (value == "XRight") return cmd::HomingTarget::XRight;
+  if (value == "YRight") return cmd::HomingTarget::YRight;
+  if (value == "Z") return cmd::HomingTarget::Z;
+  return std::nullopt;
+}
+
 void applyDispatchReply(nlohmann::json& response, const std::string& reply) {
   if (!reply.empty()) {
     response["status"] = "Error";
@@ -173,14 +183,19 @@ nlohmann::json handleSetAllMotorsEnabled(const nlohmann::json& command,
 
 nlohmann::json handleHoming(const nlohmann::json& command,
                             const cmd::DispatchFn& dispatch) {
-  if (!command.contains("target")) {
+  if (!command.contains("target") || !command.at("target").is_string()) {
     return errorResponse("homing command requires a 'target' field.");
   }
   auto response = okResponse();
   try {
+    const auto targetName = command.at("target").get<std::string>();
+    const auto target = parseHomingTarget(targetName);
+    if (!target.has_value()) {
+      throw std::runtime_error(std::format("Unknown homing target '{}'", targetName));
+    }
+
     cmd::Command c;
-    c.payload = cmd::HomingCommand{
-        .target = utl::enumFromJsonStringField<cmd::HomingTarget>(command, "target")};
+    c.payload = cmd::HomingCommand{.target = *target};
     applyDispatchReply(response, dispatch(std::move(c), 2s));
   } catch (const std::exception& e) {
     response = errorResponse(std::format("Invalid homing command: {}", e.what()));

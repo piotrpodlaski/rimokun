@@ -17,7 +17,6 @@ target_precompile_headers(rimoSrvlib PRIVATE
     <nlohmann/json.hpp>
     <spdlog/spdlog.h>
     <YamlExtensions.hpp>
-    <magic_enum/magic_enum.hpp>
     <string>
     <vector>
     <map>

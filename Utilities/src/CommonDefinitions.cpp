@@ -4,4 +4,10 @@
 
 #include "CommonDefinitions.hpp"
 
-namespace utl {}
+#include "EnumStrings.hpp"
+
+namespace utl {
+std::string getMotorName(const EMotor em) { return enumToString(em); }
+
+EMotor getMotorType(const std::string name) { return stringToEnum<EMotor>(name); }
+}  // namespace utl

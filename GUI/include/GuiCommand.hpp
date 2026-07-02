@@ -13,13 +13,19 @@ struct GuiRawCommand {
   nlohmann::json node;
 };
 
+template <typename Variant, typename Extra>
+struct AppendVariantAlternative;
+
+template <typename... Ts, typename Extra>
+struct AppendVariantAlternative<std::variant<Ts...>, Extra> {
+  using type = std::variant<Ts..., Extra>;
+};
+
+using GuiCommandPayload =
+    AppendVariantAlternative<cmd::Payload, GuiRawCommand>::type;
+
 struct GuiCommand {
-  std::variant<cmd::ToolChangerCommand, cmd::ReconnectCommand,
-               cmd::MotorDiagnosticsCommand, cmd::ResetMotorAlarmCommand,
-               cmd::SetMotorEnabledCommand, cmd::SetAllMotorsEnabledCommand,
-               cmd::HomingCommand, cmd::ContecDiagnosticsCommand, GuiRawCommand,
-               cmd::EmergencyStopCommand>
-      payload;
+  GuiCommandPayload payload;
 };
 
 struct GuiResponse {

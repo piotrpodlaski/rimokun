@@ -1,6 +1,6 @@
 ﻿#include "MotorStats.hpp"
 #include "SpeedCommandBar.hpp"
-#include "magic_enum/magic_enum.hpp"
+#include "EnumStrings.hpp"
 
 #include <format>
 #include <print>
@@ -88,7 +88,7 @@ void MotorStats::setSpeedCommand(const double percent, const double maxMmPerSec)
 
 void MotorStats::setMotorId(utl::EMotor mot) {
   _motorId = mot;
-  _motorName = magic_enum::enum_name(mot);
+  _motorName = utl::enumToString(mot);
   _ui->groupBox->setTitle(_motorName.c_str());
 }
 

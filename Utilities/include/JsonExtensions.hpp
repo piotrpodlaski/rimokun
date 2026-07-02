@@ -11,26 +11,10 @@
 #include <stdexcept>
 #include <string>
 
-#include <magic_enum/magic_enum.hpp>
+#include <EnumStrings.hpp>
 #include <nlohmann/json.hpp>
 
 namespace utl {
-
-template <typename TEnum>
-std::string enumToString(const TEnum value) {
-  static_assert(std::is_enum_v<TEnum>);
-  return std::string(magic_enum::enum_name(value));
-}
-
-template <typename TEnum>
-TEnum stringToEnum(const std::string& text) {
-  static_assert(std::is_enum_v<TEnum>);
-  const auto parsed = magic_enum::enum_cast<TEnum>(text);
-  if (!parsed.has_value()) {
-    throw std::runtime_error("Invalid enum value: " + text);
-  }
-  return *parsed;
-}
 
 template <typename TEnum, typename TValue>
 nlohmann::json enumKeyedMapToJson(const std::map<TEnum, TValue>& map) {

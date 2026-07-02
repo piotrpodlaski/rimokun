@@ -2,7 +2,7 @@
 #include <Logger.hpp>
 #include <MotorControl.hpp>
 #include <JsonExtensions.hpp>
-#include <magic_enum/magic_enum.hpp>
+#include <EnumStrings.hpp>
 
 #include <algorithm>
 #include <atomic>
@@ -192,7 +192,7 @@ std::optional<utl::EMotor> resolveMotor(const std::string& name,
   if (name.empty()) {
     return configured.front();
   }
-  const auto parsed = magic_enum::enum_cast<utl::EMotor>(name);
+  const auto parsed = utl::tryEnumFromString<utl::EMotor>(name);
   if (!parsed) {
     return std::nullopt;
   }

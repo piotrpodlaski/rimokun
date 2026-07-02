@@ -3,7 +3,7 @@
 #include <Config.hpp>
 #include <ExceptionUtils.hpp>
 #include <Logger.hpp>
-#include <magic_enum/magic_enum.hpp>
+#include <EnumStrings.hpp>
 
 #include <algorithm>
 #include <chrono>
@@ -160,6 +160,21 @@ RimoKunControlPolicy::RimoKunControlPolicy() {
       }
       if (const auto stepsPerMm = axisNode["stepsPerMm"]; stepsPerMm) {
         axis.stepsPerMm = stepsPerMm.as<double>();
+      }
+      if (const auto maxSpeed = axisNode["maxLinearSpeedMmPerSec"]; maxSpeed) {
+        const auto value = maxSpeed.as<double>();
+        axis.slowMaxLinearSpeedMmPerSec = value;
+        axis.fastMaxLinearSpeedMmPerSec = value;
+      }
+      if (const auto accel = axisNode["acceleration001MsPerKHz"]; accel) {
+        const auto value = accel.as<std::int32_t>();
+        axis.slowAcceleration001MsPerKHz = value;
+        axis.fastAcceleration001MsPerKHz = value;
+      }
+      if (const auto decel = axisNode["deceleration001MsPerKHz"]; decel) {
+        const auto value = decel.as<std::int32_t>();
+        axis.slowDeceleration001MsPerKHz = value;
+        axis.fastDeceleration001MsPerKHz = value;
       }
       // Slow speed/accel
       if (const auto slowSpeed = axisNode["slowMaxLinearSpeedMmPerSec"]; slowSpeed) {
@@ -321,8 +336,8 @@ IRobotControlPolicy::ControlDecision RimoKunControlPolicy::decide(
       // Rising edge: cycle to next state
       _armStates[arm] = cycleAxisState(_armStates[arm]);
       SPDLOG_INFO("Arm {} state changed to {}",
-                  magic_enum::enum_name(arm),
-                  magic_enum::enum_name(_armStates[arm]));
+                  utl::enumToStringView(arm),
+                  utl::enumToStringView(_armStates[arm]));
     }
     _prevButtonState[arm] = btnPressed;
   };
@@ -347,7 +362,7 @@ IRobotControlPolicy::ControlDecision RimoKunControlPolicy::decide(
             .count();
     if (elapsedMs >= _autoLockTimeoutMs) {
       SPDLOG_INFO("Arm {} auto-locked after {}ms of inactivity.",
-                  magic_enum::enum_name(arm), elapsedMs);
+                  utl::enumToStringView(arm), elapsedMs);
       _armStates[arm] = utl::EAxisState::Locked;
       _lastMovementTime.erase(arm);
     }
@@ -466,8 +481,9 @@ IRobotControlPolicy::ControlDecision RimoKunControlPolicy::decide(
   appendSpeedIntent(utl::EMotor::XRight, rightJs.x, _motion.rightArmX, utl::EArm::Right);
   appendSpeedIntent(utl::EMotor::YRight, rightJs.y, _motion.rightArmY, utl::EArm::Right);
 
-  // Gantry Z: single joystick axis drives both Z motors with the same command, through groups
-  appendSpeedIntent(utl::EMotor::ZLeft, rightJs.y, _motion.gantryZ, utl::EArm::Gantry);
+  // Gantry Z: single gantry joystick axis drives both Z motors with identical commands.
+  appendSpeedIntent(utl::EMotor::ZLeft, gantryJs.y, _motion.gantryZ, utl::EArm::Gantry);
+  appendSpeedIntent(utl::EMotor::ZRight, gantryJs.y, _motion.gantryZ, utl::EArm::Gantry);
 
   return {.outputs = std::move(ioOutputs),
           .motorIntents = std::move(motorIntents),

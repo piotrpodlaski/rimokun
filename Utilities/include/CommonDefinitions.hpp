@@ -94,4 +94,6 @@ struct RobotStatus {
 
 }  // namespace utl
 
+#ifndef RIMOKUN_SKIP_YAML_EXTENSIONS
 #include <YamlExtensions.hpp>
+#endif

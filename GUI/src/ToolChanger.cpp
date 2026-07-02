@@ -1,7 +1,7 @@
 #include "ToolChanger.hpp"
 
 #include "StyledPopup.hpp"
-#include "magic_enum/magic_enum.hpp"
+#include "EnumStrings.hpp"
 #include "spdlog/spdlog.h"
 #include "ui_ToolChanger.h"
 
@@ -35,7 +35,7 @@ void ToolChanger::handleButtons() {
         cmd::ToolChangerCommand{.arm = _arm, .action = EToolChangerAction::Close};
     auto msg =
         std::format("Are you sure you want to close the {} tool changer?",
-                    magic_enum::enum_name(_arm));
+                    utl::enumToStringView(_arm));
     if (*(_ui->proxLamp))
       reply = StyledPopup::askQuestion("Confirmation", QString::fromStdString(msg),
                                        QMessageBox::Yes | QMessageBox::No,
@@ -53,7 +53,7 @@ void ToolChanger::handleButtons() {
         cmd::ToolChangerCommand{.arm = _arm, .action = EToolChangerAction::Open};
     const auto msg =
         std::format("Are you sure you want to open the {} tool changer?",
-                    magic_enum::enum_name(_arm));
+                    utl::enumToStringView(_arm));
     reply = StyledPopup::askQuestion("Confirmation", QString::fromStdString(msg),
                                      QMessageBox::Yes | QMessageBox::No,
                                      QMessageBox::No, this);

@@ -5,7 +5,7 @@
 #include <Config.hpp>
 #include <Logger.hpp>
 #include <TimingMetrics.hpp>
-#include <magic_enum/magic_enum.hpp>
+#include <EnumStrings.hpp>
 #include <cstdlib>
 #include <chrono>
 #include <format>
@@ -20,7 +20,7 @@ const Motor& requireMotor(const std::map<utl::EMotor, Motor>& motors,
   if (it == motors.end()) {
     utl::throwRuntimeError(
         std::format("Motor {} is not configured in MotorControl",
-                    magic_enum::enum_name(motorId)));
+                    utl::enumToStringView(motorId)));
   }
   return it->second;
 }
@@ -34,7 +34,7 @@ decltype(auto) MotorControl::withBus(const utl::EMotor motorId, F&& fn) {
   if (rtIt == _runtime.end()) {
     utl::throwRuntimeError(std::format(
         "Runtime state for motor {} is not available",
-        magic_enum::enum_name(motorId)));
+        utl::enumToStringView(motorId)));
   }
   auto& runtime = rtIt->second;
   std::lock_guard<std::mutex> lock(_busMutex);
@@ -133,13 +133,13 @@ MotorControl::MotorControl() {
     if (!entry || !entry.IsMap()) {
       utl::throwRuntimeError(std::format(
           "MotorControl.motors.{} must be a map with at least 'address'.",
-          magic_enum::enum_name(motorId)));
+          utl::enumToStringView(motorId)));
     }
     const auto address = entry["address"].as<int>();
     if (address < 0 || address > 247) {
       utl::throwRuntimeError(std::format(
           "MotorControl.motors.{}.address must be in range 0..247 (got {})",
-          magic_enum::enum_name(motorId), address));
+          utl::enumToStringView(motorId), address));
     }
     std::optional<int> commandAddress;
     if (const auto commandAddressNode = entry["commandAddress"]; commandAddressNode) {
@@ -147,7 +147,7 @@ MotorControl::MotorControl() {
       if (*commandAddress < 1 || *commandAddress > 247) {
         utl::throwRuntimeError(std::format(
             "MotorControl.motors.{}.commandAddress must be in range 1..247 (got {})",
-            magic_enum::enum_name(motorId), *commandAddress));
+            utl::enumToStringView(motorId), *commandAddress));
       }
     }
     const auto groupIdNode = entry["groupId"];
@@ -163,14 +163,14 @@ MotorControl::MotorControl() {
     const auto excessivePositionDeviationAlarmNode =
         entry["excessivePositionDeviationAlarm"];
     const auto motorRotationDirectionNode = entry["motorRotationDirection"];
-    validateCurrentRange(runCurrent, "runCurrent", magic_enum::enum_name(motorId));
+    validateCurrentRange(runCurrent, "runCurrent", utl::enumToStringView(motorId));
     validateCurrentRange(stopCurrent, "stopCurrent",
-                         magic_enum::enum_name(motorId));
+                         utl::enumToStringView(motorId));
     if (stopCurrent > runCurrent) {
       SPDLOG_WARN(
           "MotorControl.motors.{}: stopCurrent ({}) > runCurrent ({}). "
           "Verify this is intentional.",
-          magic_enum::enum_name(motorId), stopCurrent, runCurrent);
+          utl::enumToStringView(motorId), stopCurrent, runCurrent);
     }
     std::optional<std::int32_t> groupId;
     std::optional<bool> forceFunction10ForSingleRegisterWrites;
@@ -187,7 +187,7 @@ MotorControl::MotorControl() {
     std::optional<std::int32_t> excessivePositionDeviationWarning;
     std::optional<std::int32_t> excessivePositionDeviationAlarm;
     std::optional<std::int32_t> motorRotationDirection;
-    const auto motorName = magic_enum::enum_name(motorId);
+    const auto motorName = utl::enumToStringView(motorId);
     if (startingSpeedNode) {
       startingSpeed = startingSpeedNode.as<std::int32_t>();
       if (*startingSpeed < 0) {
@@ -503,7 +503,7 @@ void MotorControl::startMovement(const utl::EMotor motorId) {
                              ModbusClient& bus) {
     if (!runtime.enabled) {
       SPDLOG_WARN("Ignoring startMovement for disabled motor {}",
-                  magic_enum::enum_name(motorId));
+                  utl::enumToStringView(motorId));
       return;
     }
     if (runtime.mode == MotorControlMode::Speed) {
@@ -557,7 +557,7 @@ void MotorControl::pulseStart(const utl::EMotor motorId) {
                              ModbusClient& bus) {
     if (!runtime.enabled) {
       SPDLOG_WARN("Ignoring pulseStart for disabled motor {}",
-                  magic_enum::enum_name(motorId));
+                  utl::enumToStringView(motorId));
       return;
     }
     motor.pulseStart(bus);
@@ -582,7 +582,7 @@ void MotorControl::setForward(const utl::EMotor motorId, const bool enabled) {
                                       ModbusClient& bus) {
     if (!runtime.enabled) {
       SPDLOG_WARN("Ignoring setForward for disabled motor {}",
-                  magic_enum::enum_name(motorId));
+                  utl::enumToStringView(motorId));
       return;
     }
     motor.setForward(bus, enabled);
@@ -595,7 +595,7 @@ void MotorControl::setReverse(const utl::EMotor motorId, const bool enabled) {
                                       ModbusClient& bus) {
     if (!runtime.enabled) {
       SPDLOG_WARN("Ignoring setReverse for disabled motor {}",
-                  magic_enum::enum_name(motorId));
+                  utl::enumToStringView(motorId));
       return;
     }
     motor.setReverse(bus, enabled);
@@ -608,7 +608,7 @@ void MotorControl::setJogPlus(const utl::EMotor motorId, const bool enabled) {
                                       ModbusClient& bus) {
     if (!runtime.enabled) {
       SPDLOG_WARN("Ignoring setJogPlus for disabled motor {}",
-                  magic_enum::enum_name(motorId));
+                  utl::enumToStringView(motorId));
       return;
     }
     motor.setJogPlus(bus, enabled);
@@ -621,7 +621,7 @@ void MotorControl::setJogMinus(const utl::EMotor motorId, const bool enabled) {
                                       ModbusClient& bus) {
     if (!runtime.enabled) {
       SPDLOG_WARN("Ignoring setJogMinus for disabled motor {}",
-                  magic_enum::enum_name(motorId));
+                  utl::enumToStringView(motorId));
       return;
     }
     motor.setJogMinus(bus, enabled);
@@ -635,7 +635,7 @@ void MotorControl::setEnabled(const utl::EMotor motorId, const bool enabled) {
     if (!runtime.enableControllable) {
       SPDLOG_WARN(
           "Ignoring enable change for motor {} because C-ON mapping is unavailable",
-          magic_enum::enum_name(motorId));
+          utl::enumToStringView(motorId));
       return;
     }
     if (runtime.enabled == enabled) {
@@ -654,12 +654,12 @@ void MotorControl::setAllEnabled(const bool enabled) {
     if (rtIt == _runtime.end()) {
       utl::throwRuntimeError(std::format(
           "Runtime state for motor {} is not available",
-          magic_enum::enum_name(motorId)));
+          utl::enumToStringView(motorId)));
     }
     if (!rtIt->second.enableControllable) {
       SPDLOG_WARN(
           "Ignoring enable change for motor {} because C-ON mapping is unavailable",
-          magic_enum::enum_name(motorId));
+          utl::enumToStringView(motorId));
       continue;
     }
     if (rtIt->second.enabled == enabled) {
@@ -677,7 +677,7 @@ void MotorControl::onAlarmCleared(const utl::EMotor motorId) {
     return;
   }
   SPDLOG_INFO("Motor {} alarm cleared — forcing C-ON=0 for safe recovery",
-              magic_enum::enum_name(motorId));
+              utl::enumToStringView(motorId));
   motor.invalidateDriverInputCommandCache();
   std::lock_guard<std::mutex> lock(_busMutex);
   if (!_bus) {
@@ -796,7 +796,7 @@ void MotorControl::setOperationDeceleration(const utl::EMotor motorId,
 
 void MotorControl::setRunCurrent(const utl::EMotor motorId,
                                  const std::int32_t current) {
-  validateCurrentRange(current, "runCurrent", magic_enum::enum_name(motorId));
+  validateCurrentRange(current, "runCurrent", utl::enumToStringView(motorId));
   const auto& motor = requireMotor(_motors, motorId);
   std::lock_guard<std::mutex> lock(_busMutex);
   if (!_bus) utl::throwRuntimeError("MotorControl bus is not initialized");
@@ -805,7 +805,7 @@ void MotorControl::setRunCurrent(const utl::EMotor motorId,
 
 void MotorControl::setStopCurrent(const utl::EMotor motorId,
                                   const std::int32_t current) {
-  validateCurrentRange(current, "stopCurrent", magic_enum::enum_name(motorId));
+  validateCurrentRange(current, "stopCurrent", utl::enumToStringView(motorId));
   const auto& motor = requireMotor(_motors, motorId);
   std::lock_guard<std::mutex> lock(_busMutex);
   if (!_bus) utl::throwRuntimeError("MotorControl bus is not initialized");

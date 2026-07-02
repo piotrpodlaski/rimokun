@@ -5,7 +5,7 @@
 #include <optional>
 
 #include "Config.hpp"
-#include "magic_enum/magic_enum.hpp"
+#include "EnumStrings.hpp"
 #include "spdlog/spdlog.h"
 
 RobotVisualisation::RobotVisualisation(QWidget* parent) : QWidget(parent) {
@@ -78,8 +78,8 @@ void RobotVisualisation::updateRobotStatus(const utl::RobotStatus& rs) const {
     const auto yIt = rs.motors.find(yMotor);
     if (xIt == rs.motors.end() || yIt == rs.motors.end()) {
       SPDLOG_WARN("Robot status lacks data for {} or {}. Skipping update.",
-                  magic_enum::enum_name(xMotor),
-                  magic_enum::enum_name(yMotor));
+                  utl::enumToStringView(xMotor),
+                  utl::enumToStringView(yMotor));
       return std::nullopt;
     }
     return QPointF{xIt->second.currentPosition,

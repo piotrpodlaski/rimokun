@@ -1,15 +1,8 @@
 #pragma once
 
 #include <yaml-cpp/yaml.h>
-#ifndef MAGIC_ENUM_RANGE_MIN
-#define MAGIC_ENUM_RANGE_MIN -128
-#endif
-#ifndef MAGIC_ENUM_RANGE_MAX
-#define MAGIC_ENUM_RANGE_MAX 5000
-#endif
-#include <magic_enum/magic_enum.hpp>
 #include <type_traits>
-#include "CommonDefinitions.hpp"
+#include "EnumStrings.hpp"
 #if __has_include(<libserial/SerialPortConstants.h>)
 #include <libserial/SerialPortConstants.h>
 #endif
@@ -28,12 +21,12 @@ struct convert_enum {
   static_assert(std::is_enum_v<T>, "convert_enum<T> requires an enum type");
 
   static Node encode(const T& rhs) {
-    return Node(std::string(magic_enum::enum_name(rhs)));
+    return Node(utl::enumToString(rhs));
   }
 
   static bool decode(const Node& node, T& rhs) {
     if (!node.IsScalar()) return false;
-    auto opt = magic_enum::enum_cast<T>(node.as<std::string>());
+    auto opt = utl::tryEnumFromString<T>(node.as<std::string>());
     if (!opt.has_value()) return false;
     rhs = opt.value();
     return true;

@@ -5,7 +5,7 @@
 #include <ArKd2FullRegisterMap.hpp>
 #include <Logger.hpp>
 #include <TimingMetrics.hpp>
-#include <magic_enum/magic_enum.hpp>
+#include <EnumStrings.hpp>
 
 #include <array>
 #include <algorithm>
@@ -296,7 +296,7 @@ void Motor::initialize(ModbusClient& bus) const {
   if (!alarm) {
     auto msg = std::format("Motor {} (slave {}) RTU test failed while reading "
                            "presentAlarm {}: {}",
-                           magic_enum::enum_name(_id), _slaveAddress,
+                           utl::enumToStringView(_id), _slaveAddress,
                            registerLabel(_map.presentAlarm),
                            alarm.error().message);
     SPDLOG_ERROR(msg);
@@ -309,7 +309,7 @@ void Motor::initialize(ModbusClient& bus) const {
     SPDLOG_WARN(
         "Motor {} (slave {}) startup alarm 0x{:02X}: {} | cause: {} | action: "
         "{}",
-        magic_enum::enum_name(_id), _slaveAddress, alarmCode, diag.type,
+        utl::enumToStringView(_id), _slaveAddress, alarmCode, diag.type,
         diag.cause, diag.remedialAction);
   }
 
@@ -319,7 +319,7 @@ void Motor::initialize(ModbusClient& bus) const {
     SPDLOG_WARN(
         "Motor {} (slave {}) startup warning 0x{:02X}: {} | cause: {} | "
         "action: {}",
-        magic_enum::enum_name(_id), _slaveAddress, warningCode, diag.type,
+        utl::enumToStringView(_id), _slaveAddress, warningCode, diag.type,
         diag.cause, diag.remedialAction);
   }
 
@@ -329,7 +329,7 @@ void Motor::initialize(ModbusClient& bus) const {
     SPDLOG_WARN(
         "Motor {} (slave {}) startup communication error 0x{:02X}: {} | "
         "cause: {} | action: {}",
-        magic_enum::enum_name(_id), _slaveAddress, commErrCode, diag.type,
+        utl::enumToStringView(_id), _slaveAddress, commErrCode, diag.type,
         diag.cause, diag.remedialAction);
   }
 
@@ -348,7 +348,7 @@ void Motor::initialize(ModbusClient& bus) const {
       "Motor {} (slave {}) input flags: 0x{:04X} [{}], output flags: 0x{:04X} "
       "[{}], direct IO 00D4=0x{:04X} 00D5=0x{:04X} [{}], remote IO "
       "007D=0x{:04X} 007F=0x{:04X} [{}]",
-      magic_enum::enum_name(_id), _slaveAddress, inputStatus.raw,
+      utl::enumToStringView(_id), _slaveAddress, inputStatus.raw,
       joinFlags(inputStatus.activeFlags), outputStatus.raw,
       joinFlags(outputStatus.activeFlags), ioStatus.reg00D4, ioStatus.reg00D5,
       joinFlags(ioStatus.activeFlags), remoteIoStatus.reg007D,
@@ -362,7 +362,7 @@ std::uint32_t Motor::readU32(ModbusClient& bus, int upperAddr) const {
   if (!regs || regs->size() != 2) {
     auto reason = regs ? "Unexpected register count" : regs.error().message;
     auto msg = std::format("Motor {} (slave {}) readU32({}) failed: {}",
-                           magic_enum::enum_name(_id), _slaveAddress,
+                           utl::enumToStringView(_id), _slaveAddress,
                            registerLabel(upperAddr), reason);
     utl::throwRuntimeError(msg);
   }
@@ -377,7 +377,7 @@ std::uint16_t Motor::readU16(ModbusClient& bus, const int addr) const {
   if (!regs || regs->size() != 1) {
     auto reason = regs ? "Unexpected register count" : regs.error().message;
     auto msg = std::format("Motor {} (slave {}) readU16(0x{:04X}) failed: {}",
-                           magic_enum::enum_name(_id), _slaveAddress, addr,
+                           utl::enumToStringView(_id), _slaveAddress, addr,
                            reason);
     utl::throwRuntimeError(msg);
   }
@@ -395,7 +395,7 @@ void Motor::writeU16(ModbusClient& bus, const int addr,
   if (!wr) {
     auto msg = std::format(
         "Motor {} (command slave {}) writeU16(0x{:04X}, 0x{:04X}) failed: {}",
-        magic_enum::enum_name(_id), _commandSlaveAddress, addr, value,
+        utl::enumToStringView(_id), _commandSlaveAddress, addr, value,
         wr.error().message);
     utl::throwRuntimeError(msg);
   }
@@ -417,7 +417,7 @@ void Motor::writeInt32(ModbusClient& bus, int upperAddr, std::int32_t value,
   if (!wr) {
     auto msg =
         std::format("Motor {} (slave {}) writeInt32({}, {}) failed: {}",
-                    magic_enum::enum_name(_id),
+                    utl::enumToStringView(_id),
                     target == SlaveTarget::Command ? _commandSlaveAddress
                                                    : _slaveAddress,
                     registerLabel(upperAddr), value, wr.error().message);
@@ -578,7 +578,7 @@ void Motor::setEnabled(ModbusClient& bus, const bool enabled) const {
     SPDLOG_WARN(
         "Motor {} (slave {}) C-ON mapping not available (NET-IN function 17). "
         "Enable/disable command is currently a placeholder.",
-        magic_enum::enum_name(_id), _slaveAddress);
+        utl::enumToStringView(_id), _slaveAddress);
     return;
   }
   const auto mask = static_cast<std::uint16_t>(1u << *mappedBit);
@@ -807,7 +807,7 @@ MotorMonitorSnapshot Motor::readMonitorSnapshot(ModbusClient& bus) const {
   if (wordCount <= 0) {
     utl::throwRuntimeError(std::format(
         "Motor {} (slave {}) invalid monitor snapshot range: 0x{:04X}-0x{:04X}",
-        magic_enum::enum_name(_id), _slaveAddress, baseAddr, lastAddr));
+        utl::enumToStringView(_id), _slaveAddress, baseAddr, lastAddr));
   }
 
   selectSlave(bus, SlaveTarget::Device);
@@ -816,7 +816,7 @@ MotorMonitorSnapshot Motor::readMonitorSnapshot(ModbusClient& bus) const {
     const auto reason = regs ? "Unexpected register count" : regs.error().message;
     auto msg = std::format(
         "Motor {} (slave {}) read monitor snapshot 0x{:04X}-0x{:04X} failed: {}",
-        magic_enum::enum_name(_id), _slaveAddress, baseAddr, lastAddr, reason);
+        utl::enumToStringView(_id), _slaveAddress, baseAddr, lastAddr, reason);
     utl::throwRuntimeError(msg);
   }
 
@@ -825,7 +825,7 @@ MotorMonitorSnapshot Motor::readMonitorSnapshot(ModbusClient& bus) const {
     if (idx < 0 || idx + 1 >= wordCount) {
       utl::throwRuntimeError(std::format(
           "Motor {} (slave {}) monitor snapshot index out of range for 0x{:04X}",
-          magic_enum::enum_name(_id), _slaveAddress, upperAddr));
+          utl::enumToStringView(_id), _slaveAddress, upperAddr));
     }
     const std::uint32_t raw =
         (static_cast<std::uint32_t>((*regs)[static_cast<std::size_t>(idx)]) << 16) |
@@ -978,7 +978,7 @@ std::array<std::uint16_t, 16> Motor::readOutputFunctionAssignments(
     const auto reason = regs ? "Unexpected register count" : regs.error().message;
     utl::throwRuntimeError(
         std::format("Motor {} (slave {}) read output function assignment failed: {}",
-                    magic_enum::enum_name(_id), _slaveAddress, reason));
+                    utl::enumToStringView(_id), _slaveAddress, reason));
   }
   std::array<std::uint16_t, 16> out{};
   for (int i = 0; i < kChannels; ++i) {
@@ -1003,7 +1003,7 @@ std::array<std::uint16_t, 16> Motor::readNetOutputFunctionAssignments(
                                       : regsFirstHalf.error().message;
     utl::throwRuntimeError(
         std::format("Motor {} (slave {}) read NET-OUT function assignment failed: {}",
-                    magic_enum::enum_name(_id), _slaveAddress, reason));
+                    utl::enumToStringView(_id), _slaveAddress, reason));
   }
   auto regsSecondHalf =
       bus.read_holding_registers(
@@ -1015,7 +1015,7 @@ std::array<std::uint16_t, 16> Motor::readNetOutputFunctionAssignments(
                                        : regsSecondHalf.error().message;
     utl::throwRuntimeError(
         std::format("Motor {} (slave {}) read NET-OUT function assignment failed: {}",
-                    magic_enum::enum_name(_id), _slaveAddress, reason));
+                    utl::enumToStringView(_id), _slaveAddress, reason));
   }
 
   std::array<std::uint16_t, kChannels * kWordsPerChannel> regs{};
@@ -1047,7 +1047,7 @@ std::array<std::uint16_t, 16> Motor::readNetInputFunctionAssignments(
                                       : regsFirstHalf.error().message;
     utl::throwRuntimeError(
         std::format("Motor {} (slave {}) read NET-IN function assignment failed: {}",
-                    magic_enum::enum_name(_id), _slaveAddress, reason));
+                    utl::enumToStringView(_id), _slaveAddress, reason));
   }
   auto regsSecondHalf =
       bus.read_holding_registers(
@@ -1059,7 +1059,7 @@ std::array<std::uint16_t, 16> Motor::readNetInputFunctionAssignments(
                                        : regsSecondHalf.error().message;
     utl::throwRuntimeError(
         std::format("Motor {} (slave {}) read NET-IN function assignment failed: {}",
-                    magic_enum::enum_name(_id), _slaveAddress, reason));
+                    utl::enumToStringView(_id), _slaveAddress, reason));
   }
 
   std::array<std::uint16_t, kChannels * kWordsPerChannel> regs{};
@@ -1089,7 +1089,7 @@ std::array<std::uint16_t, 12> Motor::readInputFunctionAssignments(
     const auto reason = regs ? "Unexpected register count" : regs.error().message;
     utl::throwRuntimeError(
         std::format("Motor {} (slave {}) read input function assignment failed: {}",
-                    magic_enum::enum_name(_id), _slaveAddress, reason));
+                    utl::enumToStringView(_id), _slaveAddress, reason));
   }
   std::array<std::uint16_t, 12> out{};
   for (int i = 0; i < kChannels; ++i) {
@@ -1200,7 +1200,7 @@ std::uint16_t Motor::readDriverInputCommandRawCommandTarget(ModbusClient& bus) c
     const auto reason = regs ? "Unexpected register count" : regs.error().message;
     auto msg = std::format(
         "Motor {} (command slave {}) read command driver input raw failed: {}",
-        magic_enum::enum_name(_id), _commandSlaveAddress, reason);
+        utl::enumToStringView(_id), _commandSlaveAddress, reason);
     utl::throwRuntimeError(msg);
   }
   const auto raw = (*regs)[0];
@@ -1215,7 +1215,7 @@ void Motor::selectSlave(ModbusClient& bus, const SlaveTarget target) const {
       target == SlaveTarget::Command ? _commandSlaveAddress : _slaveAddress;
   if (auto s = bus.set_slave(slave); !s) {
     auto msg = std::format("Failed to select slave {} for motor {}: {}",
-                           slave, magic_enum::enum_name(_id), s.error().message);
+                           slave, utl::enumToStringView(_id), s.error().message);
     SPDLOG_ERROR(msg);
     utl::throwRuntimeError(msg);
   }

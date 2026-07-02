@@ -8,7 +8,7 @@
 
 #include <Logger.hpp>
 #include <Motor.hpp>
-#include <magic_enum/magic_enum.hpp>
+#include <EnumStrings.hpp>
 
 namespace {
 void setAxisStepsPerMmIfPresent(const YAML::Node& axesCfg, const char* axisKey,
@@ -219,7 +219,7 @@ void MachineStatusBuilder::updateAndPublish(
           }
         } catch (const std::exception& ex) {
           SPDLOG_WARN("Failed to read status for motor {}: {}",
-                      magic_enum::enum_name(motorId), ex.what());
+                      utl::enumToStringView(motorId), ex.what());
           auto& motorStatus = status.motors[motorId];
           motorStatus.state = utl::ELEDState::Error;
           motorStatus.flags[utl::EMotorStatusFlags::BrakeApplied] =

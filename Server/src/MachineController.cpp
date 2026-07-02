@@ -3,7 +3,7 @@
 #include <Logger.hpp>
 #include <ExceptionUtils.hpp>
 #include <TimingMetrics.hpp>
-#include <magic_enum/magic_enum.hpp>
+#include <EnumStrings.hpp>
 #include <stdexcept>
 
 MachineController::MachineController(IoOps io,
@@ -62,7 +62,7 @@ void MachineController::runControlLoopTasks() {
         SPDLOG_WARN(
             "Control policy emitted command for motor {} which is not configured. "
             "Ignoring commands for this motor.",
-            magic_enum::enum_name(intent.motorId));
+            utl::enumToStringView(intent.motorId));
         _missingMotorWarned[intent.motorId] = true;
       }
       continue;
@@ -100,8 +100,8 @@ void MachineController::handleToolChangerCommand(
     const cmd::ToolChangerCommand& command) const {
   RIMO_TIMED_SCOPE("MachineController::handleToolChangerCommand");
   SPDLOG_INFO("Changing status of '{}' tool changer to '{}'",
-              magic_enum::enum_name(command.arm),
-              magic_enum::enum_name(command.action));
+              utl::enumToStringView(command.arm),
+              utl::enumToStringView(command.action));
   if (_io.contecState() == MachineComponent::State::Error) {
     utl::throwRuntimeError(
         "Contec is in error state. Not possible to alter tool changer state!");

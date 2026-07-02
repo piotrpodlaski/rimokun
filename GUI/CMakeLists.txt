@@ -35,7 +35,6 @@ target_include_directories(rimokunControl
 
 target_link_libraries(rimokunControl PRIVATE
         Qt6::Widgets
-        magic_enum
         utilities
         cppzmq
         spdlog

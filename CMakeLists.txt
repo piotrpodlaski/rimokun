@@ -3,6 +3,13 @@ project(rimokun)
 
 set(CMAKE_CXX_STANDARD 23)
 
+if (NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+    set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS Debug Release RelWithDebInfo MinSizeRel)
+endif ()
+
+option(RIMOKUN_BUILD_TESTS "Build and register tests" OFF)
+set(BUILD_TESTING ${RIMOKUN_BUILD_TESTS} CACHE BOOL "Enable CTest-based testing" FORCE)
 include(CTest)
 
 if (CMAKE_VERSION VERSION_GREATER_EQUAL "4.0")

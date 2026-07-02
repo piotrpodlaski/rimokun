@@ -14,44 +14,6 @@
 using namespace std::chrono_literals;
 
 namespace {
-std::string_view homingTargetName(const cmd::HomingTarget target) {
-  switch (target) {
-    case cmd::HomingTarget::All: return "All";
-    case cmd::HomingTarget::XLeft: return "XLeft";
-    case cmd::HomingTarget::YLeft: return "YLeft";
-    case cmd::HomingTarget::XRight: return "XRight";
-    case cmd::HomingTarget::YRight: return "YRight";
-    case cmd::HomingTarget::Z: return "Z";
-  }
-  return "Unknown";
-}
-
-std::optional<cmd::HomingTarget> parseHomingTarget(const std::string_view value) {
-  if (value == "All") return cmd::HomingTarget::All;
-  if (value == "XLeft") return cmd::HomingTarget::XLeft;
-  if (value == "YLeft") return cmd::HomingTarget::YLeft;
-  if (value == "XRight") return cmd::HomingTarget::XRight;
-  if (value == "YRight") return cmd::HomingTarget::YRight;
-  if (value == "Z") return cmd::HomingTarget::Z;
-  return std::nullopt;
-}
-
-utl::EHomingAxis homingAxisFromTarget(const cmd::HomingTarget target) {
-  switch (target) {
-    case cmd::HomingTarget::XLeft: return utl::EHomingAxis::XLeft;
-    case cmd::HomingTarget::YLeft: return utl::EHomingAxis::YLeft;
-    case cmd::HomingTarget::XRight: return utl::EHomingAxis::XRight;
-    case cmd::HomingTarget::YRight: return utl::EHomingAxis::YRight;
-    case cmd::HomingTarget::Z: return utl::EHomingAxis::Z;
-    case cmd::HomingTarget::All: break;
-  }
-  utl::throwRuntimeError("Homing target 'All' does not map to a single axis.");
-}
-
-std::string_view homingAxisName(const utl::EHomingAxis axis) {
-  return utl::enumToStringView(axis);
-}
-
 unsigned int requireMappingIndex(
     const std::map<std::string, unsigned int, std::less<>>& mapping,
     const std::string_view key) {
@@ -129,30 +91,6 @@ std::vector<std::string> buildContecChannelNames(
   return names;
 }
 
-std::string_view axisConfigKey(const cmd::HomingTarget target) {
-  switch (target) {
-    case cmd::HomingTarget::XLeft: return "leftArmX";
-    case cmd::HomingTarget::YLeft: return "leftArmY";
-    case cmd::HomingTarget::XRight: return "rightArmX";
-    case cmd::HomingTarget::YRight: return "rightArmY";
-    case cmd::HomingTarget::Z: return "gantryZ";
-    case cmd::HomingTarget::All: break;
-  }
-  utl::throwRuntimeError("Homing target 'All' does not map to a single axis.");
-}
-
-utl::EMotor motorForHomingTarget(const cmd::HomingTarget target) {
-  switch (target) {
-    case cmd::HomingTarget::XLeft: return utl::EMotor::XLeft;
-    case cmd::HomingTarget::YLeft: return utl::EMotor::YLeft;
-    case cmd::HomingTarget::XRight: return utl::EMotor::XRight;
-    case cmd::HomingTarget::YRight: return utl::EMotor::YRight;
-    case cmd::HomingTarget::Z: return utl::EMotor::ZLeft;
-    case cmd::HomingTarget::All: break;
-  }
-  utl::throwRuntimeError("Homing target 'All' does not map to a single motor.");
-}
-
 }  // namespace
 
 Machine::~Machine() { shutdown(); }
@@ -186,9 +124,6 @@ Machine::Machine(std::shared_ptr<IClock> clock) : _clock(std::move(clock)) {
       cfg.getOptional<int>("Machine", "statusPublishPeriodMS", 50));
   _statusUpdatesEnabled =
       cfg.getOptional<bool>("Machine", "statusUpdatesEnabled", true);
-  _homingOrder = loadHomingOrder();
-  _homingAxisConfigs = loadHomingAxisConfigs();
-  _homingTimeout = loadHomingTimeout();
 
   _loopInterval = std::chrono::milliseconds{std::max(1, loopIntervalMS)};
   _updateInterval = std::chrono::milliseconds{std::max(1, updateIntervalMS)};
@@ -199,6 +134,12 @@ Machine::Machine(std::shared_ptr<IClock> clock) : _clock(std::move(clock)) {
   _components.emplace(_contec.componentType(), &_contec);
   _components.emplace(_controlPanel.componentType(), &_controlPanel);
   _components.emplace(_motorControl.componentType(), &_motorControl);
+  _axisHomingManager = std::make_unique<AxisHomingManager>(
+      _clock, AxisHomingManager::loadTimeout(), AxisHomingManager::loadOrder(),
+      AxisHomingManager::loadAxisConfigs(),
+      [this](const cmd::HomingTarget axis, const AxisHomingManager::AxisConfig& config) {
+        startHomingAxis(axis, config);
+      });
 
   // Validate mappings used by the control loop and command handlers at startup.
   (void)requireMappingIndex(_inputMapping, "button1");
@@ -556,122 +497,6 @@ std::string Machine::reconnectComponent(const utl::ERobotComponent component) {
   return "";
 }
 
-std::vector<cmd::HomingTarget> Machine::loadHomingOrder() const {
-  constexpr std::array defaultOrder{
-      cmd::HomingTarget::Z,
-      cmd::HomingTarget::XLeft,
-      cmd::HomingTarget::XRight,
-      cmd::HomingTarget::YLeft,
-      cmd::HomingTarget::YRight,
-  };
-
-  std::vector<cmd::HomingTarget> order(defaultOrder.begin(), defaultOrder.end());
-  try {
-    const auto machineCfg = utl::Config::instance().getClassConfig("Machine");
-    const auto homingCfg = machineCfg["homing"];
-    if (!homingCfg || !homingCfg.IsMap()) {
-      return order;
-    }
-    const auto orderCfg = homingCfg["order"];
-    if (!orderCfg || !orderCfg.IsSequence()) {
-      return order;
-    }
-    order.clear();
-    for (const auto& node : orderCfg) {
-      const auto value = node.as<std::string>();
-      const auto parsed = parseHomingTarget(value);
-      if (!parsed.has_value()) {
-        utl::throwRuntimeError(std::format(
-            "Unknown Machine.homing.order target '{}'", value));
-      }
-      if (*parsed == cmd::HomingTarget::All) {
-        utl::throwRuntimeError(
-            "Machine.homing.order must list single axes, not 'All'.");
-      }
-      order.push_back(*parsed);
-    }
-  } catch (const std::exception& e) {
-    SPDLOG_WARN("Using default homing order: {}", e.what());
-    order.assign(defaultOrder.begin(), defaultOrder.end());
-  }
-  return order;
-}
-
-std::map<cmd::HomingTarget, Machine::HomingAxisConfig>
-Machine::loadHomingAxisConfigs() const {
-  std::map<cmd::HomingTarget, HomingAxisConfig> configs;
-  try {
-    const auto machineCfg = utl::Config::instance().getClassConfig("Machine");
-    const auto axesCfg = machineCfg["motion"]["axes"];
-    const auto directionCfg = machineCfg["homing"]["startingDirection"];
-    if (!axesCfg || !axesCfg.IsMap()) {
-      return configs;
-    }
-    if (!directionCfg || !directionCfg.IsMap()) {
-      return configs;
-    }
-
-    for (const auto axis : {cmd::HomingTarget::XLeft, cmd::HomingTarget::YLeft,
-                           cmd::HomingTarget::XRight, cmd::HomingTarget::YRight,
-                           cmd::HomingTarget::Z}) {
-      const auto axisKey = axisConfigKey(axis);
-      const auto axisCfg = axesCfg[std::string(axisKey)];
-      if (!axisCfg || !axisCfg.IsMap()) {
-        utl::throwRuntimeError(std::format(
-            "Missing Machine.motion.axes.{} config for homing.", axisKey));
-      }
-      const auto directionNode =
-          directionCfg[std::string(homingTargetName(axis))];
-      if (!directionNode) {
-        utl::throwRuntimeError(std::format(
-            "Missing Machine.homing.startingDirection.{} config.",
-            homingTargetName(axis)));
-      }
-      const auto startingDirection = directionNode.as<std::int32_t>();
-      if (startingDirection != 0 && startingDirection != 1) {
-        utl::throwRuntimeError(std::format(
-            "Machine.homing.startingDirection.{} must be 0 or 1.",
-            homingTargetName(axis)));
-      }
-      const auto slowSpeedMmPerSec =
-          axisCfg["slowMaxLinearSpeedMmPerSec"].as<double>();
-      const auto stepsPerMm = axisCfg["stepsPerMm"].as<double>();
-      configs.emplace(
-          axis, HomingAxisConfig{
-                    .motorId = motorForHomingTarget(axis),
-                    .speedStepsPerSec = static_cast<std::int32_t>(
-                        std::llround(slowSpeedMmPerSec * stepsPerMm)),
-                    .acceleration =
-                        axisCfg["slowAcceleration001MsPerKHz"].as<std::int32_t>(),
-                    .startingDirection = startingDirection,
-                });
-    }
-  } catch (const std::exception& e) {
-    SPDLOG_WARN("Homing axis config cache is incomplete: {}", e.what());
-    configs.clear();
-  }
-  return configs;
-}
-
-std::chrono::milliseconds Machine::loadHomingTimeout() const {
-  try {
-    const auto machineCfg = utl::Config::instance().getClassConfig("Machine");
-    const auto homingCfg = machineCfg["homing"];
-    if (!homingCfg || !homingCfg.IsMap()) {
-      return 60s;
-    }
-    const auto timeoutMs = homingCfg["timeoutMS"];
-    if (!timeoutMs) {
-      return 60s;
-    }
-    return std::chrono::milliseconds{
-        std::max(1, timeoutMs.as<int>())};
-  } catch (const std::exception& e) {
-    SPDLOG_WARN("Using default homing timeout: {}", e.what());
-    return 60s;
-  }
-}
-
 nlohmann::json Machine::handleMotorDiagnosticsCommand(
     const cmd::MotorDiagnosticsCommand& c) {
   auto response = makeDefaultIoAssignmentResponse(c.motor);
@@ -767,191 +592,23 @@ void Machine::handleSetAllMotorsEnabledCommand(
 }
 
 void Machine::handleHomingCommand(const cmd::HomingCommand& c) {
-  if (c.target == cmd::HomingTarget::All) {
-    beginHomingSession(_homingOrder);
-    return;
+  if (!_axisHomingManager) {
+    utl::throwRuntimeError("AxisHomingManager is not initialized.");
   }
-  beginHomingSession({c.target});
+  _axisHomingManager->start(c.target, _robotStatus, _homingRequested);
 }
 
-void Machine::homeAxesInOrder(const std::vector<cmd::HomingTarget>& axes) {
-  beginHomingSession(axes);
-}
-
-void Machine::homeSingleAxis(const cmd::HomingTarget axis) {
-  const auto cfgIt = _homingAxisConfigs.find(axis);
-  if (cfgIt == _homingAxisConfigs.end()) {
-    utl::throwRuntimeError(std::format("Missing cached homing config for {}.",
-                                       homingTargetName(axis)));
-  }
-  const auto& cfg = cfgIt->second;
-
+void Machine::startHomingAxis(const cmd::HomingTarget axis,
+                              const AxisHomingManager::AxisConfig& config) {
   SPDLOG_INFO("Starting homing for {}: speed={} steps/s, accel={}, direction={}",
-              homingTargetName(axis), cfg.speedStepsPerSec, cfg.acceleration,
-              cfg.startingDirection);
-  _motorControl.configureHoming(cfg.motorId, 0, cfg.speedStepsPerSec,
-                                cfg.acceleration, cfg.speedStepsPerSec,
-                                cfg.startingDirection);
-  _motorControl.pulseHome(cfg.motorId);
-  _homingRequested[cfg.motorId] = true;
-}
-
-void Machine::beginHomingSession(const std::vector<cmd::HomingTarget>& axes) {
-  if (axes.empty()) {
-    utl::throwRuntimeError("Cannot start homing session with no axes.");
-  }
-  if (_homingSessionRuntime.active) {
-    utl::throwRuntimeError("A homing session is already in progress.");
-  }
-
-  _robotStatus.homing = {};
-  _robotStatus.homing.state = utl::EHomingState::Pending;
-  _robotStatus.homing.message.clear();
-  _robotStatus.homing.axes.clear();
-  _homingSessionRuntime = {};
-
-  for (const auto axis : axes) {
-    if (axis == cmd::HomingTarget::All) {
-      utl::throwRuntimeError("Homing session axis list must not contain 'All'.");
-    }
-    const auto homingAxis = homingAxisFromTarget(axis);
-    _robotStatus.homing.axes.push_back(
-        {.axis = homingAxis, .state = utl::EHomingState::Pending, .message = {}});
-    if (const auto motor = homingMotorFromAxis(homingAxis); motor.has_value()) {
-      _homingRequested[*motor] = false;
-    }
-  }
-
-  _homingSessionRuntime.active = true;
-  _homingSessionRuntime.currentAxisIndex = 0;
-  startNextHomingAxis();
-}
-
-void Machine::startNextHomingAxis() {
-  if (_homingSessionRuntime.currentAxisIndex >= _robotStatus.homing.axes.size()) {
-    _robotStatus.homing.state = utl::EHomingState::Succeeded;
-    _robotStatus.homing.message = "Homing complete.";
-    _homingSessionRuntime.active = false;
-    return;
-  }
-
-  auto& axisStatus = _robotStatus.homing.axes[_homingSessionRuntime.currentAxisIndex];
-  const auto target = [&]() {
-    switch (axisStatus.axis) {
-      case utl::EHomingAxis::XLeft: return cmd::HomingTarget::XLeft;
-      case utl::EHomingAxis::YLeft: return cmd::HomingTarget::YLeft;
-      case utl::EHomingAxis::XRight: return cmd::HomingTarget::XRight;
-      case utl::EHomingAxis::YRight: return cmd::HomingTarget::YRight;
-      case utl::EHomingAxis::Z: return cmd::HomingTarget::Z;
-    }
-    return cmd::HomingTarget::Z;
-  }();
-
-  axisStatus.state = utl::EHomingState::Running;
-  axisStatus.message = "Homing in progress";
-  _robotStatus.homing.state = utl::EHomingState::Running;
-  _robotStatus.homing.message =
-      std::format("Homing {}...", homingAxisName(axisStatus.axis));
-  _homingSessionRuntime.currentAxisStartedAt = _clock->now();
-  try {
-    homeSingleAxis(target);
-  } catch (const std::exception& e) {
-    finishCurrentHomingAxis(utl::EHomingState::Failed, e.what());
-    throw;
-  }
-}
-
-void Machine::advanceHomingSessionFromStatus() {
-  if (!_homingSessionRuntime.active ||
-      _homingSessionRuntime.currentAxisIndex >= _robotStatus.homing.axes.size()) {
-    return;
-  }
-
-  auto& axisStatus = _robotStatus.homing.axes[_homingSessionRuntime.currentAxisIndex];
-  const auto motor = homingMotorFromAxis(axisStatus.axis);
-  if (!motor.has_value()) {
-    finishCurrentHomingAxis(utl::EHomingState::Failed,
-                            "Axis is not mapped to a motor.");
-    return;
-  }
-
-  const auto motorIt = _robotStatus.motors.find(*motor);
-  if (motorIt == _robotStatus.motors.end()) {
-    return;
-  }
-  const auto& motorStatus = motorIt->second;
-
-  const auto alarmIt = motorStatus.flags.find(utl::EMotorStatusFlags::Alarm);
-  if (alarmIt != motorStatus.flags.end() &&
-      alarmIt->second == utl::ELEDState::Error) {
-    finishCurrentHomingAxis(
-        utl::EHomingState::Failed,
-        motorStatus.alarmDescription.empty() ? "Motor alarm during homing."
-                                             : motorStatus.alarmDescription);
-    return;
-  }
-
-  const auto homingIt = motorStatus.flags.find(utl::EMotorStatusFlags::Homing);
-  if (homingIt != motorStatus.flags.end() &&
-      homingIt->second == utl::ELEDState::On) {
-    finishCurrentHomingAxis(utl::EHomingState::Succeeded, "Homing complete.");
-    return;
-  }
-
-  if ((_clock->now() - _homingSessionRuntime.currentAxisStartedAt) > _homingTimeout) {
-    finishCurrentHomingAxis(
-        utl::EHomingState::TimedOut,
-        std::format("Timed out after {} ms.", _homingTimeout.count()));
-  }
-}
-
-void Machine::finishCurrentHomingAxis(const utl::EHomingState state, std::string message) {
-  if (_homingSessionRuntime.currentAxisIndex >= _robotStatus.homing.axes.size()) {
-    return;
-  }
-
-  auto& axisStatus = _robotStatus.homing.axes[_homingSessionRuntime.currentAxisIndex];
-  axisStatus.state = state;
-  axisStatus.message = std::move(message);
-  if (const auto motor = homingMotorFromAxis(axisStatus.axis); motor.has_value()) {
-    _homingRequested[*motor] = false;
-  }
-
-  if (state == utl::EHomingState::Succeeded) {
-    ++_homingSessionRuntime.currentAxisIndex;
-    startNextHomingAxis();
-    return;
-  }
-
-  _robotStatus.homing.state = state;
-  _robotStatus.homing.message = axisStatus.message.empty()
-                                    ? std::format("Homing {} failed.",
-                                                  homingAxisName(axisStatus.axis))
-                                    : std::format("{}: {}", homingAxisName(axisStatus.axis),
-                                                  axisStatus.message);
-  _homingSessionRuntime.active = false;
-
-  for (std::size_t i = _homingSessionRuntime.currentAxisIndex + 1;
-       i < _robotStatus.homing.axes.size(); ++i) {
-    if (_robotStatus.homing.axes[i].state == utl::EHomingState::Pending) {
-      _robotStatus.homing.axes[i].message = "Not started";
-    }
-  }
-}
-
-utl::EHomingAxis Machine::homingAxisFromTarget(const cmd::HomingTarget target) {
-  return ::homingAxisFromTarget(target);
-}
-
-std::optional<utl::EMotor> Machine::homingMotorFromAxis(const utl::EHomingAxis axis) {
-  switch (axis) {
-    case utl::EHomingAxis::XLeft: return utl::EMotor::XLeft;
-    case utl::EHomingAxis::YLeft: return utl::EMotor::YLeft;
-    case utl::EHomingAxis::XRight: return utl::EMotor::XRight;
-    case utl::EHomingAxis::YRight: return utl::EMotor::YRight;
-    case utl::EHomingAxis::Z: return utl::EMotor::ZLeft;
-  }
-  return std::nullopt;
+              utl::enumToStringView(AxisHomingManager::axisFromTarget(axis)),
+              config.speedStepsPerSec, config.acceleration,
+              config.startingDirection);
+  _motorControl.configureHoming(config.motorId, 0, config.speedStepsPerSec,
+                                config.acceleration, config.speedStepsPerSec,
+                                config.startingDirection);
+  _motorControl.pulseHome(config.motorId);
+  _homingRequested[config.motorId] = true;
 }
 
 nlohmann::json Machine::handleContecDiagnosticsCommand(
@@ -1073,7 +730,9 @@ void Machine::updateStatus() {
             homingLed = utl::ELEDState::Warning;
           }
         }
-        advanceHomingSessionFromStatus();
+        if (_axisHomingManager) {
+          _axisHomingManager->advanceFromStatus(_robotStatus, _homingRequested);
+        }
         _robotServer.publish(_robotStatus);
       });
 }

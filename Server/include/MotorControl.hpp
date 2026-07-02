@@ -148,7 +148,16 @@ class MotorControl final : public MachineComponent {
 
   template <typename F>
   decltype(auto) withBus(utl::EMotor motorId, F&& fn);
+  template <typename F>
+  decltype(auto) withMotor(utl::EMotor motorId, F&& fn);
+  template <typename F>
+  decltype(auto) withMotorHandled(std::string_view action, utl::EMotor motorId,
+                                  F&& fn);
 
+  void prepareSpeedMode(const Motor& motor, MotorRuntimeState& runtime,
+                        ModbusClient& bus);
+  void preparePositionMode(const Motor& motor, MotorRuntimeState& runtime,
+                           ModbusClient& bus);
   void applyConfiguredParameters(const Motor& motor, const MotorConfig& config,
                                  ModbusClient& bus) const;
   void handleCommunicationFailure(std::string_view action,

@@ -42,6 +42,26 @@ decltype(auto) MotorControl::withBus(const utl::EMotor motorId, F&& fn) {
   return std::forward<F>(fn)(motor, runtime, *_bus);
 }
 
+template <typename F>
+decltype(auto) MotorControl::withMotor(const utl::EMotor motorId, F&& fn) {
+  const auto& motor = requireMotor(_motors, motorId);
+  std::lock_guard<std::mutex> lock(_busMutex);
+  if (!_bus) utl::throwRuntimeError("MotorControl bus is not initialized");
+  return std::forward<F>(fn)(motor, *_bus);
+}
+
+template <typename F>
+decltype(auto) MotorControl::withMotorHandled(const std::string_view action,
+                                              const utl::EMotor motorId,
+                                              F&& fn) {
+  try {
+    return withMotor(motorId, std::forward<F>(fn));
+  } catch (const std::exception& ex) {
+    handleCommunicationFailure(action, ex);
+    throw;
+  }
+}
+
 namespace {
 constexpr std::int32_t kDefaultRunCurrent = 1000;
 constexpr std::int32_t kDefaultStopCurrent = 500;
@@ -388,40 +408,27 @@ void MotorControl::reset() {
 
 void MotorControl::setMode(const utl::EMotor motorId, const MotorControlMode mode) {
   RIMO_TIMED_SCOPE("MotorControl::setMode");
-  withBus(motorId, [mode](const Motor& motor, MotorRuntimeState& runtime,
-                          ModbusClient& bus) {
+  withBus(motorId, [this, mode](const Motor& motor, MotorRuntimeState& runtime,
+                                ModbusClient& bus) {
     runtime.mode = mode;
     if (mode == MotorControlMode::Speed) {
-      if (!runtime.speedPairPrepared) {
-        motor.configureConstantSpeedPair(bus, runtime.speed, runtime.speed,
-                                         runtime.acceleration,
-                                         runtime.deceleration);
-        runtime.speedPairPrepared = true;
-      }
-    } else if (!runtime.positionPrepared) {
-      motor.setOperationMode(bus, 2, MotorOperationMode::Incremental);
-      motor.setOperationFunction(bus, 2, MotorOperationFunction::SingleMotion);
-      motor.setOperationSpeed(bus, 2, runtime.speed);
-      motor.setOperationAcceleration(bus, 2, runtime.acceleration);
-      motor.setOperationDeceleration(bus, 2, runtime.deceleration);
-      runtime.positionPrepared = true;
+      prepareSpeedMode(motor, runtime, bus);
+    } else {
+      preparePositionMode(motor, runtime, bus);
     }
   });
 }
 
 void MotorControl::setSpeed(const utl::EMotor motorId, const std::int32_t speed) {
   RIMO_TIMED_SCOPE("MotorControl::setSpeed");
-  withBus(motorId, [speed](const Motor& motor, MotorRuntimeState& runtime,
-                           ModbusClient& bus) {
+  withBus(motorId, [this, speed](const Motor& motor, MotorRuntimeState& runtime,
+                                 ModbusClient& bus) {
     runtime.speed = std::abs(speed);
     if (runtime.mode == MotorControlMode::Speed) {
-      if (!runtime.speedPairPrepared) {
-        motor.configureConstantSpeedPair(bus, runtime.speed, runtime.speed,
-                                         runtime.acceleration,
-                                         runtime.deceleration);
-        runtime.speedPairPrepared = true;
-      } else {
+      if (runtime.speedPairPrepared) {
         motor.updateConstantSpeedBuffered(bus, runtime.speed);
+      } else {
+        prepareSpeedMode(motor, runtime, bus);
       }
     }
   });
@@ -464,18 +471,11 @@ void MotorControl::setDeceleration(const utl::EMotor motorId,
 void MotorControl::setPosition(const utl::EMotor motorId,
                                const std::int32_t position) {
   RIMO_TIMED_SCOPE("MotorControl::setPosition");
-  withBus(motorId, [position](const Motor& motor, MotorRuntimeState& runtime,
-                              ModbusClient& bus) {
+  withBus(motorId, [this, position](const Motor& motor, MotorRuntimeState& runtime,
+                                    ModbusClient& bus) {
     runtime.position = position;
     if (runtime.mode == MotorControlMode::Position) {
-      if (!runtime.positionPrepared) {
-        motor.setOperationMode(bus, 2, MotorOperationMode::Incremental);
-        motor.setOperationFunction(bus, 2, MotorOperationFunction::SingleMotion);
-        motor.setOperationSpeed(bus, 2, runtime.speed);
-        motor.setOperationAcceleration(bus, 2, runtime.acceleration);
-        motor.setOperationDeceleration(bus, 2, runtime.deceleration);
-        runtime.positionPrepared = true;
-      }
+      preparePositionMode(motor, runtime, bus);
       motor.setOperationPosition(bus, 2, runtime.position);
     }
   });
@@ -499,20 +499,16 @@ void MotorControl::setDirection(const utl::EMotor motorId,
 
 void MotorControl::startMovement(const utl::EMotor motorId) {
   RIMO_TIMED_SCOPE("MotorControl::startMovement");
-  withBus(motorId, [motorId](const Motor& motor, MotorRuntimeState& runtime,
-                             ModbusClient& bus) {
+  withBus(motorId, [this, motorId](const Motor& motor,
+                                   MotorRuntimeState& runtime,
+                                   ModbusClient& bus) {
     if (!runtime.enabled) {
       SPDLOG_WARN("Ignoring startMovement for disabled motor {}",
                   utl::enumToStringView(motorId));
       return;
     }
     if (runtime.mode == MotorControlMode::Speed) {
-      if (!runtime.speedPairPrepared) {
-        motor.configureConstantSpeedPair(bus, runtime.speed, runtime.speed,
-                                         runtime.acceleration,
-                                         runtime.deceleration);
-        runtime.speedPairPrepared = true;
-      }
+      prepareSpeedMode(motor, runtime, bus);
       if (runtime.direction == MotorControlDirection::Forward) {
         motor.setReverse(bus, false);
         motor.setForward(bus, true);
@@ -522,14 +518,7 @@ void MotorControl::startMovement(const utl::EMotor motorId) {
       }
       return;
     } else {
-      if (!runtime.positionPrepared) {
-        motor.setOperationMode(bus, 2, MotorOperationMode::Incremental);
-        motor.setOperationFunction(bus, 2, MotorOperationFunction::SingleMotion);
-        motor.setOperationSpeed(bus, 2, runtime.speed);
-        motor.setOperationAcceleration(bus, 2, runtime.acceleration);
-        motor.setOperationDeceleration(bus, 2, runtime.deceleration);
-        runtime.positionPrepared = true;
-      }
+      preparePositionMode(motor, runtime, bus);
       motor.setOperationPosition(bus, 2, runtime.position);
       motor.setSelectedOperationId(bus, 2);
     }
@@ -705,111 +694,94 @@ bool MotorControl::isEnableControllable(const utl::EMotor motorId) const {
 }
 
 std::uint8_t MotorControl::readSelectedOperationId(const utl::EMotor motorId) {
-  const auto& motor = requireMotor(_motors, motorId);
-  try {
-    std::lock_guard<std::mutex> lock(_busMutex);
-    if (!_bus) utl::throwRuntimeError("MotorControl bus is not initialized");
-    return motor.readSelectedOperationId(*_bus);
-  } catch (const std::exception& ex) {
-    handleCommunicationFailure("readSelectedOperationId", ex);
-    throw;
-  }
+  return withMotorHandled("readSelectedOperationId", motorId,
+                          [](const Motor& motor, ModbusClient& bus) {
+                            return motor.readSelectedOperationId(bus);
+                          });
 }
 
 void MotorControl::resetAlarm(const utl::EMotor motorId) {
-  const auto& motor = requireMotor(_motors, motorId);
-  try {
-    std::lock_guard<std::mutex> lock(_busMutex);
-    if (!_bus) utl::throwRuntimeError("MotorControl bus is not initialized");
-    motor.resetAlarm(*_bus);
+  withMotorHandled("resetAlarm", motorId,
+                   [this, motorId](const Motor& motor, ModbusClient& bus) {
+                     motor.resetAlarm(bus);
     const auto cfgIt = _motorConfigs.find(motorId);
     if (cfgIt != _motorConfigs.end()) {
-      applyConfiguredParameters(motor, cfgIt->second, *_bus);
+                       applyConfiguredParameters(motor, cfgIt->second, bus);
     }
-  } catch (const std::exception& ex) {
-    handleCommunicationFailure("resetAlarm", ex);
-    throw;
-  }
+                   });
 }
 
 void MotorControl::setSelectedOperationId(const utl::EMotor motorId,
                                           const std::uint8_t opId) {
-  const auto& motor = requireMotor(_motors, motorId);
-  std::lock_guard<std::mutex> lock(_busMutex);
-  if (!_bus) utl::throwRuntimeError("MotorControl bus is not initialized");
-  motor.setSelectedOperationId(*_bus, opId);
+  withMotor(motorId, [opId](const Motor& motor, ModbusClient& bus) {
+    motor.setSelectedOperationId(bus, opId);
+  });
 }
 
 void MotorControl::setOperationMode(const utl::EMotor motorId,
                                     const std::uint8_t opId,
                                     const MotorOperationMode mode) {
-  const auto& motor = requireMotor(_motors, motorId);
-  std::lock_guard<std::mutex> lock(_busMutex);
-  if (!_bus) utl::throwRuntimeError("MotorControl bus is not initialized");
-  motor.setOperationMode(*_bus, opId, mode);
+  withMotor(motorId, [opId, mode](const Motor& motor, ModbusClient& bus) {
+    motor.setOperationMode(bus, opId, mode);
+  });
 }
 
 void MotorControl::setOperationFunction(const utl::EMotor motorId,
                                         const std::uint8_t opId,
                                         const MotorOperationFunction function) {
-  const auto& motor = requireMotor(_motors, motorId);
-  std::lock_guard<std::mutex> lock(_busMutex);
-  if (!_bus) utl::throwRuntimeError("MotorControl bus is not initialized");
-  motor.setOperationFunction(*_bus, opId, function);
+  withMotor(motorId, [opId, function](const Motor& motor, ModbusClient& bus) {
+    motor.setOperationFunction(bus, opId, function);
+  });
 }
 
 void MotorControl::setOperationPosition(const utl::EMotor motorId,
                                         const std::uint8_t opId,
                                         const std::int32_t position) {
-  const auto& motor = requireMotor(_motors, motorId);
-  std::lock_guard<std::mutex> lock(_busMutex);
-  if (!_bus) utl::throwRuntimeError("MotorControl bus is not initialized");
-  motor.setOperationPosition(*_bus, opId, position);
+  withMotor(motorId, [opId, position](const Motor& motor, ModbusClient& bus) {
+    motor.setOperationPosition(bus, opId, position);
+  });
 }
 
 void MotorControl::setOperationSpeed(const utl::EMotor motorId,
                                      const std::uint8_t opId,
                                      const std::int32_t speed) {
-  const auto& motor = requireMotor(_motors, motorId);
-  std::lock_guard<std::mutex> lock(_busMutex);
-  if (!_bus) utl::throwRuntimeError("MotorControl bus is not initialized");
-  motor.setOperationSpeed(*_bus, opId, speed);
+  withMotor(motorId, [opId, speed](const Motor& motor, ModbusClient& bus) {
+    motor.setOperationSpeed(bus, opId, speed);
+  });
 }
 
 void MotorControl::setOperationAcceleration(const utl::EMotor motorId,
                                             const std::uint8_t opId,
                                             const std::int32_t acceleration) {
-  const auto& motor = requireMotor(_motors, motorId);
-  std::lock_guard<std::mutex> lock(_busMutex);
-  if (!_bus) utl::throwRuntimeError("MotorControl bus is not initialized");
-  motor.setOperationAcceleration(*_bus, opId, acceleration);
+  withMotor(motorId,
+            [opId, acceleration](const Motor& motor, ModbusClient& bus) {
+              motor.setOperationAcceleration(bus, opId, acceleration);
+            });
 }
 
 void MotorControl::setOperationDeceleration(const utl::EMotor motorId,
                                             const std::uint8_t opId,
                                             const std::int32_t deceleration) {
-  const auto& motor = requireMotor(_motors, motorId);
-  std::lock_guard<std::mutex> lock(_busMutex);
-  if (!_bus) utl::throwRuntimeError("MotorControl bus is not initialized");
-  motor.setOperationDeceleration(*_bus, opId, deceleration);
+  withMotor(motorId,
+            [opId, deceleration](const Motor& motor, ModbusClient& bus) {
+              motor.setOperationDeceleration(bus, opId, deceleration);
+            });
 }
 
 void MotorControl::setRunCurrent(const utl::EMotor motorId,
                                  const std::int32_t current) {
   validateCurrentRange(current, "runCurrent", utl::enumToStringView(motorId));
-  const auto& motor = requireMotor(_motors, motorId);
-  std::lock_guard<std::mutex> lock(_busMutex);
-  if (!_bus) utl::throwRuntimeError("MotorControl bus is not initialized");
-  motor.setRunCurrent(*_bus, current);
+  withMotor(motorId, [current](const Motor& motor, ModbusClient& bus) {
+    motor.setRunCurrent(bus, current);
+  });
 }
 
 void MotorControl::setStopCurrent(const utl::EMotor motorId,
                                   const std::int32_t current) {
   validateCurrentRange(current, "stopCurrent", utl::enumToStringView(motorId));
-  const auto& motor = requireMotor(_motors, motorId);
-  std::lock_guard<std::mutex> lock(_busMutex);
-  if (!_bus) utl::throwRuntimeError("MotorControl bus is not initialized");
-  motor.setStopCurrent(*_bus, current);
+  withMotor(motorId, [current](const Motor& motor, ModbusClient& bus) {
+    motor.setStopCurrent(bus, current);
+  });
 }
 
 void MotorControl::configureHoming(const utl::EMotor motorId,
@@ -818,11 +790,10 @@ void MotorControl::configureHoming(const utl::EMotor motorId,
                                    const std::int32_t acceleration,
                                    const std::int32_t startingSpeed,
                                    const std::int32_t startingDirection) {
-  const auto& motor = requireMotor(_motors, motorId);
-  std::lock_guard<std::mutex> lock(_busMutex);
-  if (!_bus) utl::throwRuntimeError("MotorControl bus is not initialized");
-  motor.configureHoming(*_bus, mode, operatingSpeed, acceleration,
-                        startingSpeed, startingDirection);
+  withMotor(motorId, [=](const Motor& motor, ModbusClient& bus) {
+    motor.configureHoming(bus, mode, operatingSpeed, acceleration,
+                          startingSpeed, startingDirection);
+  });
 }
 
 void MotorControl::configureConstantSpeedPair(const utl::EMotor motorId,
@@ -830,81 +801,57 @@ void MotorControl::configureConstantSpeedPair(const utl::EMotor motorId,
                                               const std::int32_t speedOp1,
                                               const std::int32_t acceleration,
                                               const std::int32_t deceleration) {
-  const auto& motor = requireMotor(_motors, motorId);
-  std::lock_guard<std::mutex> lock(_busMutex);
-  if (!_bus) utl::throwRuntimeError("MotorControl bus is not initialized");
-  motor.configureConstantSpeedPair(*_bus, speedOp0, speedOp1, acceleration,
-                                   deceleration);
+  withMotor(motorId, [=](const Motor& motor, ModbusClient& bus) {
+    motor.configureConstantSpeedPair(bus, speedOp0, speedOp1, acceleration,
+                                     deceleration);
+  });
 }
 
 void MotorControl::updateConstantSpeedBuffered(const utl::EMotor motorId,
                                                const std::int32_t speed) {
-  const auto& motor = requireMotor(_motors, motorId);
-  std::lock_guard<std::mutex> lock(_busMutex);
-  if (!_bus) utl::throwRuntimeError("MotorControl bus is not initialized");
-  motor.updateConstantSpeedBuffered(*_bus, speed);
+  withMotor(motorId, [speed](const Motor& motor, ModbusClient& bus) {
+    motor.updateConstantSpeedBuffered(bus, speed);
+  });
 }
 
 MotorFlagStatus MotorControl::readInputStatus(const utl::EMotor motorId) {
-  const auto& motor = requireMotor(_motors, motorId);
-  try {
-    std::lock_guard<std::mutex> lock(_busMutex);
-    if (!_bus) utl::throwRuntimeError("MotorControl bus is not initialized");
-    return motor.decodeDriverInputStatus(motor.readDriverInputCommandRaw(*_bus));
-  } catch (const std::exception& ex) {
-    handleCommunicationFailure("readInputStatus", ex);
-    throw;
-  }
+  return withMotorHandled("readInputStatus", motorId,
+                          [](const Motor& motor, ModbusClient& bus) {
+                            return motor.decodeDriverInputStatus(
+                                motor.readDriverInputCommandRaw(bus));
+                          });
 }
 
 MotorFlagStatus MotorControl::readOutputStatus(const utl::EMotor motorId) {
-  const auto& motor = requireMotor(_motors, motorId);
-  try {
-    std::lock_guard<std::mutex> lock(_busMutex);
-    if (!_bus) utl::throwRuntimeError("MotorControl bus is not initialized");
-    return motor.decodeDriverOutputStatus(motor.readDriverOutputStatusRaw(*_bus));
-  } catch (const std::exception& ex) {
-    handleCommunicationFailure("readOutputStatus", ex);
-    throw;
-  }
+  return withMotorHandled("readOutputStatus", motorId,
+                          [](const Motor& motor, ModbusClient& bus) {
+                            return motor.decodeDriverOutputStatus(
+                                motor.readDriverOutputStatusRaw(bus));
+                          });
 }
 
 MotorDirectIoStatus MotorControl::readDirectIoStatus(const utl::EMotor motorId) {
-  const auto& motor = requireMotor(_motors, motorId);
-  try {
-    std::lock_guard<std::mutex> lock(_busMutex);
-    if (!_bus) utl::throwRuntimeError("MotorControl bus is not initialized");
-    return motor.decodeDirectIoAndBrakeStatus(
-        motor.readDirectIoAndBrakeStatusRaw(*_bus));
-  } catch (const std::exception& ex) {
-    handleCommunicationFailure("readDirectIoStatus", ex);
-    throw;
-  }
+  return withMotorHandled("readDirectIoStatus", motorId,
+                          [](const Motor& motor, ModbusClient& bus) {
+                            return motor.decodeDirectIoAndBrakeStatus(
+                                motor.readDirectIoAndBrakeStatusRaw(bus));
+                          });
 }
 
 MotorMonitorSnapshot MotorControl::readMonitorSnapshot(const utl::EMotor motorId) {
-  const auto& motor = requireMotor(_motors, motorId);
-  try {
-    std::lock_guard<std::mutex> lock(_busMutex);
-    if (!_bus) utl::throwRuntimeError("MotorControl bus is not initialized");
-    return motor.readMonitorSnapshot(*_bus);
-  } catch (const std::exception& ex) {
-    handleCommunicationFailure("readMonitorSnapshot", ex);
-    throw;
-  }
+  return withMotorHandled("readMonitorSnapshot", motorId,
+                          [](const Motor& motor, ModbusClient& bus) {
+                            return motor.readMonitorSnapshot(bus);
+                          });
 }
 
 MotorRemoteIoStatus MotorControl::readRemoteIoStatus(const utl::EMotor motorId) {
-  const auto& motor = requireMotor(_motors, motorId);
-  try {
-    std::lock_guard<std::mutex> lock(_busMutex);
-    if (!_bus) utl::throwRuntimeError("MotorControl bus is not initialized");
-    return motor.decodeRemoteIoStatus(motor.readDriverInputCommandRaw(*_bus),
-                                      motor.readDriverOutputStatusRaw(*_bus));
-  } catch (const std::exception& ex) {
-    handleCommunicationFailure("readRemoteIoStatus", ex);
-    throw;
-  }
+  return withMotorHandled("readRemoteIoStatus", motorId,
+                          [](const Motor& motor, ModbusClient& bus) {
+                            return motor.decodeRemoteIoStatus(
+                                motor.readDriverInputCommandRaw(bus),
+                                motor.readDriverOutputStatusRaw(bus));
+                          });
 }
 
 bool MotorControl::hasAnyWarningOrAlarm() {
@@ -936,62 +883,61 @@ void MotorControl::setWarningState(const bool warningActive) {
 
 MotorCodeDiagnostic MotorControl::diagnoseCurrentAlarm(
     const utl::EMotor motorId) {
-  const auto& motor = requireMotor(_motors, motorId);
-  try {
-    std::lock_guard<std::mutex> lock(_busMutex);
-    if (!_bus) {
-      utl::throwRuntimeError("MotorControl bus is not initialized");
-    }
-    return motor.diagnoseAlarm(motor.readAlarmCode(*_bus));
-  } catch (const std::exception& ex) {
-    handleCommunicationFailure("diagnoseCurrentAlarm", ex);
-    throw;
-  }
+  return withMotorHandled("diagnoseCurrentAlarm", motorId,
+                          [](const Motor& motor, ModbusClient& bus) {
+                            return motor.diagnoseAlarm(motor.readAlarmCode(bus));
+                          });
 }
 
 MotorCodeDiagnostic MotorControl::diagnoseCurrentWarning(
     const utl::EMotor motorId) {
-  const auto& motor = requireMotor(_motors, motorId);
-  try {
-    std::lock_guard<std::mutex> lock(_busMutex);
-    if (!_bus) {
-      utl::throwRuntimeError("MotorControl bus is not initialized");
-    }
-    return motor.diagnoseWarning(motor.readWarningCode(*_bus));
-  } catch (const std::exception& ex) {
-    handleCommunicationFailure("diagnoseCurrentWarning", ex);
-    throw;
-  }
+  return withMotorHandled("diagnoseCurrentWarning", motorId,
+                          [](const Motor& motor, ModbusClient& bus) {
+                            return motor.diagnoseWarning(
+                                motor.readWarningCode(bus));
+                          });
 }
 
 MotorCodeDiagnostic MotorControl::diagnoseCurrentCommunicationError(
     const utl::EMotor motorId) {
-  const auto& motor = requireMotor(_motors, motorId);
-  try {
-    std::lock_guard<std::mutex> lock(_busMutex);
-    if (!_bus) {
-      utl::throwRuntimeError("MotorControl bus is not initialized");
-    }
-    return motor.diagnoseCommunicationError(
-        motor.readCommunicationErrorCode(*_bus));
-  } catch (const std::exception& ex) {
-    handleCommunicationFailure("diagnoseCurrentCommunicationError", ex);
-    throw;
-  }
+  return withMotorHandled(
+      "diagnoseCurrentCommunicationError", motorId,
+      [](const Motor& motor, ModbusClient& bus) {
+        return motor.diagnoseCommunicationError(
+            motor.readCommunicationErrorCode(bus));
+      });
 }
 
 std::int32_t MotorControl::readGroupId(const utl::EMotor motorId) {
-  const auto& motor = requireMotor(_motors, motorId);
-  try {
-    std::lock_guard<std::mutex> lock(_busMutex);
-    if (!_bus) {
-      utl::throwRuntimeError("MotorControl bus is not initialized");
-    }
-    return motor.readGroupId(*_bus);
-  } catch (const std::exception& ex) {
-    handleCommunicationFailure("readGroupId", ex);
-    throw;
+  return withMotorHandled("readGroupId", motorId,
+                          [](const Motor& motor, ModbusClient& bus) {
+                            return motor.readGroupId(bus);
+                          });
+}
+
+void MotorControl::prepareSpeedMode(const Motor& motor,
+                                    MotorRuntimeState& runtime,
+                                    ModbusClient& bus) {
+  if (runtime.speedPairPrepared) {
+    return;
   }
+  motor.configureConstantSpeedPair(bus, runtime.speed, runtime.speed,
+                                   runtime.acceleration, runtime.deceleration);
+  runtime.speedPairPrepared = true;
+}
+
+void MotorControl::preparePositionMode(const Motor& motor,
+                                       MotorRuntimeState& runtime,
+                                       ModbusClient& bus) {
+  if (runtime.positionPrepared) {
+    return;
+  }
+  motor.setOperationMode(bus, 2, MotorOperationMode::Incremental);
+  motor.setOperationFunction(bus, 2, MotorOperationFunction::SingleMotion);
+  motor.setOperationSpeed(bus, 2, runtime.speed);
+  motor.setOperationAcceleration(bus, 2, runtime.acceleration);
+  motor.setOperationDeceleration(bus, 2, runtime.deceleration);
+  runtime.positionPrepared = true;
 }
 
 void MotorControl::applyConfiguredParameters(const Motor& motor,

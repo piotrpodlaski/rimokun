@@ -12,11 +12,14 @@ namespace Ui {
 class ResetControls;
 }
 
+class GuiStateStore;
+
 class ResetControls : public QWidget {
   Q_OBJECT
  public:
-  ResetControls(QWidget* parent);
+  explicit ResetControls(QWidget* parent);
   void applyViewModel(const ResetControlsViewModel& vm) const;
+  void setStateStore(GuiStateStore* store);
  private slots:
   void handleButtons();
   void openHomingWindow();
@@ -39,4 +42,5 @@ class ResetControls : public QWidget {
   LedIndicator* _lMotorPowerLed;
   QPushButton* _bEmergencyStop;
   HomingWindow* _homingWindow{nullptr};
+  GuiStateStore* _store{nullptr};
 };

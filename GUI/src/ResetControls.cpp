@@ -42,6 +42,8 @@ ResetControls::ResetControls(QWidget* parent) : QWidget(parent), _ui(new Ui::Res
           &ResetControls::handleButtons);
 }
 
+void ResetControls::setStateStore(GuiStateStore* store) { _store = store; }
+
 void ResetControls::applyViewModel(const ResetControlsViewModel& vm) const {
   _lServerLed->setState(vm.server);
   _lContecLed->setState(vm.contec);
@@ -58,7 +60,7 @@ void ResetControls::applyViewModel(const ResetControlsViewModel& vm) const {
 
 void ResetControls::openHomingWindow() {
   if (_homingWindow == nullptr) {
-    _homingWindow = new HomingWindow(this);
+    _homingWindow = new HomingWindow(_store, this);
     connect(_homingWindow, &HomingWindow::commandIssued, this,
             &ResetControls::buttonPressed);
   }

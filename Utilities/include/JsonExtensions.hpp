@@ -106,6 +106,22 @@ struct adl_serializer<utl::EAxisState> {
 };
 
 template <>
+struct adl_serializer<utl::EHomingAxis> {
+  static void to_json(json& j, const utl::EHomingAxis& v) { j = utl::enumToString(v); }
+  static void from_json(const json& j, utl::EHomingAxis& v) {
+    v = utl::stringToEnum<utl::EHomingAxis>(j.get<std::string>());
+  }
+};
+
+template <>
+struct adl_serializer<utl::EHomingState> {
+  static void to_json(json& j, const utl::EHomingState& v) { j = utl::enumToString(v); }
+  static void from_json(const json& j, utl::EHomingState& v) {
+    v = utl::stringToEnum<utl::EHomingState>(j.get<std::string>());
+  }
+};
+
+template <>
 struct adl_serializer<utl::SingleMotorStatus> {
   static void to_json(json& j, const utl::SingleMotorStatus& v) {
     j = json{
@@ -153,6 +169,34 @@ struct adl_serializer<utl::ToolChangerStatus> {
 };
 
 template <>
+struct adl_serializer<utl::HomingAxisStatus> {
+  static void to_json(json& j, const utl::HomingAxisStatus& v) {
+    j = json{{"axis", v.axis}, {"state", v.state}, {"message", v.message}};
+  }
+
+  static void from_json(const json& j, utl::HomingAxisStatus& v) {
+    v.axis = j.at("axis").get<utl::EHomingAxis>();
+    v.state = j.at("state").get<utl::EHomingState>();
+    v.message = j.value("message", std::string{});
+  }
+};
+
+template <>
+struct adl_serializer<utl::HomingSessionStatus> {
+  static void to_json(json& j, const utl::HomingSessionStatus& v) {
+    j = json{{"state", v.state}, {"axes", v.axes}, {"message", v.message}};
+  }
+
+  static void from_json(const json& j, utl::HomingSessionStatus& v) {
+    v.state = j.contains("state") ? j.at("state").get<utl::EHomingState>()
+                                   : utl::EHomingState::Idle;
+    v.axes = j.contains("axes") ? j.at("axes").get<std::vector<utl::HomingAxisStatus>>()
+                                : std::vector<utl::HomingAxisStatus>{};
+    v.message = j.value("message", std::string{});
+  }
+};
+
+template <>
 struct adl_serializer<utl::JoystickStatus> {
   static void to_json(json& j, const utl::JoystickStatus& v) {
     j = json{{"x", v.x}, {"y", v.y}, {"btn", v.btn}};
@@ -174,6 +218,7 @@ struct adl_serializer<utl::RobotStatus> {
         {"robotComponents", utl::enumKeyedMapToJson(v.robotComponents)},
         {"joystics", utl::enumKeyedMapToJson(v.joystics)},
         {"armStates", utl::enumKeyedMapToJson(v.armStates)},
+        {"homing", v.homing},
     };
     if (v.safetyOn.has_value()) {
       j["safetyOn"] = *v.safetyOn;
@@ -200,6 +245,11 @@ struct adl_serializer<utl::RobotStatus> {
     if (j.contains("armStates")) {
       v.armStates = utl::enumKeyedMapFromJson<utl::EArm, utl::EAxisState>(
           j.at("armStates"));
+    }
+    if (j.contains("homing")) {
+      v.homing = j.at("homing").get<utl::HomingSessionStatus>();
+    } else {
+      v.homing = {};
     }
   }
 };

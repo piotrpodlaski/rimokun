@@ -61,6 +61,12 @@ struct convert<utl::ERobotComponent> : convert_enum<utl::ERobotComponent> {
 template <>
 struct convert<utl::EAxisState> : convert_enum<utl::EAxisState> {};
 
+template <>
+struct convert<utl::EHomingAxis> : convert_enum<utl::EHomingAxis> {};
+
+template <>
+struct convert<utl::EHomingState> : convert_enum<utl::EHomingState> {};
+
 #if __has_include(<libserial/SerialPortConstants.h>)
 template <>
 struct convert<LibSerial::BaudRate> : convert_enum<LibSerial::BaudRate> {};
@@ -164,6 +170,49 @@ struct convert<utl::JoystickStatus> {
 };
 
 template <>
+struct convert<utl::HomingAxisStatus> {
+  static Node encode(const utl::HomingAxisStatus& rhs) {
+    Node node;
+    node["axis"] = rhs.axis;
+    node["state"] = rhs.state;
+    node["message"] = rhs.message;
+    return node;
+  }
+
+  static bool decode(const Node& node, utl::HomingAxisStatus& rhs) {
+    if (!node.IsMap()) return false;
+    rhs.axis = node["axis"].as<utl::EHomingAxis>();
+    rhs.state = node["state"] ? node["state"].as<utl::EHomingState>()
+                               : utl::EHomingState::Idle;
+    rhs.message = node["message"] ? node["message"].as<std::string>()
+                                   : std::string{};
+    return true;
+  }
+};
+
+template <>
+struct convert<utl::HomingSessionStatus> {
+  static Node encode(const utl::HomingSessionStatus& rhs) {
+    Node node;
+    node["state"] = rhs.state;
+    node["axes"] = rhs.axes;
+    node["message"] = rhs.message;
+    return node;
+  }
+
+  static bool decode(const Node& node, utl::HomingSessionStatus& rhs) {
+    if (!node.IsMap()) return false;
+    rhs.state = node["state"] ? node["state"].as<utl::EHomingState>()
+                               : utl::EHomingState::Idle;
+    rhs.axes = node["axes"] ? node["axes"].as<std::vector<utl::HomingAxisStatus>>()
+                             : std::vector<utl::HomingAxisStatus>{};
+    rhs.message = node["message"] ? node["message"].as<std::string>()
+                                   : std::string{};
+    return true;
+  }
+};
+
+template <>
 struct convert<utl::RobotStatus> {
   static Node encode(const utl::RobotStatus& rhs) {
     Node node;
@@ -185,6 +234,7 @@ struct convert<utl::RobotStatus> {
     for (const auto& [arm, state] : rhs.armStates) {
       node["armStates"][convert<utl::EArm>::encode(arm)] = state;
     }
+    node["homing"] = rhs.homing;
     return node;
   }
 
@@ -225,6 +275,9 @@ struct convert<utl::RobotStatus> {
         if (!convert<utl::EArm>::decode(kv.first, arm)) return false;
         rhs.armStates[arm] = kv.second.as<utl::EAxisState>();
       }
+    }
+    if (const auto homingNode = node["homing"]; homingNode) {
+      rhs.homing = homingNode.as<utl::HomingSessionStatus>();
     }
 
     return true;

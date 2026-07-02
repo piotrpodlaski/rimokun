@@ -4,6 +4,7 @@
 #include <map>
 #include <optional>
 #include <string>
+#include <vector>
 
 namespace utl {
 enum class EMotor { XLeft, XRight, YLeft, YRight, ZLeft, ZRight };
@@ -29,6 +30,8 @@ enum class EToolChangerAction { Open, Close };
 enum class ERobotComponent {Contec, MotorControl, ControlPanel};
 
 enum class EAxisState { Locked, Slow, Fast };
+enum class EHomingAxis { XLeft, YLeft, XRight, YRight, Z };
+enum class EHomingState { Idle, Pending, Running, Succeeded, Failed, TimedOut };
 
 // Known Contec digital input signal names.  All keys in Machine.inputMapping
 // must correspond to one of these values (validated at startup).
@@ -83,6 +86,18 @@ struct ToolChangerStatus {
   std::map<EToolChangerStatusFlags, ELEDState> flags;
 };
 
+struct HomingAxisStatus {
+  EHomingAxis axis{EHomingAxis::Z};
+  EHomingState state{EHomingState::Idle};
+  std::string message;
+};
+
+struct HomingSessionStatus {
+  EHomingState state{EHomingState::Idle};
+  std::vector<HomingAxisStatus> axes;
+  std::string message;
+};
+
 struct RobotStatus {
   std::map<EMotor, SingleMotorStatus> motors;
   std::map<EArm, ToolChangerStatus> toolChangers;
@@ -90,6 +105,7 @@ struct RobotStatus {
   std::map<EArm, JoystickStatus> joystics;
   std::optional<bool> safetyOn;
   std::map<EArm, EAxisState> armStates;
+  HomingSessionStatus homing;
 };
 
 }  // namespace utl

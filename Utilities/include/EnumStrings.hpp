@@ -55,6 +55,16 @@ std::optional<EAxisState> enumFromStringImpl(std::type_identity<EAxisState>,
                                              std::string_view text);
 std::string_view knownEnumNamesImpl(std::type_identity<EAxisState>);
 
+std::string_view enumToStringImpl(EHomingAxis value);
+std::optional<EHomingAxis> enumFromStringImpl(std::type_identity<EHomingAxis>,
+                                              std::string_view text);
+std::string_view knownEnumNamesImpl(std::type_identity<EHomingAxis>);
+
+std::string_view enumToStringImpl(EHomingState value);
+std::optional<EHomingState> enumFromStringImpl(std::type_identity<EHomingState>,
+                                               std::string_view text);
+std::string_view knownEnumNamesImpl(std::type_identity<EHomingState>);
+
 std::string_view enumToStringImpl(EInputSignal value);
 std::optional<EInputSignal> enumFromStringImpl(std::type_identity<EInputSignal>,
                                                std::string_view text);

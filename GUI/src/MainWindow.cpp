@@ -38,6 +38,7 @@ MainWindow::MainWindow(QWidget* parent)
   const auto leftChanger = _ui->leftChanger;
   const auto rightChanger = _ui->rightChanger;
   const auto robotVis = _ui->robotVis;
+  _ui->resetControls->setStateStore(&_stateStore);
 
   _leftToolChangerPresenter = std::make_unique<ToolChangerPresenter>(
       leftChanger, utl::EArm::Left, &_stateStore, this);
@@ -150,7 +151,7 @@ void MainWindow::openContecPanel() {
 
 void MainWindow::openHomingPanel() {
   if (homingPanel == nullptr) {
-    homingPanel = new HomingWindow(this);
+    homingPanel = new HomingWindow(&_stateStore, this);
     connect(homingPanel, &HomingWindow::commandIssued, &_updater,
             &Updater::sendCommand);
   }

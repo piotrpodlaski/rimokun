@@ -79,6 +79,12 @@ class Machine {
     std::int32_t startingDirection{0};
   };
 
+  struct HomingSessionRuntime {
+    bool active{false};
+    std::size_t currentAxisIndex{0};
+    IClock::time_point currentAxisStartedAt{};
+  };
+
   void cacheInputSignals(std::optional<utl::SignalMap> value);
   void cacheOutputSignals(std::optional<utl::SignalMap> value);
 
@@ -86,8 +92,15 @@ class Machine {
   std::string reconnectComponent(utl::ERobotComponent component);
   std::vector<cmd::HomingTarget> loadHomingOrder() const;
   std::map<cmd::HomingTarget, HomingAxisConfig> loadHomingAxisConfigs() const;
+  std::chrono::milliseconds loadHomingTimeout() const;
   void homeAxesInOrder(const std::vector<cmd::HomingTarget>& axes);
   void homeSingleAxis(cmd::HomingTarget axis);
+  void beginHomingSession(const std::vector<cmd::HomingTarget>& axes);
+  void startNextHomingAxis();
+  void advanceHomingSessionFromStatus();
+  void finishCurrentHomingAxis(utl::EHomingState state, std::string message = {});
+  static utl::EHomingAxis homingAxisFromTarget(cmd::HomingTarget target);
+  static std::optional<utl::EMotor> homingMotorFromAxis(utl::EHomingAxis axis);
 
   void makeDummyStatus();
 
@@ -111,7 +124,9 @@ class Machine {
   std::uint64_t _ioCacheCycle{0};
   std::vector<cmd::HomingTarget> _homingOrder;
   std::map<cmd::HomingTarget, HomingAxisConfig> _homingAxisConfigs;
+  std::chrono::milliseconds _homingTimeout{std::chrono::seconds{60}};
   std::map<utl::EMotor, bool> _homingRequested;
+  HomingSessionRuntime _homingSessionRuntime;
   IoSignalCache _inputSignalsCache;
   IoSignalCache _outputSignalsCache;
   utl::SignalMap _inputSignals;

@@ -97,6 +97,23 @@ constexpr std::array kAxisStateEntries{
     EnumEntry<utl::EAxisState>{utl::EAxisState::Fast, "Fast"},
 };
 
+constexpr std::array kHomingAxisEntries{
+    EnumEntry<utl::EHomingAxis>{utl::EHomingAxis::XLeft, "XLeft"},
+    EnumEntry<utl::EHomingAxis>{utl::EHomingAxis::YLeft, "YLeft"},
+    EnumEntry<utl::EHomingAxis>{utl::EHomingAxis::XRight, "XRight"},
+    EnumEntry<utl::EHomingAxis>{utl::EHomingAxis::YRight, "YRight"},
+    EnumEntry<utl::EHomingAxis>{utl::EHomingAxis::Z, "Z"},
+};
+
+constexpr std::array kHomingStateEntries{
+    EnumEntry<utl::EHomingState>{utl::EHomingState::Idle, "Idle"},
+    EnumEntry<utl::EHomingState>{utl::EHomingState::Pending, "Pending"},
+    EnumEntry<utl::EHomingState>{utl::EHomingState::Running, "Running"},
+    EnumEntry<utl::EHomingState>{utl::EHomingState::Succeeded, "Succeeded"},
+    EnumEntry<utl::EHomingState>{utl::EHomingState::Failed, "Failed"},
+    EnumEntry<utl::EHomingState>{utl::EHomingState::TimedOut, "TimedOut"},
+};
+
 constexpr std::array kInputSignalEntries{
     EnumEntry<utl::EInputSignal>{utl::EInputSignal::safetyON, "safetyON"},
     EnumEntry<utl::EInputSignal>{utl::EInputSignal::button1, "button1"},
@@ -314,6 +331,28 @@ std::optional<EAxisState> enumFromStringImpl(const std::type_identity<EAxisState
 }
 std::string_view knownEnumNamesImpl(const std::type_identity<EAxisState>) {
   return "Locked, Slow, Fast";
+}
+
+std::string_view enumToStringImpl(const EHomingAxis value) {
+  return enumToString(kHomingAxisEntries, value);
+}
+std::optional<EHomingAxis> enumFromStringImpl(
+    const std::type_identity<EHomingAxis>, const std::string_view text) {
+  return enumFromString(kHomingAxisEntries, text);
+}
+std::string_view knownEnumNamesImpl(const std::type_identity<EHomingAxis>) {
+  return "XLeft, YLeft, XRight, YRight, Z";
+}
+
+std::string_view enumToStringImpl(const EHomingState value) {
+  return enumToString(kHomingStateEntries, value);
+}
+std::optional<EHomingState> enumFromStringImpl(
+    const std::type_identity<EHomingState>, const std::string_view text) {
+  return enumFromString(kHomingStateEntries, text);
+}
+std::string_view knownEnumNamesImpl(const std::type_identity<EHomingState>) {
+  return "Idle, Pending, Running, Succeeded, Failed, TimedOut";
 }
 
 std::string_view enumToStringImpl(const EInputSignal value) {

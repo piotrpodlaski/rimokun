@@ -124,6 +124,8 @@ Machine::Machine(std::shared_ptr<IClock> clock) : _clock(std::move(clock)) {
       cfg.getOptional<int>("Machine", "statusPublishPeriodMS", 50));
   _statusUpdatesEnabled =
       cfg.getOptional<bool>("Machine", "statusUpdatesEnabled", true);
+  _heartBeatPrescaleCycles = static_cast<std::size_t>(std::max(
+      0, cfg.getOptional<int>("Machine", "heartBeatPrescaleCycles", 0)));
 
   _loopInterval = std::chrono::milliseconds{std::max(1, loopIntervalMS)};
   _updateInterval = std::chrono::milliseconds{std::max(1, updateIntervalMS)};
@@ -142,12 +144,17 @@ Machine::Machine(std::shared_ptr<IClock> clock) : _clock(std::move(clock)) {
       });
 
   // Validate mappings used by the control loop and command handlers at startup.
-  (void)requireMappingIndex(_inputMapping, "button1");
-  (void)requireMappingIndex(_inputMapping, "button2");
+  (void)requireMappingIndex(_inputMapping, "tclProx");
+  (void)requireMappingIndex(_inputMapping, "tcrProx");
+  (void)requireMappingIndex(_inputMapping, "tclOpen");
+  (void)requireMappingIndex(_inputMapping, "tclClose");
+  (void)requireMappingIndex(_inputMapping, "tcrOpen");
+  (void)requireMappingIndex(_inputMapping, "tcrClose");
   (void)requireMappingIndex(_outputMapping, "toolChangerLeft");
   (void)requireMappingIndex(_outputMapping, "toolChangerRight");
-  (void)requireMappingIndex(_outputMapping, "light1");
-  (void)requireMappingIndex(_outputMapping, "light2");
+  if (_heartBeatPrescaleCycles > 0) {
+    (void)requireMappingIndex(_outputMapping, "heartBeat");
+  }
 }
 
 std::optional<utl::SignalMap> Machine::readInputSignals() {
@@ -263,7 +270,10 @@ void Machine::runOneCycle(LoopState& state) {
     _inputSignalsCache.valid = false;
     _outputSignalsCache.valid = false;
     _loopRunner->runOneCycle(
-        [this]() { controlLoopTasks(); },
+        [this]() {
+          controlLoopTasks();
+          updateHeartBeatOutput();
+        },
         [this]() {
           if (auto command = _commandQueue.try_pop()) {
             try {
@@ -341,6 +351,22 @@ void Machine::cacheOutputSignals(std::optional<utl::SignalMap> value) {
   _outputSignalsCache.cycle = _ioCacheCycle;
   _outputSignalsCache.valid = true;
   _outputSignalsCache.value = std::move(value);
+}
+
+void Machine::updateHeartBeatOutput() {
+  if (_heartBeatPrescaleCycles == 0 ||
+      _contec.state() == MachineComponent::State::Error) {
+    return;
+  }
+
+  ++_heartBeatCycleCounter;
+  if (_heartBeatCycleCounter < _heartBeatPrescaleCycles) {
+    return;
+  }
+
+  _heartBeatCycleCounter = 0;
+  _heartBeatState = !_heartBeatState;
+  setOutputs({{"heartBeat", _heartBeatState}});
 }
 
 bool Machine::submitCommand(cmd::Command command) {

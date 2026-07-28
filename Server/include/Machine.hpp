@@ -75,6 +75,7 @@ class Machine {
 
   void cacheInputSignals(std::optional<utl::SignalMap> value);
   void cacheOutputSignals(std::optional<utl::SignalMap> value);
+  void updateHeartBeatOutput();
 
   void initializeComponents();
   std::string reconnectComponent(utl::ERobotComponent component);
@@ -94,6 +95,9 @@ class Machine {
   std::chrono::milliseconds _loopInterval{10};
   std::chrono::milliseconds _updateInterval{50};
   bool _statusUpdatesEnabled{true};
+  std::size_t _heartBeatPrescaleCycles{0};
+  std::size_t _heartBeatCycleCounter{0};
+  bool _heartBeatState{false};
   std::shared_ptr<IClock> _clock;
   utl::RimoServer<utl::RobotStatus> _robotServer;
   std::thread _commandServerThread;

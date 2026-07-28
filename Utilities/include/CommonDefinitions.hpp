@@ -52,6 +52,7 @@ enum class EInputSignal {
 enum class EOutputSignal {
   toolChangerLeft,
   toolChangerRight,
+  heartBeat,
   light1,
   light2,
 };

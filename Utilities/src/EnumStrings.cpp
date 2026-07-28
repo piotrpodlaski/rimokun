@@ -131,6 +131,7 @@ constexpr std::array kOutputSignalEntries{
                                   "toolChangerLeft"},
     EnumEntry<utl::EOutputSignal>{utl::EOutputSignal::toolChangerRight,
                                   "toolChangerRight"},
+    EnumEntry<utl::EOutputSignal>{utl::EOutputSignal::heartBeat, "heartBeat"},
     EnumEntry<utl::EOutputSignal>{utl::EOutputSignal::light1, "light1"},
     EnumEntry<utl::EOutputSignal>{utl::EOutputSignal::light2, "light2"},
 };
@@ -375,7 +376,7 @@ std::optional<EOutputSignal> enumFromStringImpl(
   return enumFromString(kOutputSignalEntries, text);
 }
 std::string_view knownEnumNamesImpl(const std::type_identity<EOutputSignal>) {
-  return "toolChangerLeft, toolChangerRight, light1, light2";
+  return "toolChangerLeft, toolChangerRight, heartBeat, light1, light2";
 }
 
 #if __has_include(<libserial/SerialPortConstants.h>)

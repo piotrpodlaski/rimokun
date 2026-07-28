@@ -274,6 +274,16 @@ void MachineStatusBuilder::updateAndPublish(
     status.toolChangers[utl::EArm::Right]
         .flags[utl::EToolChangerStatusFlags::ProxSen] = utl::ELEDState::Error;
   };
+  const auto setOpenClosedSensorsUnknown = [&status]() {
+    status.toolChangers[utl::EArm::Left]
+        .flags[utl::EToolChangerStatusFlags::OpenSen] = utl::ELEDState::Error;
+    status.toolChangers[utl::EArm::Left]
+        .flags[utl::EToolChangerStatusFlags::ClosedSen] = utl::ELEDState::Error;
+    status.toolChangers[utl::EArm::Right]
+        .flags[utl::EToolChangerStatusFlags::OpenSen] = utl::ELEDState::Error;
+    status.toolChangers[utl::EArm::Right]
+        .flags[utl::EToolChangerStatusFlags::ClosedSen] = utl::ELEDState::Error;
+  };
   const auto setValveUnknown = [&status]() {
     status.toolChangers[utl::EArm::Left]
         .flags[utl::EToolChangerStatusFlags::ClosedValve] = utl::ELEDState::Error;
@@ -300,26 +310,51 @@ void MachineStatusBuilder::updateAndPublish(
     status.safetyOn = std::nullopt;
   }
 
-  if (inputs && inputs->contains("button1") && inputs->contains("button2")) {
+  if (inputs && inputs->contains("tclProx") && inputs->contains("tcrProx")) {
     status.toolChangers[utl::EArm::Left].flags[utl::EToolChangerStatusFlags::ProxSen] =
-        inputs->at("button1") ? utl::ELEDState::On : utl::ELEDState::Off;
+        inputs->at("tclProx") ? utl::ELEDState::On : utl::ELEDState::Off;
     status.toolChangers[utl::EArm::Right]
         .flags[utl::EToolChangerStatusFlags::ProxSen] =
-        inputs->at("button2") ? utl::ELEDState::On : utl::ELEDState::Off;
+        inputs->at("tcrProx") ? utl::ELEDState::On : utl::ELEDState::Off;
   } else {
     setProxUnknown();
   }
 
-  if (outputs && outputs->contains("toolChangerLeft") &&
-      outputs->contains("toolChangerRight")) {
+  if (inputs && inputs->contains("tclOpen") && inputs->contains("tclClose") &&
+      inputs->contains("tcrOpen") && inputs->contains("tcrClose")) {
+    status.toolChangers[utl::EArm::Left]
+        .flags[utl::EToolChangerStatusFlags::OpenSen] =
+        inputs->at("tclOpen") ? utl::ELEDState::On : utl::ELEDState::Off;
+    status.toolChangers[utl::EArm::Left]
+        .flags[utl::EToolChangerStatusFlags::ClosedSen] =
+        inputs->at("tclClose") ? utl::ELEDState::On : utl::ELEDState::Off;
+    status.toolChangers[utl::EArm::Right]
+        .flags[utl::EToolChangerStatusFlags::OpenSen] =
+        inputs->at("tcrOpen") ? utl::ELEDState::On : utl::ELEDState::Off;
+    status.toolChangers[utl::EArm::Right]
+        .flags[utl::EToolChangerStatusFlags::ClosedSen] =
+        inputs->at("tcrClose") ? utl::ELEDState::On : utl::ELEDState::Off;
+  } else {
+    setOpenClosedSensorsUnknown();
+  }
+
+  if (outputs && outputs->contains("toolChangerLeft")) {
     const auto tclStatus = outputs->at("toolChangerLeft");
-    const auto tcrStatus = outputs->at("toolChangerRight");
     status.toolChangers[utl::EArm::Left]
         .flags[utl::EToolChangerStatusFlags::ClosedValve] =
         tclStatus ? utl::ELEDState::Off : utl::ELEDState::On;
     status.toolChangers[utl::EArm::Left]
         .flags[utl::EToolChangerStatusFlags::OpenValve] =
         tclStatus ? utl::ELEDState::On : utl::ELEDState::Off;
+  } else {
+    status.toolChangers[utl::EArm::Left]
+        .flags[utl::EToolChangerStatusFlags::ClosedValve] = utl::ELEDState::Error;
+    status.toolChangers[utl::EArm::Left]
+        .flags[utl::EToolChangerStatusFlags::OpenValve] = utl::ELEDState::Error;
+  }
+
+  if (outputs && outputs->contains("toolChangerRight")) {
+    const auto tcrStatus = outputs->at("toolChangerRight");
     status.toolChangers[utl::EArm::Right]
         .flags[utl::EToolChangerStatusFlags::ClosedValve] =
         tcrStatus ? utl::ELEDState::Off : utl::ELEDState::On;
@@ -327,7 +362,10 @@ void MachineStatusBuilder::updateAndPublish(
         .flags[utl::EToolChangerStatusFlags::OpenValve] =
         tcrStatus ? utl::ELEDState::On : utl::ELEDState::Off;
   } else {
-    setValveUnknown();
+    status.toolChangers[utl::EArm::Right]
+        .flags[utl::EToolChangerStatusFlags::ClosedValve] = utl::ELEDState::Error;
+    status.toolChangers[utl::EArm::Right]
+        .flags[utl::EToolChangerStatusFlags::OpenValve] = utl::ELEDState::Error;
   }
 
   publish(status);

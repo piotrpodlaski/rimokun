@@ -255,25 +255,13 @@ IRobotControlPolicy::ControlDecision RimoKunControlPolicy::decide(
       isComponentOperational(contecStatus);
   if (!contecAvailable) {
     warnOnce(_warningState.contecUnavailable,
-             "Contec is unavailable. Tool changer and light outputs are disabled.");
+             "Contec is unavailable. Tool changer outputs are disabled.");
     return {.outputs = std::nullopt, .setToolChangerErrorBlinking = true,
             .armStates = _armStates};
   }
   setWarningFlag(_warningState.contecUnavailable, false, "Contec unavailable");
 
-  if (!inputs || !inputs->contains("button1") || !inputs->contains("button2")) {
-    warnOnce(_warningState.missingInputSignals,
-             "Missing required input signals 'button1'/'button2'. "
-             "Skipping this control cycle.");
-    return {.outputs = std::nullopt, .setToolChangerErrorBlinking = false,
-            .armStates = _armStates};
-  }
-  setWarningFlag(_warningState.missingInputSignals, false,
-                 "missing input signals");
-
   SignalMap ioOutputs;
-  ioOutputs["light1"] = inputs->at("button1");
-  ioOutputs["light2"] = inputs->at("button2");
 
   const bool motorControlAvailable = isComponentOperational(motorControlStatus);
   const bool controlPanelAvailable = isComponentOperational(controlPanelStatus);

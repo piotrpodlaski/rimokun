@@ -10,7 +10,7 @@
 namespace {
 constexpr std::string_view kHost = "10.1.1.102";
 constexpr int kPort = 4002;
-constexpr int kSlaveId = 2;
+constexpr int kSlaveId = 6;
 constexpr auto kResponseTimeout = std::chrono::milliseconds{1000};
 constexpr auto kConnectTimeout = std::chrono::milliseconds{1000};
 

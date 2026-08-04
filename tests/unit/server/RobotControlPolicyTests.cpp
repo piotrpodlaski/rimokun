@@ -72,6 +72,10 @@ void setAllComponentsOn(utl::RobotStatus& status) {
   status.robotComponents[utl::ERobotComponent::ControlPanel] = utl::ELEDState::On;
 }
 
+void unlockArmForThisCycle(utl::RobotStatus& status, const utl::EArm arm) {
+  status.joystics[arm].btn = true;
+}
+
 const IRobotControlPolicy::MotorIntent* findIntent(
     const std::vector<IRobotControlPolicy::MotorIntent>& intents,
     const utl::EMotor motorId) {
@@ -92,6 +96,9 @@ TEST(RobotControlPolicyTests, RimoKunPolicyGeneratesMotorIntentsFromJoystick) {
   status.joystics[utl::EArm::Left] = {.x = 0.4, .y = 0.7, .btn = false};
   status.joystics[utl::EArm::Right] = {.x = -0.6, .y = -0.5, .btn = false};
   status.joystics[utl::EArm::Gantry] = {.x = 0.2, .y = 0.3, .btn = false};
+  unlockArmForThisCycle(status, utl::EArm::Left);
+  unlockArmForThisCycle(status, utl::EArm::Right);
+  unlockArmForThisCycle(status, utl::EArm::Gantry);
 
   const auto decision = policy.decide(
       IRobotControlPolicy::SignalMap{{"button1", true}, {"button2", false}},
@@ -123,6 +130,7 @@ TEST(RobotControlPolicyTests, RimoKunPolicyGantryUsesSingleAxisForBothZMotors) {
   status.joystics[utl::EArm::Left] = {.x = 0.0, .y = 0.0, .btn = false};
   status.joystics[utl::EArm::Right] = {.x = 0.0, .y = 0.0, .btn = false};
   status.joystics[utl::EArm::Gantry] = {.x = -0.9, .y = 1.0, .btn = false};
+  unlockArmForThisCycle(status, utl::EArm::Gantry);
 
   const auto decision = policy.decide(
       IRobotControlPolicy::SignalMap{{"button1", false}, {"button2", true}},
@@ -155,6 +163,7 @@ TEST(RobotControlPolicyTests, RimoKunPolicyAppliesPerMotorSpeedLimits) {
   status.joystics[utl::EArm::Left] = {.x = 1.0, .y = 0.0, .btn = false};
   status.joystics[utl::EArm::Right] = {.x = 0.0, .y = 0.0, .btn = false};
   status.joystics[utl::EArm::Gantry] = {.x = 0.0, .y = 0.0, .btn = false};
+  unlockArmForThisCycle(status, utl::EArm::Left);
 
   const auto decisionLeft = policy.decide(
       IRobotControlPolicy::SignalMap{{"button1", false}, {"button2", false}},
@@ -172,6 +181,7 @@ TEST(RobotControlPolicyTests, RimoKunPolicyAppliesPerMotorSpeedLimits) {
   RimoKunControlPolicy policyRight;
   status.joystics[utl::EArm::Left] = {.x = 0.0, .y = 0.0, .btn = false};
   status.joystics[utl::EArm::Right] = {.x = 1.0, .y = 0.0, .btn = false};
+  unlockArmForThisCycle(status, utl::EArm::Right);
   const auto decisionRight = policyRight.decide(
       IRobotControlPolicy::SignalMap{{"button1", false}, {"button2", false}},
       std::nullopt, MachineComponent::State::Normal, status);
@@ -194,6 +204,9 @@ TEST(RobotControlPolicyTests, RimoKunPolicyUsesCommonThresholdWithPerAxisOverrid
   status.joystics[utl::EArm::Left] = {.x = 0.2, .y = 0.2, .btn = false};
   status.joystics[utl::EArm::Right] = {.x = 0.2, .y = 0.2, .btn = false};
   status.joystics[utl::EArm::Gantry] = {.x = 0.0, .y = 0.2, .btn = false};
+  unlockArmForThisCycle(status, utl::EArm::Left);
+  unlockArmForThisCycle(status, utl::EArm::Right);
+  unlockArmForThisCycle(status, utl::EArm::Gantry);
 
   const auto decision = policy.decide(
       IRobotControlPolicy::SignalMap{{"button1", false}, {"button2", false}},
@@ -227,6 +240,9 @@ TEST(RobotControlPolicyTests,
   EXPECT_TRUE(decision.setToolChangerErrorBlinking);
   EXPECT_FALSE(decision.outputs.has_value());
   EXPECT_TRUE(decision.motorIntents.empty());
+  EXPECT_EQ(decision.armStates.at(utl::EArm::Left), utl::EAxisState::Locked);
+  EXPECT_EQ(decision.armStates.at(utl::EArm::Right), utl::EAxisState::Locked);
+  EXPECT_EQ(decision.armStates.at(utl::EArm::Gantry), utl::EAxisState::Locked);
 }
 
 TEST(RobotControlPolicyTests, RimoKunPolicySkipsMotorCommandsWhenMotorControlDown) {
@@ -251,6 +267,34 @@ TEST(RobotControlPolicyTests, RimoKunPolicySkipsMotorCommandsWhenMotorControlDow
 }
 
 TEST(RobotControlPolicyTests,
+     RimoKunPolicyLocksArmStatesWhenControlPanelIsUnavailable) {
+  RimoKunControlPolicy policy;
+  utl::RobotStatus status;
+  setAllComponentsOn(status);
+  status.joystics[utl::EArm::Left] = {.x = 0.8, .y = 0.0, .btn = false};
+  status.joystics[utl::EArm::Right] = {.x = 0.0, .y = 0.0, .btn = false};
+  status.joystics[utl::EArm::Gantry] = {.x = 0.0, .y = 0.0, .btn = false};
+  unlockArmForThisCycle(status, utl::EArm::Left);
+
+  const auto unlocked = policy.decide(
+      IRobotControlPolicy::SignalMap{{"button1", false}, {"button2", false}},
+      std::nullopt, MachineComponent::State::Normal, status);
+  EXPECT_EQ(unlocked.armStates.at(utl::EArm::Left), utl::EAxisState::Slow);
+
+  status.robotComponents[utl::ERobotComponent::ControlPanel] =
+      utl::ELEDState::Error;
+  status.joystics[utl::EArm::Left].btn = false;
+  const auto unavailable = policy.decide(
+      IRobotControlPolicy::SignalMap{{"button1", false}, {"button2", false}},
+      std::nullopt, MachineComponent::State::Normal, status);
+
+  EXPECT_TRUE(unavailable.motorIntents.empty());
+  EXPECT_EQ(unavailable.armStates.at(utl::EArm::Left), utl::EAxisState::Locked);
+  EXPECT_EQ(unavailable.armStates.at(utl::EArm::Right), utl::EAxisState::Locked);
+  EXPECT_EQ(unavailable.armStates.at(utl::EArm::Gantry), utl::EAxisState::Locked);
+}
+
+TEST(RobotControlPolicyTests,
      RimoKunPolicyTreatsWarningComponentStateAsOperational) {
   RimoKunControlPolicy policy;
   utl::RobotStatus status;
@@ -262,6 +306,7 @@ TEST(RobotControlPolicyTests,
   status.joystics[utl::EArm::Left] = {.x = 0.8, .y = 0.0, .btn = false};
   status.joystics[utl::EArm::Right] = {.x = 0.0, .y = 0.0, .btn = false};
   status.joystics[utl::EArm::Gantry] = {.x = 0.0, .y = 0.0, .btn = false};
+  unlockArmForThisCycle(status, utl::EArm::Left);
 
   const auto decision = policy.decide(
       IRobotControlPolicy::SignalMap{{"button1", true}, {"button2", false}},
@@ -321,6 +366,7 @@ TEST(RobotControlPolicyTests, RimoKunPolicyUpdatesSpeedOnlyAfterAxisDeltaThresho
   status.joystics[utl::EArm::Left] = {.x = 0.50, .y = 0.0, .btn = false};
   status.joystics[utl::EArm::Right] = {.x = 0.0, .y = 0.0, .btn = false};
   status.joystics[utl::EArm::Gantry] = {.x = 0.0, .y = 0.0, .btn = false};
+  unlockArmForThisCycle(status, utl::EArm::Left);
 
   const auto first = policy.decide(
       IRobotControlPolicy::SignalMap{{"button1", true}, {"button2", true}},

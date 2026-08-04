@@ -10,6 +10,7 @@
 class GuiStateStore;
 class QGridLayout;
 class QLabel;
+class QPushButton;
 class QTimer;
 class QVBoxLayout;
 
@@ -42,11 +43,13 @@ class HomingWindow final : public QDialog {
   static QString axisDisplayName(utl::EHomingAxis axis);
   static QString stateText(const utl::HomingAxisStatus& axisStatus);
   void emitHomingCommand(cmd::HomingTarget target) const;
+  void emitCancelHomingCommand();
 
   GuiStateStore* _store;
   QLabel* _summaryLabel{nullptr};
   QLabel* _spinnerLabel{nullptr};
   QLabel* _detailLabel{nullptr};
+  QPushButton* _cancelButton{nullptr};
   QGridLayout* _statusGrid{nullptr};
   QTimer* _animationTimer{nullptr};
   int _spinnerIndex{0};

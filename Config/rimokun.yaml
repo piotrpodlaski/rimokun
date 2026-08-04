@@ -73,15 +73,15 @@ classes:
         overloadAlarm: 300
         excessivePositionDeviationWarning: 500
         excessivePositionDeviationAlarm: 700
-      XRight:
-        address: 2
-        runCurrent: 500
-        stopCurrent: 500
-        startingSpeed: 100
-        overloadWarning: 10
-        overloadAlarm: 300
-        excessivePositionDeviationWarning: 500
-        excessivePositionDeviationAlarm: 700
+#      XRight:
+#        address: 2
+#        runCurrent: 500
+#        stopCurrent: 500
+#        startingSpeed: 100
+#        overloadWarning: 10
+#        overloadAlarm: 300
+#        excessivePositionDeviationWarning: 500
+#        excessivePositionDeviationAlarm: 700
 #      YLeft:
 #        address: 3
 #        runCurrent: 500
@@ -190,9 +190,10 @@ classes:
           fastAcceleration001MsPerKHz: *fastAccelX
           fastDeceleration001MsPerKHz: *fastDeccelX
     inputMapping:
+      motorPower: 9
       safetyON : 8
-      button1 : 9
-      button2 : 10
+      button1 : 11
+      cpuOverride : 10
       tclProx : 0
       tclOpen : 1
       tclClose: 2
@@ -202,5 +203,6 @@ classes:
     outputMapping:
       toolChangerLeft: 4
       toolChangerRight: 5
+      safetyReset: 0
       heartBeat : 7
-      light2 : 1
+      alarmIndicator : 1

@@ -266,6 +266,7 @@ class Motor {
   void setRunCurrent(ModbusClient& bus, std::int32_t current) const;
   void setStopCurrent(ModbusClient& bus, std::int32_t current) const;
   void setStopInputAction(ModbusClient& bus, std::int32_t value) const;
+  void setStopInputPolarity(ModbusClient& bus, std::int32_t value) const;
   void setStartingSpeed(ModbusClient& bus, std::int32_t speed) const;
   void configureHoming(ModbusClient& bus, std::int32_t mode,
                        std::int32_t operatingSpeed,

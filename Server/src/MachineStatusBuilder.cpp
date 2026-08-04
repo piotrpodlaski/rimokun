@@ -296,6 +296,8 @@ void MachineStatusBuilder::updateAndPublish(
   };
 
   if (contecInError) {
+    status.motorPower = false;
+    status.safetyOn = false;
     setAllToolChangerFlags(utl::ELEDState::Error);
     publish(status);
     return;
@@ -304,10 +306,16 @@ void MachineStatusBuilder::updateAndPublish(
   auto inputs = readInputSignals();
   auto outputs = readOutputSignals();
 
+  if (inputs && inputs->contains("motorPower")) {
+    status.motorPower = inputs->at("motorPower");
+  } else {
+    status.motorPower = false;
+  }
+
   if (inputs && inputs->contains("safetyON")) {
     status.safetyOn = inputs->at("safetyON");
   } else {
-    status.safetyOn = std::nullopt;
+    status.safetyOn = false;
   }
 
   if (inputs && inputs->contains("tclProx") && inputs->contains("tcrProx")) {

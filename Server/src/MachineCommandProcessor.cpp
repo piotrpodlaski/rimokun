@@ -203,6 +203,20 @@ nlohmann::json handleHoming(const nlohmann::json& command,
   return response;
 }
 
+nlohmann::json handleCancelHoming(const nlohmann::json&,
+                                  const cmd::DispatchFn& dispatch) {
+  auto response = okResponse();
+  try {
+    cmd::Command c;
+    c.payload = cmd::CancelHomingCommand{};
+    applyDispatchReply(response, dispatch(std::move(c), 2s));
+  } catch (const std::exception& e) {
+    response =
+        errorResponse(std::format("cancelHoming command failed: {}", e.what()));
+  }
+  return response;
+}
+
 nlohmann::json handleEmergencyStop(const nlohmann::json&,
                                    const cmd::DispatchFn& dispatch) {
   auto response = okResponse();
@@ -217,6 +231,20 @@ nlohmann::json handleEmergencyStop(const nlohmann::json&,
   return response;
 }
 
+nlohmann::json handleSafetyReset(const nlohmann::json&,
+                                 const cmd::DispatchFn& dispatch) {
+  auto response = okResponse();
+  try {
+    cmd::Command c;
+    c.payload = cmd::SafetyResetCommand{};
+    applyDispatchReply(response, dispatch(std::move(c), 3s));
+  } catch (const std::exception& e) {
+    response =
+        errorResponse(std::format("safetyReset command failed: {}", e.what()));
+  }
+  return response;
+}
+
 const std::unordered_map<std::string, HandlerFn>& handlers() {
   static const std::unordered_map<std::string, HandlerFn> table{
       {"toolChanger", handleToolChanger},
@@ -227,7 +255,9 @@ const std::unordered_map<std::string, HandlerFn>& handlers() {
       {"setMotorEnabled", handleSetMotorEnabled},
       {"setAllMotorsEnabled", handleSetAllMotorsEnabled},
       {"homing", handleHoming},
+      {"cancelHoming", handleCancelHoming},
       {"emergencyStop", handleEmergencyStop},
+      {"safetyReset", handleSafetyReset},
   };
   return table;
 }

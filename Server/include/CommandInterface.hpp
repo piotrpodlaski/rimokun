@@ -54,15 +54,20 @@ struct HomingCommand {
   HomingTarget target;
 };
 
+struct CancelHomingCommand {};
+
 struct ContecDiagnosticsCommand {};
 
 struct EmergencyStopCommand {};
 
+struct SafetyResetCommand {};
+
 using Payload = std::variant<ToolChangerCommand, ReconnectCommand,
                              MotorDiagnosticsCommand, ResetMotorAlarmCommand,
                              SetMotorEnabledCommand, SetAllMotorsEnabledCommand,
-                             HomingCommand, ContecDiagnosticsCommand,
-                             EmergencyStopCommand>;
+                             HomingCommand, CancelHomingCommand,
+                             ContecDiagnosticsCommand,
+                             EmergencyStopCommand, SafetyResetCommand>;
 
 struct Command {
   Payload payload;

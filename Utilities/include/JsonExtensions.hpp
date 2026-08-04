@@ -220,6 +220,12 @@ struct adl_serializer<utl::RobotStatus> {
         {"armStates", utl::enumKeyedMapToJson(v.armStates)},
         {"homing", v.homing},
     };
+    if (v.motorPower.has_value()) {
+      j["motorPower"] = *v.motorPower;
+    }
+    if (v.heartBeatRunning.has_value()) {
+      j["heartBeatRunning"] = *v.heartBeatRunning;
+    }
     if (v.safetyOn.has_value()) {
       j["safetyOn"] = *v.safetyOn;
     }
@@ -234,6 +240,18 @@ struct adl_serializer<utl::RobotStatus> {
     v.robotComponents =
         utl::enumKeyedMapFromJson<utl::ERobotComponent, utl::ELEDState>(
             j.at("robotComponents"));
+    if (const auto motorPowerIt = j.find("motorPower");
+        motorPowerIt != j.end() && motorPowerIt->is_boolean()) {
+      v.motorPower = motorPowerIt->get<bool>();
+    } else {
+      v.motorPower = std::nullopt;
+    }
+    if (const auto heartBeatRunningIt = j.find("heartBeatRunning");
+        heartBeatRunningIt != j.end() && heartBeatRunningIt->is_boolean()) {
+      v.heartBeatRunning = heartBeatRunningIt->get<bool>();
+    } else {
+      v.heartBeatRunning = std::nullopt;
+    }
     if (const auto safetyOnIt = j.find("safetyOn");
         safetyOnIt != j.end() && safetyOnIt->is_boolean()) {
       v.safetyOn = safetyOnIt->get<bool>();

@@ -947,8 +947,12 @@ void MotorControl::applyConfiguredParameters(const Motor& motor,
     motor.setGroupId(bus, *config.groupId);
   }
   // Fixed startup policy: STOP input triggers deceleration and current-off.
-  // This is intentionally hardcoded for all active motors, not config-driven.
+  // STOP input polarity is also fixed here so the physical wiring is treated
+  // as active-high by the driver.
+  // Both settings are intentionally hardcoded for all active motors, not
+  // config-driven.
   motor.setStopInputAction(bus, 3);
+  motor.setStopInputPolarity(bus, 1);
   motor.setRunCurrent(bus, config.runCurrent);
   motor.setStopCurrent(bus, config.stopCurrent);
   if (config.startingSpeed.has_value()) {
@@ -970,8 +974,8 @@ void MotorControl::applyConfiguredParameters(const Motor& motor,
   }
   if (config.motorRotationDirection.has_value()) {
     motor.setMotorRotationDirection(bus, *config.motorRotationDirection);
-    motor.executeConfiguration(bus);
   }
+  motor.executeConfiguration(bus);
 }
 
 void MotorControl::handleCommunicationFailure(const std::string_view action,

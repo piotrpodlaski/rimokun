@@ -21,6 +21,7 @@ struct MotorRegisterMap {
   int alarmResetCommand{0x0180};
   int configurationExecute{0x018C};
   int stopInputAction{0x0200};
+  int stopInputPolarity{0x112C};
 
   int commandPosition{0x00C6};
   int commandSpeed{0x00C8};

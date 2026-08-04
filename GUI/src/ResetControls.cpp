@@ -8,6 +8,7 @@ ResetControls::ResetControls(QWidget* parent) : QWidget(parent), _ui(new Ui::Res
   _ui->setupUi(this);
 
   _bResetContec=_ui->resetContec;
+  _bResetSafety=_ui->resetSafety;
   _bResetMotors=_ui->resetMotors;
   _bResetControlPanel=_ui->resetControlPanel;
   _bEnableAllMotors = _ui->enableAllMotors;
@@ -19,17 +20,20 @@ ResetControls::ResetControls(QWidget* parent) : QWidget(parent), _ui(new Ui::Res
   _lMotorLed = _ui->ledMotors;
   _lControlPanelLed = _ui->ledControlPanel;
   _lMotorPowerLed = _ui->ledMotorPower;
+  _lSafetyOnLed = _ui->ledSafetyOn;
   _bEmergencyStop = _ui->emergencyStop;
 
   _lServerLed->setState(ELEDState::Error);
   _bResetContec->setEnabled(false);
   _bResetMotors->setEnabled(false);
   _bResetControlPanel->setEnabled(false);
+  _bResetSafety->setEnabled(false);
   _bEnableAllMotors->setEnabled(false);
   _bDisableAllMotors->setEnabled(false);
   _bHoming->setEnabled(false);
 
   connect(_bResetContec, &QPushButton::clicked, this, &ResetControls::handleButtons);
+  connect(_bResetSafety, &QPushButton::clicked, this, &ResetControls::handleButtons);
   connect(_bResetMotors, &QPushButton::clicked, this, &ResetControls::handleButtons);
   connect(_bResetControlPanel, &QPushButton::clicked, this, &ResetControls::handleButtons);
   connect(_bEnableAllMotors, &QPushButton::clicked, this,
@@ -50,7 +54,9 @@ void ResetControls::applyViewModel(const ResetControlsViewModel& vm) const {
   _lMotorLed->setState(vm.motor);
   _lControlPanelLed->setState(vm.controlPanel);
   _lMotorPowerLed->setState(vm.motorPower);
+  _lSafetyOnLed->setState(vm.safetyOn);
   _bResetContec->setEnabled(vm.resetContecEnabled);
+  _bResetSafety->setEnabled(vm.resetSafetyEnabled);
   _bResetMotors->setEnabled(vm.resetMotorEnabled);
   _bResetControlPanel->setEnabled(vm.resetControlPanelEnabled);
   _bEnableAllMotors->setEnabled(vm.enableAllMotorsEnabled);
@@ -74,6 +80,9 @@ void ResetControls::handleButtons() {
   GuiCommand command;
   if (sender == _ui->resetContec) {
     command.payload = cmd::ReconnectCommand{.robotComponent = ERobotComponent::Contec};
+  }
+  else if (sender == _ui->resetSafety) {
+    command.payload = cmd::SafetyResetCommand{};
   }
   else if (sender == _ui->resetMotors) {
     command.payload =

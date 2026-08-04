@@ -224,6 +224,35 @@ void AxisHomingManager::start(const cmd::HomingTarget target, utl::RobotStatus& 
   beginSession({target}, status, homingRequested);
 }
 
+void AxisHomingManager::cancel(
+    utl::RobotStatus& status,
+    std::map<utl::EMotor, bool>& homingRequested) {
+  if (!_runtime.active) {
+    status.homing.state = utl::EHomingState::Cancelled;
+    status.homing.message = "No active homing session to cancel.";
+    return;
+  }
+
+  if (_runtime.currentAxisIndex < status.homing.axes.size()) {
+    auto& axisStatus = status.homing.axes[_runtime.currentAxisIndex];
+    axisStatus.state = utl::EHomingState::Cancelled;
+    axisStatus.message = "Homing cancelled by operator.";
+  }
+  for (std::size_t i = _runtime.currentAxisIndex + 1;
+       i < status.homing.axes.size(); ++i) {
+    if (status.homing.axes[i].state == utl::EHomingState::Pending) {
+      status.homing.axes[i].state = utl::EHomingState::Cancelled;
+      status.homing.axes[i].message = "Not started.";
+    }
+  }
+  for (auto& [_, requested] : homingRequested) {
+    requested = false;
+  }
+  status.homing.state = utl::EHomingState::Cancelled;
+  status.homing.message = "Homing cancelled by operator.";
+  _runtime.active = false;
+}
+
 void AxisHomingManager::advanceFromStatus(utl::RobotStatus& status,
                                           std::map<utl::EMotor, bool>& homingRequested) {
   if (!_runtime.active || _runtime.currentAxisIndex >= status.homing.axes.size()) {

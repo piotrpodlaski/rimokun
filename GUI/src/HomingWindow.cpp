@@ -107,6 +107,10 @@ HomingVisualState visualState(const utl::EHomingState state) {
       return {.foreground = "#d46a00",
               .spinnerText = "TO",
               .summaryText = "Homing timed out"};
+    case utl::EHomingState::Cancelled:
+      return {.foreground = "#6b5d00",
+              .spinnerText = "CAN",
+              .summaryText = "Homing cancelled"};
   }
   return {};
 }
@@ -198,6 +202,13 @@ HomingWindow::HomingWindow(GuiStateStore* store, QWidget* parent)
   statusBox->addWidget(tableCard);
   statusBox->addStretch(1);
 
+  _cancelButton = new QPushButton("Cancel homing", this);
+  _cancelButton->setMinimumHeight(42);
+  _cancelButton->setEnabled(false);
+  connect(_cancelButton, &QPushButton::clicked, this,
+          &HomingWindow::emitCancelHomingCommand);
+  root->addWidget(_cancelButton);
+
   auto* closeButton = new QPushButton("Close", this);
   closeButton->setMinimumHeight(42);
   connect(closeButton, &QPushButton::clicked, this, &HomingWindow::close);
@@ -234,6 +245,8 @@ void HomingWindow::handleStatusUpdated(const utl::RobotStatus& status) {
     updateAxisRow(axisStatus);
   }
   setSpinnerForState(status.homing.state);
+  _cancelButton->setEnabled(status.homing.state == utl::EHomingState::Pending ||
+                            status.homing.state == utl::EHomingState::Running);
 }
 
 void HomingWindow::handleConnectionChanged(const bool connected) {
@@ -246,6 +259,7 @@ void HomingWindow::handleConnectionChanged(const bool connected) {
   _summaryLabel->setText("Disconnected");
   _summaryLabel->setStyleSheet(makeSummaryStyle(failedVisual.foreground));
   _detailLabel->setText("Server connection lost.");
+  _cancelButton->setEnabled(false);
 }
 
 void HomingWindow::ensureAxisRows(const utl::HomingSessionStatus& session) {
@@ -342,5 +356,11 @@ QString HomingWindow::stateText(const utl::HomingAxisStatus& axisStatus) {
 void HomingWindow::emitHomingCommand(const cmd::HomingTarget target) const {
   GuiCommand command;
   command.payload = cmd::HomingCommand{.target = target};
+  emit commandIssued(command);
+}
+
+void HomingWindow::emitCancelHomingCommand() {
+  GuiCommand command;
+  command.payload = cmd::CancelHomingCommand{};
   emit commandIssued(command);
 }

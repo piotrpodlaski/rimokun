@@ -31,11 +31,20 @@ enum class ERobotComponent {Contec, MotorControl, ControlPanel};
 
 enum class EAxisState { Locked, Slow, Fast };
 enum class EHomingAxis { XLeft, YLeft, XRight, YRight, Z };
-enum class EHomingState { Idle, Pending, Running, Succeeded, Failed, TimedOut };
+enum class EHomingState {
+  Idle,
+  Pending,
+  Running,
+  Succeeded,
+  Failed,
+  TimedOut,
+  Cancelled
+};
 
 // Known Contec digital input signal names.  All keys in Machine.inputMapping
 // must correspond to one of these values (validated at startup).
 enum class EInputSignal {
+  motorPower,
   safetyON,
   button1,
   button2,
@@ -45,6 +54,7 @@ enum class EInputSignal {
   tcrProx,
   tcrOpen,
   tcrClose,
+  cpuOverride
 };
 
 // Known Contec digital output signal names.  All keys in Machine.outputMapping
@@ -53,8 +63,10 @@ enum class EOutputSignal {
   toolChangerLeft,
   toolChangerRight,
   heartBeat,
+  safetyReset,
   light1,
   light2,
+  alarmIndicator
 };
 
 using SignalMap = std::map<std::string, bool, std::less<>>;
@@ -104,6 +116,8 @@ struct RobotStatus {
   std::map<EArm, ToolChangerStatus> toolChangers;
   std::map<ERobotComponent, ELEDState> robotComponents;
   std::map<EArm, JoystickStatus> joystics;
+  std::optional<bool> motorPower;
+  std::optional<bool> heartBeatRunning;
   std::optional<bool> safetyOn;
   std::map<EArm, EAxisState> armStates;
   HomingSessionStatus homing;

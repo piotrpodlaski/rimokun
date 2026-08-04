@@ -108,9 +108,9 @@ class RimoKunControlPolicy final : public IRobotControlPolicy {
 
   std::int64_t _autoLockTimeoutMs{5000};
   std::map<utl::EArm, utl::EAxisState> _armStates{
-      {utl::EArm::Left, utl::EAxisState::Slow},
-      {utl::EArm::Right, utl::EAxisState::Slow},
-      {utl::EArm::Gantry, utl::EAxisState::Slow},
+      {utl::EArm::Left, utl::EAxisState::Locked},
+      {utl::EArm::Right, utl::EAxisState::Locked},
+      {utl::EArm::Gantry, utl::EAxisState::Locked},
   };
   std::map<utl::EArm, std::chrono::steady_clock::time_point> _lastMovementTime;
   std::map<utl::EArm, bool> _prevButtonState{

@@ -90,3 +90,12 @@ TEST(GuiCommandJsonAdapterTests, HomingCommandMapsToJson) {
   EXPECT_EQ(json["type"].get<std::string>(), "homing");
   EXPECT_EQ(json["target"].get<std::string>(), "Z");
 }
+
+TEST(GuiCommandJsonAdapterTests, CancelHomingCommandMapsToJson) {
+  GuiCommand command;
+  command.payload = cmd::CancelHomingCommand{};
+
+  const auto json = GuiCommandJsonAdapter::toJson(command);
+  ASSERT_TRUE(json.contains("type"));
+  EXPECT_EQ(json["type"].get<std::string>(), "cancelHoming");
+}

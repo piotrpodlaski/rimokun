@@ -433,3 +433,21 @@ TEST(MachineCommandProcessorTests, HomingMissingTargetReturnsErrorWithoutDispatc
   EXPECT_TRUE(response["message"].get<std::string>().find("'target'") !=
               std::string::npos);
 }
+
+TEST(MachineCommandProcessorTests, CancelHomingCommandDispatches) {
+  nlohmann::json command{
+      {"type", "cancelHoming"},
+  };
+
+  bool dispatched = false;
+  const auto response = cmd::processCommand(
+      command, [&](cmd::Command c, const std::chrono::milliseconds timeout) {
+        dispatched = true;
+        EXPECT_EQ(timeout, 2s);
+        EXPECT_TRUE(std::holds_alternative<cmd::CancelHomingCommand>(c.payload));
+        return std::string{};
+      });
+
+  EXPECT_TRUE(dispatched);
+  EXPECT_EQ(response["status"].get<std::string>(), "OK");
+}

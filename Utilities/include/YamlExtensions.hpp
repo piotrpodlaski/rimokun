@@ -225,6 +225,12 @@ struct convert<utl::RobotStatus> {
     for (const auto& [cmp, tc] : rhs.robotComponents) {
       node["robotComponents"][convert<utl::ERobotComponent>::encode(cmp)] = tc;
     }
+    if (rhs.motorPower.has_value()) {
+      node["motorPower"] = *rhs.motorPower;
+    }
+    if (rhs.heartBeatRunning.has_value()) {
+      node["heartBeatRunning"] = *rhs.heartBeatRunning;
+    }
     if (rhs.safetyOn.has_value()) {
       node["safetyOn"] = *rhs.safetyOn;
     }
@@ -256,6 +262,13 @@ struct convert<utl::RobotStatus> {
       utl::ERobotComponent cmp;
       if (!convert<utl::ERobotComponent>::decode(kv.first, cmp)) return false;
       rhs.robotComponents[cmp] = kv.second.as<utl::ELEDState>();
+    }
+    if (const auto motorPowerNode = node["motorPower"]; motorPowerNode) {
+      rhs.motorPower = motorPowerNode.as<bool>();
+    }
+    if (const auto heartBeatRunningNode = node["heartBeatRunning"];
+        heartBeatRunningNode) {
+      rhs.heartBeatRunning = heartBeatRunningNode.as<bool>();
     }
     if (const auto safetyOnNode = node["safetyOn"]; safetyOnNode) {
       rhs.safetyOn = safetyOnNode.as<bool>();

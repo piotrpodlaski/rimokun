@@ -57,6 +57,10 @@ nlohmann::json GuiCommandJsonAdapter::toJson(const GuiCommand& command) {
               {"type", "homing"},
               {"target", homingTargetToString(payload.target)},
           };
+        } else if constexpr (std::is_same_v<CmdT, cmd::CancelHomingCommand>) {
+          return nlohmann::json{
+              {"type", "cancelHoming"},
+          };
         } else if constexpr (std::is_same_v<CmdT, cmd::ContecDiagnosticsCommand>) {
           return nlohmann::json{
               {"type", "contecDiagnostics"},
@@ -64,6 +68,10 @@ nlohmann::json GuiCommandJsonAdapter::toJson(const GuiCommand& command) {
         } else if constexpr (std::is_same_v<CmdT, cmd::EmergencyStopCommand>) {
           return nlohmann::json{
               {"type", "emergencyStop"},
+          };
+        } else if constexpr (std::is_same_v<CmdT, cmd::SafetyResetCommand>) {
+          return nlohmann::json{
+              {"type", "safetyReset"},
           };
         } else {
           return payload.node;

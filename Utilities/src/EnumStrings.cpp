@@ -112,9 +112,11 @@ constexpr std::array kHomingStateEntries{
     EnumEntry<utl::EHomingState>{utl::EHomingState::Succeeded, "Succeeded"},
     EnumEntry<utl::EHomingState>{utl::EHomingState::Failed, "Failed"},
     EnumEntry<utl::EHomingState>{utl::EHomingState::TimedOut, "TimedOut"},
+    EnumEntry<utl::EHomingState>{utl::EHomingState::Cancelled, "Cancelled"},
 };
 
 constexpr std::array kInputSignalEntries{
+    EnumEntry<utl::EInputSignal>{utl::EInputSignal::motorPower, "motorPower"},
     EnumEntry<utl::EInputSignal>{utl::EInputSignal::safetyON, "safetyON"},
     EnumEntry<utl::EInputSignal>{utl::EInputSignal::button1, "button1"},
     EnumEntry<utl::EInputSignal>{utl::EInputSignal::button2, "button2"},
@@ -124,6 +126,7 @@ constexpr std::array kInputSignalEntries{
     EnumEntry<utl::EInputSignal>{utl::EInputSignal::tcrProx, "tcrProx"},
     EnumEntry<utl::EInputSignal>{utl::EInputSignal::tcrOpen, "tcrOpen"},
     EnumEntry<utl::EInputSignal>{utl::EInputSignal::tcrClose, "tcrClose"},
+    EnumEntry<utl::EInputSignal>{utl::EInputSignal::cpuOverride, "cpuOverride"},
 };
 
 constexpr std::array kOutputSignalEntries{
@@ -132,8 +135,11 @@ constexpr std::array kOutputSignalEntries{
     EnumEntry<utl::EOutputSignal>{utl::EOutputSignal::toolChangerRight,
                                   "toolChangerRight"},
     EnumEntry<utl::EOutputSignal>{utl::EOutputSignal::heartBeat, "heartBeat"},
+    EnumEntry<utl::EOutputSignal>{utl::EOutputSignal::safetyReset,
+                                  "safetyReset"},
     EnumEntry<utl::EOutputSignal>{utl::EOutputSignal::light1, "light1"},
     EnumEntry<utl::EOutputSignal>{utl::EOutputSignal::light2, "light2"},
+    EnumEntry<utl::EOutputSignal>{utl::EOutputSignal::alarmIndicator, "alarmIndicator"},
 };
 
 #if __has_include(<libserial/SerialPortConstants.h>)
@@ -353,7 +359,7 @@ std::optional<EHomingState> enumFromStringImpl(
   return enumFromString(kHomingStateEntries, text);
 }
 std::string_view knownEnumNamesImpl(const std::type_identity<EHomingState>) {
-  return "Idle, Pending, Running, Succeeded, Failed, TimedOut";
+  return "Idle, Pending, Running, Succeeded, Failed, TimedOut, Cancelled";
 }
 
 std::string_view enumToStringImpl(const EInputSignal value) {
@@ -364,8 +370,8 @@ std::optional<EInputSignal> enumFromStringImpl(
   return enumFromString(kInputSignalEntries, text);
 }
 std::string_view knownEnumNamesImpl(const std::type_identity<EInputSignal>) {
-  return "safetyON, button1, button2, tclProx, tclOpen, tclClose, tcrProx, "
-         "tcrOpen, tcrClose";
+  return "motorPower, safetyON, button1, button2, tclProx, tclOpen, "
+         "tclClose, tcrProx, tcrOpen, tcrClose";
 }
 
 std::string_view enumToStringImpl(const EOutputSignal value) {
@@ -376,7 +382,8 @@ std::optional<EOutputSignal> enumFromStringImpl(
   return enumFromString(kOutputSignalEntries, text);
 }
 std::string_view knownEnumNamesImpl(const std::type_identity<EOutputSignal>) {
-  return "toolChangerLeft, toolChangerRight, heartBeat, light1, light2";
+  return "toolChangerLeft, toolChangerRight, heartBeat, safetyReset, light1, "
+         "light2, alarmIndicator";
 }
 
 #if __has_include(<libserial/SerialPortConstants.h>)

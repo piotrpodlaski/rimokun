@@ -51,6 +51,7 @@ class Machine {
  private:
   void commandServerThread();
   void processThread();
+  void contecThread();
  protected:
   virtual void controlLoopTasks();
   virtual void updateStatus();
@@ -63,9 +64,11 @@ class Machine {
   virtual void handleSetAllMotorsEnabledCommand(
       const cmd::SetAllMotorsEnabledCommand& c);
   virtual void handleHomingCommand(const cmd::HomingCommand& c);
+  virtual void handleCancelHomingCommand(const cmd::CancelHomingCommand& c);
   virtual nlohmann::json handleContecDiagnosticsCommand(
       const cmd::ContecDiagnosticsCommand& c);
   virtual void handleEmergencyStopCommand(const cmd::EmergencyStopCommand& c);
+  virtual void handleSafetyResetCommand(const cmd::SafetyResetCommand& c);
  private:
   struct IoSignalCache {
     std::uint64_t cycle{0};
@@ -75,7 +78,9 @@ class Machine {
 
   void cacheInputSignals(std::optional<utl::SignalMap> value);
   void cacheOutputSignals(std::optional<utl::SignalMap> value);
-  void updateHeartBeatOutput();
+  void runContecCycle();
+  void updateHeartBeatOutput(utl::SignalMap& desiredOutputs);
+  void setDesiredOutputSignal(std::string_view signal, bool value);
 
   void initializeComponents();
   std::string reconnectComponent(utl::ERobotComponent component);
@@ -93,22 +98,31 @@ class Machine {
   cmd::CommandQueue _commandQueue;
   std::atomic<bool> _isRunning{false};
   std::chrono::milliseconds _loopInterval{10};
+  std::chrono::milliseconds _contecLoopInterval{10};
   std::chrono::milliseconds _updateInterval{50};
   bool _statusUpdatesEnabled{true};
   std::size_t _heartBeatPrescaleCycles{0};
   std::size_t _heartBeatCycleCounter{0};
   bool _heartBeatState{false};
+  bool _heartBeatEnabled{true};
+  std::atomic<bool> _motorAlarmActive{false};
+  std::optional<IClock::time_point> _safetyResetTurnOnAt;
+  std::optional<IClock::time_point> _safetyResetTurnOffAt;
   std::shared_ptr<IClock> _clock;
   utl::RimoServer<utl::RobotStatus> _robotServer;
   std::thread _commandServerThread;
   std::thread _processThread;
+  std::thread _contecThread;
   std::mutex _lifecycleMutex;
+  std::mutex _contecStateMutex;
+  std::mutex _contecHardwareMutex;
   std::uint64_t _ioCacheCycle{0};
   std::map<utl::EMotor, bool> _homingRequested;
   IoSignalCache _inputSignalsCache;
   IoSignalCache _outputSignalsCache;
   utl::SignalMap _inputSignals;
   utl::SignalMap _outputSignals;
+  utl::SignalMap _desiredOutputSignals;
   std::unique_ptr<ControlLoopRunner> _loopRunner;
   std::unique_ptr<MachineController> _controller;
   std::unique_ptr<MachineStatusBuilder> _statusBuilder;

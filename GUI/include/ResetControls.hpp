@@ -30,6 +30,7 @@ class ResetControls : public QWidget {
  private:
   Ui::ResetControls* _ui;
   QPushButton* _bResetContec;
+  QPushButton* _bResetSafety;
   QPushButton* _bResetMotors;
   QPushButton* _bResetControlPanel;
   QPushButton* _bEnableAllMotors;
@@ -40,6 +41,7 @@ class ResetControls : public QWidget {
   LedIndicator* _lMotorLed;
   LedIndicator* _lControlPanelLed;
   LedIndicator* _lMotorPowerLed;
+  LedIndicator* _lSafetyOnLed;
   QPushButton* _bEmergencyStop;
   HomingWindow* _homingWindow{nullptr};
   GuiStateStore* _store{nullptr};

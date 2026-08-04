@@ -282,6 +282,11 @@ IRobotControlPolicy::ControlDecision RimoKunControlPolicy::decide(
   }
 
   if (!motorControlAvailable || !controlPanelAvailable) {
+    if (!controlPanelAvailable) {
+      for (auto& [_, armState] : _armStates) {
+        armState = utl::EAxisState::Locked;
+      }
+    }
     return {.outputs = std::move(ioOutputs),
             .motorIntents = {},
             .setToolChangerErrorBlinking = false,

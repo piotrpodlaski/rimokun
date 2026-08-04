@@ -690,6 +690,10 @@ void Motor::setStopInputAction(ModbusClient& bus, const std::int32_t value) cons
   writeInt32(bus, _map.stopInputAction, value, SlaveTarget::Device);
 }
 
+void Motor::setStopInputPolarity(ModbusClient& bus, const std::int32_t value) const {
+  writeInt32(bus, _map.stopInputPolarity, value, SlaveTarget::Device);
+}
+
 void Motor::setStartingSpeed(ModbusClient& bus, const std::int32_t speed) const {
   writeInt32(bus, _map.startingSpeed, speed, SlaveTarget::Device);
 }

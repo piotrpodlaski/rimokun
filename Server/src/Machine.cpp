@@ -14,6 +14,9 @@
 using namespace std::chrono_literals;
 
 namespace {
+constexpr auto kSafetyResetDelay = 500ms;
+constexpr auto kSafetyResetPulseDuration = 1s;
+
 unsigned int requireMappingIndex(
     const std::map<std::string, unsigned int, std::less<>>& mapping,
     const std::string_view key) {
@@ -113,6 +116,7 @@ Machine::Machine(std::shared_ptr<IClock> clock) : _clock(std::move(clock)) {
   }
   for (const auto& [signal, _] : _outputMapping) {
     _outputSignals.emplace(signal, false);
+    _desiredOutputSignals.emplace(signal, false);
   }
   validateSignalMappingKeys<utl::EInputSignal>(_inputMapping, "input");
   validateSignalMappingKeys<utl::EOutputSignal>(_outputMapping, "output");
@@ -122,12 +126,16 @@ Machine::Machine(std::shared_ptr<IClock> clock) : _clock(std::move(clock)) {
   const auto updateIntervalMS = cfg.getOptional<int>(
       "Machine", "updateIntervalMS",
       cfg.getOptional<int>("Machine", "statusPublishPeriodMS", 50));
+  const auto contecLoopIntervalMS =
+      cfg.getOptional<int>("Machine", "contecLoopIntervalMS", loopIntervalMS);
   _statusUpdatesEnabled =
       cfg.getOptional<bool>("Machine", "statusUpdatesEnabled", true);
   _heartBeatPrescaleCycles = static_cast<std::size_t>(std::max(
       0, cfg.getOptional<int>("Machine", "heartBeatPrescaleCycles", 0)));
 
   _loopInterval = std::chrono::milliseconds{std::max(1, loopIntervalMS)};
+  _contecLoopInterval =
+      std::chrono::milliseconds{std::max(1, contecLoopIntervalMS)};
   _updateInterval = std::chrono::milliseconds{std::max(1, updateIntervalMS)};
   const auto commandQueueMaxSize =
       cfg.getOptional<std::size_t>("Machine", "commandQueueMaxSize", 16u);
@@ -155,80 +163,44 @@ Machine::Machine(std::shared_ptr<IClock> clock) : _clock(std::move(clock)) {
   if (_heartBeatPrescaleCycles > 0) {
     (void)requireMappingIndex(_outputMapping, "heartBeat");
   }
+  (void)requireMappingIndex(_outputMapping, "safetyReset");
 }
 
 std::optional<utl::SignalMap> Machine::readInputSignals() {
-  if (_inputSignalsCache.valid && _inputSignalsCache.cycle == _ioCacheCycle) {
-    return _inputSignalsCache.value;
-  }
-  if (_contec.state() == MachineComponent::State::Error) {
-    cacheInputSignals(std::nullopt);
+  std::lock_guard<std::mutex> lock(_contecStateMutex);
+  if (!_inputSignalsCache.valid) {
     return std::nullopt;
   }
-  try {
-    auto inputs = _contec.readInputs();
-    for (const auto& [signal, index] : _inputMapping) {
-      validateMappedIndex(signal, index, inputs.size(), "input");
-      _inputSignals[signal] = inputs[index];
-    }
-    cacheInputSignals(_inputSignals);
-  } catch (const std::exception& e) {
-    SPDLOG_ERROR("Exception caught in 'readInputSignals'! {}", e.what());
-    cacheInputSignals(std::nullopt);
-    return std::nullopt;
-  }
-  return _inputSignals;
+  return _inputSignalsCache.value;
 }
 
 void Machine::setOutputs(const utl::SignalMap& signals) {
-  if (_contec.state() == MachineComponent::State::Error) {
-    return;
-  }
-  try {
-    auto outputs = _contec.readOutputs();
-    for (const auto& [signal, value] : signals) {
-      const auto it = _outputMapping.find(signal);
-      if (it == _outputMapping.end()) {
-        utl::throwRuntimeError(
-            std::format("Unknown output signal '{}'", signal));
-      }
-      validateMappedIndex(signal, it->second, outputs.size(), "output");
-      outputs[it->second] = value;
+  std::lock_guard<std::mutex> lock(_contecStateMutex);
+  for (const auto& [signal, value] : signals) {
+    const auto it = _outputMapping.find(signal);
+    if (it == _outputMapping.end()) {
+      utl::throwRuntimeError(
+          std::format("Unknown output signal '{}'", signal));
     }
-    _contec.setOutputs(outputs);
-
-    for (const auto& [signal, index] : _outputMapping) {
-      validateMappedIndex(signal, index, outputs.size(), "output");
-      _outputSignals[signal] = outputs[index];
-    }
-    cacheOutputSignals(_outputSignals);
-  } catch (const std::exception& e) {
-    SPDLOG_ERROR("Exception caught in 'setOutputs'! {}", e.what());
-    cacheOutputSignals(std::nullopt);
+    _desiredOutputSignals[signal] = value;
   }
 }
 
+void Machine::setDesiredOutputSignal(const std::string_view signal, const bool value) {
+  std::lock_guard<std::mutex> lock(_contecStateMutex);
+  const auto it = _outputMapping.find(std::string(signal));
+  if (it == _outputMapping.end()) {
+    utl::throwRuntimeError(std::format("Unknown output signal '{}'", signal));
+  }
+  _desiredOutputSignals[std::string(signal)] = value;
+}
+
 std::optional<utl::SignalMap> Machine::readOutputSignals() {
-  if (_outputSignalsCache.valid && _outputSignalsCache.cycle == _ioCacheCycle) {
-    return _outputSignalsCache.value;
-  }
-  if (_contec.state() == MachineComponent::State::Error) {
-    cacheOutputSignals(std::nullopt);
+  std::lock_guard<std::mutex> lock(_contecStateMutex);
+  if (!_outputSignalsCache.valid) {
     return std::nullopt;
   }
-  try {
-    auto output = _contec.readOutputs();
-    for (auto& [signal, index] : _outputMapping) {
-      validateMappedIndex(signal, index, output.size(), "output");
-      _outputSignals[signal] = output[index];
-    }
-    cacheOutputSignals(_outputSignals);
-    return _outputSignals;
-  } catch (const std::exception& e) {
-    SPDLOG_WARN("Exception caught in 'readOutputSignals'! {}", e.what());
-    cacheOutputSignals(std::nullopt);
-    return std::nullopt;
-  }
+  return _outputSignalsCache.value;
 }
 
 void Machine::validateMappedIndex(const std::string_view signal,
@@ -250,6 +222,30 @@ void Machine::processThread() {
   SPDLOG_INFO("Processing thread finished!");
 }
 
+void Machine::contecThread() {
+  SPDLOG_INFO("Contec thread started");
+  auto nextCycleAt = _clock->now();
+  while (_isRunning.load(std::memory_order_acquire)) {
+    const auto nowBefore = _clock->now();
+    if (nowBefore < nextCycleAt) {
+      _clock->sleepUntil(nextCycleAt);
+    }
+    runContecCycle();
+
+    nextCycleAt += _contecLoopInterval;
+    const auto nowAfter = _clock->now();
+    if (nextCycleAt <= nowAfter) {
+      const auto overrun = std::chrono::duration_cast<std::chrono::milliseconds>(
+          nowAfter - nextCycleAt + _contecLoopInterval);
+      SPDLOG_WARN("Contec loop overrun by {} ms", overrun.count());
+      do {
+        nextCycleAt += _contecLoopInterval;
+      } while (nextCycleAt <= nowAfter);
+    }
+  }
+  SPDLOG_INFO("Contec thread finished!");
+}
+
 void Machine::runOneCycle(LoopState& state) {
   RIMO_TIMED_SCOPE("Machine::runOneCycle");
   if (!_loopRunner) {
@@ -262,17 +258,16 @@ void Machine::runOneCycle(LoopState& state) {
       }
     };
     resetIfNeeded(_motorControl);
-    resetIfNeeded(_contec);
+    {
+      std::lock_guard<std::mutex> hardwareLock(_contecHardwareMutex);
+      resetIfNeeded(_contec);
+    }
     resetIfNeeded(_controlPanel);
   };
   try {
-    ++_ioCacheCycle;
-    _inputSignalsCache.valid = false;
-    _outputSignalsCache.valid = false;
     _loopRunner->runOneCycle(
         [this]() {
           controlLoopTasks();
-          updateHeartBeatOutput();
         },
         [this]() {
           if (auto command = _commandQueue.try_pop()) {
@@ -302,6 +297,9 @@ void Machine::runOneCycle(LoopState& state) {
                                     [this](const cmd::HomingCommand& c) {
                                       handleHomingCommand(c);
                                     },
+                                    [this](const cmd::CancelHomingCommand& c) {
+                                      handleCancelHomingCommand(c);
+                                    },
                                     [this, &responsePayload](
                                         const cmd::ContecDiagnosticsCommand& c) {
                                       responsePayload =
@@ -309,6 +307,9 @@ void Machine::runOneCycle(LoopState& state) {
                                     },
                                     [this](const cmd::EmergencyStopCommand& c) {
                                       handleEmergencyStopCommand(c);
+                                    },
+                                    [this](const cmd::SafetyResetCommand& c) {
+                                      handleSafetyResetCommand(c);
                                     }},
                          command->payload);
               command->reply.set_value(std::move(responsePayload));
@@ -353,9 +354,89 @@ void Machine::cacheOutputSignals(std::optional<utl::SignalMap> value) {
   _outputSignalsCache.value = std::move(value);
 }
 
-void Machine::updateHeartBeatOutput() {
-  if (_heartBeatPrescaleCycles == 0 ||
-      _contec.state() == MachineComponent::State::Error) {
+void Machine::runContecCycle() {
+  try {
+    std::vector<bool> inputs;
+    std::vector<bool> outputs;
+    {
+      std::lock_guard<std::mutex> hardwareLock(_contecHardwareMutex);
+      if (_contec.state() == MachineComponent::State::Error) {
+        std::lock_guard<std::mutex> stateLock(_contecStateMutex);
+        _inputSignalsCache.valid = false;
+        _inputSignalsCache.value = std::nullopt;
+        _outputSignalsCache.valid = false;
+        _outputSignalsCache.value = std::nullopt;
+        return;
+      }
+      inputs = _contec.readInputs();
+      outputs = _contec.readOutputs();
+    }
+
+    utl::SignalMap desiredOutputs;
+    {
+      std::lock_guard<std::mutex> stateLock(_contecStateMutex);
+      desiredOutputs = _desiredOutputSignals;
+      const auto now = _clock->now();
+      if (_safetyResetTurnOffAt.has_value() && now >= *_safetyResetTurnOffAt) {
+        SPDLOG_INFO("Safety reset pulse complete. Driving 'safetyReset' output low.");
+        desiredOutputs["safetyReset"] = false;
+        _desiredOutputSignals["safetyReset"] = false;
+        _safetyResetTurnOffAt.reset();
+      } else if (_safetyResetTurnOnAt.has_value() && now >= *_safetyResetTurnOnAt) {
+        SPDLOG_INFO("Safety reset delay elapsed. Driving 'safetyReset' output high.");
+        desiredOutputs["safetyReset"] = true;
+        _desiredOutputSignals["safetyReset"] = true;
+        _safetyResetTurnOffAt = now + kSafetyResetPulseDuration;
+        _safetyResetTurnOnAt.reset();
+      }
+      updateHeartBeatOutput(desiredOutputs);
+      desiredOutputs["alarmIndicator"] =
+          _motorAlarmActive.load(std::memory_order_acquire);
+      _desiredOutputSignals = desiredOutputs;
+    }
+
+    bool outputsChanged = false;
+    for (const auto& [signal, value] : desiredOutputs) {
+      const auto it = _outputMapping.find(signal);
+      if (it == _outputMapping.end()) {
+        continue;
+      }
+      validateMappedIndex(signal, it->second, outputs.size(), "output");
+      if (outputs[it->second] != value) {
+        outputs[it->second] = value;
+        outputsChanged = true;
+      }
+    }
+    if (outputsChanged) {
+      std::lock_guard<std::mutex> hardwareLock(_contecHardwareMutex);
+      _contec.setOutputs(outputs);
+    }
+
+    std::lock_guard<std::mutex> stateLock(_contecStateMutex);
+    for (const auto& [signal, index] : _inputMapping) {
+      validateMappedIndex(signal, index, inputs.size(), "input");
+      _inputSignals[signal] = inputs[index];
+    }
+    for (const auto& [signal, index] : _outputMapping) {
+      validateMappedIndex(signal, index, outputs.size(), "output");
+      _outputSignals[signal] = outputs[index];
+    }
+    cacheInputSignals(_inputSignals);
+    cacheOutputSignals(_outputSignals);
+  } catch (const std::exception& e) {
+    SPDLOG_ERROR("Exception caught in 'runContecCycle'! {}", e.what());
+    std::lock_guard<std::mutex> stateLock(_contecStateMutex);
+    _inputSignalsCache.valid = false;
+    _inputSignalsCache.value = std::nullopt;
+    _outputSignalsCache.valid = false;
+    _outputSignalsCache.value = std::nullopt;
+  }
+}
+
+void Machine::updateHeartBeatOutput(utl::SignalMap& desiredOutputs) {
+  if (!_heartBeatEnabled || _heartBeatPrescaleCycles == 0) {
+    _heartBeatState = false;
+    desiredOutputs["heartBeat"] = false;
     return;
   }
 
@@ -366,7 +447,7 @@ void Machine::updateHeartBeatOutput() {
 
   _heartBeatCycleCounter = 0;
   _heartBeatState = !_heartBeatState;
-  setOutputs({{"heartBeat", _heartBeatState}});
+  desiredOutputs["heartBeat"] = _heartBeatState;
 }
 
 bool Machine::submitCommand(cmd::Command command) {
@@ -463,6 +544,7 @@ void Machine::initialize() {
   initializeComponents();
   try {
     _commandServerThread = std::thread(&Machine::commandServerThread, this);
+    _contecThread = std::thread(&Machine::contecThread, this);
     _processThread = std::thread(&Machine::processThread, this);
   } catch (...) {
     _isRunning.store(false, std::memory_order_release);
@@ -509,12 +591,18 @@ std::string Machine::reconnectComponent(const utl::ERobotComponent component) {
   }
   auto* comp = it->second;
   SPDLOG_INFO("Reconnecting {}...", utl::enumToStringView(component));
-  comp->reset();
   try {
-    comp->initialize();
+    if (component == utl::ERobotComponent::Contec) {
+      std::lock_guard<std::mutex> hardwareLock(_contecHardwareMutex);
+      comp->reset();
+      comp->initialize();
+    } else {
+      comp->reset();
+      comp->initialize();
+    }
   } catch (const std::exception& e) {
-    return std::format("Resetting '{}' failed: {}",
-                       utl::enumToStringView(component), e.what());
+      return std::format("Resetting '{}' failed: {}",
+                         utl::enumToStringView(component), e.what());
   }
   if (comp->state() == MachineComponent::State::Error) {
     return std::format("Resetting '{}' was unsuccessful!",
@@ -624,8 +712,25 @@ void Machine::handleHomingCommand(const cmd::HomingCommand& c) {
   _axisHomingManager->start(c.target, _robotStatus, _homingRequested);
 }
 
+void Machine::handleCancelHomingCommand(const cmd::CancelHomingCommand&) {
+  if (!_axisHomingManager) {
+    utl::throwRuntimeError("AxisHomingManager is not initialized.");
+  }
+  for (const auto& [motorId, requested] : _homingRequested) {
+    if (requested && _motorControl.motors().contains(motorId)) {
+      _motorControl.stopMovement(motorId);
+    }
+  }
+  _axisHomingManager->cancel(_robotStatus, _homingRequested);
+}
+
 void Machine::startHomingAxis(const cmd::HomingTarget axis,
                               const AxisHomingManager::AxisConfig& config) {
+  if (!_motorControl.isEnabled(config.motorId)) {
+    utl::throwRuntimeError(std::format(
+        "Motor {} is disabled. Homing aborted.",
+        utl::enumToStringView(config.motorId)));
+  }
   SPDLOG_INFO("Starting homing for {}: speed={} steps/s, accel={}, direction={}",
               utl::enumToStringView(AxisHomingManager::axisFromTarget(axis)),
               config.speedStepsPerSec, config.acceleration,
@@ -666,15 +771,21 @@ nlohmann::json Machine::handleContecDiagnosticsCommand(
   }
 
   try {
-    const auto inputs = _contec.readInputs();
-    const auto outputs = _contec.readOutputs();
-    for (std::size_t i = 0; i < inputCount && i < inputs.size(); ++i) {
-      const auto active = static_cast<bool>(inputs[i]);
+    const auto inputs = readInputSignals();
+    const auto outputs = readOutputSignals();
+    for (std::size_t i = 0; i < inputCount; ++i) {
+      const auto active = inputs && i < inputNames.size() &&
+                                  inputs->contains(inputNames[i])
+                              ? inputs->at(inputNames[i])
+                              : false;
       response["inputsRaw"][i] = active;
       response["inputs"][i]["active"] = active;
     }
-    for (std::size_t i = 0; i < outputCount && i < outputs.size(); ++i) {
-      const auto active = static_cast<bool>(outputs[i]);
+    for (std::size_t i = 0; i < outputCount; ++i) {
+      const auto active = outputs && i < outputNames.size() &&
+                                  outputs->contains(outputNames[i])
+                              ? outputs->at(outputNames[i])
+                              : false;
       response["outputsRaw"][i] = active;
       response["outputs"][i]["active"] = active;
     }
@@ -685,7 +796,27 @@ nlohmann::json Machine::handleContecDiagnosticsCommand(
 }
 
 void Machine::handleEmergencyStopCommand(const cmd::EmergencyStopCommand&) {
-  SPDLOG_WARN("Emergency stop requested — not yet implemented.");
+  SPDLOG_WARN("Emergency stop requested. Stopping heartbeat pulsing.");
+  std::lock_guard<std::mutex> lock(_contecStateMutex);
+  _heartBeatEnabled = false;
+  _heartBeatState = false;
+  _heartBeatCycleCounter = 0;
+  _desiredOutputSignals["heartBeat"] = false;
+}
+
+void Machine::handleSafetyResetCommand(const cmd::SafetyResetCommand&) {
+  std::lock_guard<std::mutex> lock(_contecStateMutex);
+  SPDLOG_INFO(
+      "Safety reset requested. Resuming heartbeat, delaying {} ms, then pulsing "
+      "'safetyReset' high for {} ms.",
+      std::chrono::duration_cast<std::chrono::milliseconds>(kSafetyResetDelay).count(),
+      std::chrono::duration_cast<std::chrono::milliseconds>(
+          kSafetyResetPulseDuration)
+          .count());
+  _heartBeatEnabled = true;
+  _safetyResetTurnOnAt = _clock->now() + kSafetyResetDelay;
+  _safetyResetTurnOffAt.reset();
+  _desiredOutputSignals["safetyReset"] = false;
 }
 
 void Machine::shutdown() {
@@ -697,6 +828,7 @@ void Machine::shutdown() {
     command->reply.set_value("Machine is shutting down");
   }
   if (_processThread.joinable()) _processThread.join();
+  if (_contecThread.joinable()) _contecThread.join();
   if (_commandServerThread.joinable()) _commandServerThread.join();
 }
 
@@ -732,11 +864,18 @@ void Machine::makeDummyStatus() {
                 {EToolChangerStatusFlags::OpenSen, ELEDState::Off},
                 {EToolChangerStatusFlags::OpenValve, ELEDState::Off},
                 {EToolChangerStatusFlags::ClosedValve, ELEDState::Off}}};
+  _robotStatus.armStates = {{EArm::Left, EAxisState::Locked},
+                            {EArm::Right, EAxisState::Locked},
+                            {EArm::Gantry, EAxisState::Locked}};
   _robotStatus.homing = {};
 }
 
 void Machine::updateStatus() {
   RIMO_TIMED_SCOPE("Machine::updateStatus");
+  {
+    std::lock_guard<std::mutex> lock(_contecStateMutex);
+    _robotStatus.heartBeatRunning = _heartBeatEnabled;
+  }
   _statusBuilder->updateAndPublish(
       _robotStatus, _components, &_motorControl,
       [this]() { return _controlPanel.getSnapshot(); },
@@ -759,6 +898,17 @@ void Machine::updateStatus() {
         if (_axisHomingManager) {
           _axisHomingManager->advanceFromStatus(_robotStatus, _homingRequested);
         }
+        bool motorAlarmActive = false;
+        for (const auto& [_, motorStatus] : _robotStatus.motors) {
+          const auto alarmIt =
+              motorStatus.flags.find(utl::EMotorStatusFlags::Alarm);
+          if (alarmIt != motorStatus.flags.end() &&
+              alarmIt->second == utl::ELEDState::Error) {
+            motorAlarmActive = true;
+            break;
+          }
+        }
+        _motorAlarmActive.store(motorAlarmActive, std::memory_order_release);
         _robotServer.publish(_robotStatus);
       });
 }

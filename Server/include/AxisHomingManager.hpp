@@ -35,6 +35,8 @@ class AxisHomingManager {
 
   void start(cmd::HomingTarget target, utl::RobotStatus& status,
              std::map<utl::EMotor, bool>& homingRequested);
+  void cancel(utl::RobotStatus& status,
+              std::map<utl::EMotor, bool>& homingRequested);
   void advanceFromStatus(utl::RobotStatus& status,
                          std::map<utl::EMotor, bool>& homingRequested);
 

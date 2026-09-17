@@ -39,7 +39,7 @@ TEST(MachineControllerTests, ErrorDecisionDoesNotMutateToolChangerStatusInContro
   bool outputsCalled = false;
   MachineController controller(
       MachineController::IoOps{
-          .readInputs = []() -> std::optional<utl::SignalMap> { return utl::SignalMap{{"button1", true}}; },
+          .readInputs = []() -> std::optional<utl::SignalMap> { return utl::SignalMap{{"localAUX1", true}}; },
           .setOutputs = [&](const utl::SignalMap&) { outputsCalled = true; },
           .readOutputs = []() -> std::optional<utl::SignalMap> { return std::nullopt; },
           .contecState = []() { return MachineComponent::State::Error; },
@@ -91,7 +91,7 @@ TEST(MachineControllerTests, PolicyOutputsAreForwardedToOutputsWriter) {
 
   MachineController controller(
       MachineController::IoOps{
-          .readInputs = []() -> std::optional<utl::SignalMap> { return utl::SignalMap{{"button1", true}}; },
+          .readInputs = []() -> std::optional<utl::SignalMap> { return utl::SignalMap{{"localAUX1", true}}; },
           .setOutputs = [&](const utl::SignalMap& outputs) { seenOutputs = outputs; },
           .readOutputs = []() -> std::optional<utl::SignalMap> { return std::nullopt; },
           .contecState = []() { return MachineComponent::State::Normal; },
@@ -164,7 +164,7 @@ TEST(MachineControllerTests, PolicyMotorIntentsAreAppliedInExpectedOrder) {
   std::vector<std::string> applied;
   MachineController controller(
       MachineController::IoOps{
-          .readInputs = []() -> std::optional<utl::SignalMap> { return utl::SignalMap{{"button1", true}}; },
+          .readInputs = []() -> std::optional<utl::SignalMap> { return utl::SignalMap{{"localAUX1", true}}; },
           .setOutputs = [](const utl::SignalMap&) {},
           .readOutputs = []() -> std::optional<utl::SignalMap> { return utl::SignalMap{}; },
           .contecState = []() { return MachineComponent::State::Normal; },
@@ -204,7 +204,7 @@ TEST(MachineControllerTests, UnconfiguredMotorIntentsAreIgnored) {
   std::vector<std::string> applied;
   MachineController controller(
       MachineController::IoOps{
-          .readInputs = []() -> std::optional<utl::SignalMap> { return utl::SignalMap{{"button1", true}}; },
+          .readInputs = []() -> std::optional<utl::SignalMap> { return utl::SignalMap{{"localAUX1", true}}; },
           .setOutputs = [](const utl::SignalMap&) {},
           .readOutputs = []() -> std::optional<utl::SignalMap> { return utl::SignalMap{}; },
           .contecState = []() { return MachineComponent::State::Normal; },
@@ -227,6 +227,37 @@ TEST(MachineControllerTests, UnconfiguredMotorIntentsAreIgnored) {
   EXPECT_TRUE(applied.empty());
 }
 
+TEST(MachineControllerTests, GroupMemberMotorIntentsAreNotSentDirectly) {
+  utl::RobotStatus status;
+  auto policy = std::make_unique<FakeControlPolicy>();
+  policy->decisionToReturn.motorIntents.push_back(
+      {.motorId = utl::EMotor::ZLeft, .speed = 900, .startMovement = true});
+  policy->decisionToReturn.motorIntents.push_back(
+      {.motorId = utl::EMotor::ZRight, .speed = 900, .startMovement = true});
+
+  std::vector<utl::EMotor> commanded;
+  MachineController controller(
+      MachineController::IoOps{
+          .readInputs = []() -> std::optional<utl::SignalMap> { return {}; },
+          .setOutputs = [](const utl::SignalMap&) {},
+          .readOutputs = []() -> std::optional<utl::SignalMap> { return {}; },
+          .contecState = []() { return MachineComponent::State::Normal; },
+      },
+      MachineController::MotorOps{
+          .setSpeed = [&](const utl::EMotor id, std::int32_t) { commanded.push_back(id); },
+          .start = [&](const utl::EMotor id) { commanded.push_back(id); },
+          .isConfigured = [](utl::EMotor) { return true; },
+          .isGroupMember = [](const utl::EMotor id) { return id == utl::EMotor::ZRight; },
+      },
+      status, std::move(policy));
+
+  controller.runControlLoopTasks();
+
+  ASSERT_EQ(commanded.size(), 2u);
+  EXPECT_EQ(commanded[0], utl::EMotor::ZLeft);
+  EXPECT_EQ(commanded[1], utl::EMotor::ZLeft);
+}
+
 TEST(MachineControllerTests, AccelerationAndDecelerationIntentsAreApplied) {
   utl::RobotStatus status;
   auto policy = std::make_unique<FakeControlPolicy>();
@@ -241,7 +272,7 @@ TEST(MachineControllerTests, AccelerationAndDecelerationIntentsAreApplied) {
   std::vector<std::string> applied;
   MachineController controller(
       MachineController::IoOps{
-          .readInputs = []() -> std::optional<utl::SignalMap> { return utl::SignalMap{{"button1", true}}; },
+          .readInputs = []() -> std::optional<utl::SignalMap> { return utl::SignalMap{{"localAUX1", true}}; },
           .setOutputs = [](const utl::SignalMap&) {},
           .readOutputs = []() -> std::optional<utl::SignalMap> { return utl::SignalMap{}; },
           .contecState = []() { return MachineComponent::State::Normal; },

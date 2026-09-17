@@ -14,7 +14,8 @@ enum class EMotorStatusFlags {
   Enabled,
   Warning,
   Alarm,
-  Homing
+  Homing,
+  Free
 };
 enum class EArm { Left, Right, Gantry };
 enum class EToolChangerStatusFlags {
@@ -46,8 +47,13 @@ enum class EHomingState {
 enum class EInputSignal {
   motorPower,
   safetyON,
-  button1,
-  button2,
+  robotAUX1,
+  robotAUX2,
+  localAUX1,
+  localAUX2,
+  localAUX3,
+  localAUX4,
+  localAUX5,
   tclProx,
   tclOpen,
   tclClose,
@@ -84,6 +90,7 @@ struct SingleMotorStatus {
   std::string warningDescription;
   std::string alarmDescription;
   std::map<EMotorStatusFlags, ELEDState> flags;
+  bool freeControllable{false};
   double speedCommandPercent{0};         // [-100, 100]; 0 when locked/idle
   double modeMaxLinearSpeedMmPerSec{0};  // max speed for the current mode
 };
@@ -117,11 +124,16 @@ struct RobotStatus {
   std::map<ERobotComponent, ELEDState> robotComponents;
   std::map<EArm, JoystickStatus> joystics;
   std::optional<bool> motorPower;
+  std::optional<bool> cpuOverride;
   std::optional<bool> heartBeatRunning;
   std::optional<bool> safetyOn;
   std::map<EArm, EAxisState> armStates;
   HomingSessionStatus homing;
 };
+
+inline constexpr char kCpuOverrideWarningMessage[] =
+    "CPU OK signal override active, operation suspended. Disable override to keep "
+    "using the system.";
 
 }  // namespace utl
 

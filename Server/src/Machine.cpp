@@ -290,6 +290,9 @@ void Machine::runOneCycle(LoopState& state) {
                                     [this](const cmd::SetMotorEnabledCommand& c) {
                                       handleSetMotorEnabledCommand(c);
                                     },
+                                    [this](const cmd::SetMotorFreeCommand& c) {
+                                      handleSetMotorFreeCommand(c);
+                                    },
                                     [this](
                                         const cmd::SetAllMotorsEnabledCommand& c) {
                                       handleSetAllMotorsEnabledCommand(c);
@@ -362,6 +365,7 @@ void Machine::runContecCycle() {
       std::lock_guard<std::mutex> hardwareLock(_contecHardwareMutex);
       if (_contec.state() == MachineComponent::State::Error) {
         std::lock_guard<std::mutex> stateLock(_contecStateMutex);
+        _cpuOverrideActive.store(false, std::memory_order_release);
         _inputSignalsCache.valid = false;
         _inputSignalsCache.value = std::nullopt;
         _outputSignalsCache.valid = false;
@@ -417,6 +421,10 @@ void Machine::runContecCycle() {
       validateMappedIndex(signal, index, inputs.size(), "input");
       _inputSignals[signal] = inputs[index];
     }
+    const auto cpuOverrideIt = _inputSignals.find("cpuOverride");
+    _cpuOverrideActive.store(cpuOverrideIt != _inputSignals.end() &&
+                                 cpuOverrideIt->second,
+                             std::memory_order_release);
     for (const auto& [signal, index] : _outputMapping) {
       validateMappedIndex(signal, index, outputs.size(), "output");
       _outputSignals[signal] = outputs[index];
@@ -426,6 +434,7 @@ void Machine::runContecCycle() {
   } catch (const std::exception& e) {
     SPDLOG_ERROR("Exception caught in 'runContecCycle'! {}", e.what());
     std::lock_guard<std::mutex> stateLock(_contecStateMutex);
+    _cpuOverrideActive.store(false, std::memory_order_release);
     _inputSignalsCache.valid = false;
     _inputSignalsCache.value = std::nullopt;
     _outputSignalsCache.valid = false;
@@ -517,6 +526,9 @@ void Machine::wire() {
             .start = [this](utl::EMotor id) { _motorControl.startMovement(id); },
             .stop = [this](utl::EMotor id) { _motorControl.stopMovement(id); },
             .isConfigured = [this](utl::EMotor id) { return _motorControl.motors().contains(id); },
+            .isGroupMember = [this](utl::EMotor id) {
+              return _motorControl.isGroupMember(id);
+            },
             .onAlarmCleared = [this](utl::EMotor id) { _motorControl.onAlarmCleared(id); },
         },
         _robotStatus, std::make_unique<RimoKunControlPolicy>());
@@ -559,6 +571,7 @@ void Machine::commandServerThread() {
 }
 
 void Machine::handleToolChangerCommand(const cmd::ToolChangerCommand& c) {
+  requireOperationAllowed();
   _controller->handleToolChangerCommand(c);
 }
 void Machine::handleReconnectCommand(const cmd::ReconnectCommand& c) {
@@ -611,8 +624,19 @@ std::string Machine::reconnectComponent(const utl::ERobotComponent component) {
   return "";
 }
 
+bool Machine::isCpuOverrideActive() const {
+  return _cpuOverrideActive.load(std::memory_order_acquire);
+}
+
+void Machine::requireOperationAllowed() const {
+  if (isCpuOverrideActive()) {
+    utl::throwRuntimeError(utl::kCpuOverrideWarningMessage);
+  }
+}
+
 nlohmann::json Machine::handleMotorDiagnosticsCommand(
     const cmd::MotorDiagnosticsCommand& c) {
+  requireOperationAllowed();
   auto response = makeDefaultIoAssignmentResponse(c.motor);
   try {
     const auto inputStatus = _motorControl.readInputStatus(c.motor);
@@ -693,19 +717,28 @@ nlohmann::json Machine::handleMotorDiagnosticsCommand(
 }
 
 void Machine::handleResetMotorAlarmCommand(const cmd::ResetMotorAlarmCommand& c) {
+  requireOperationAllowed();
   _motorControl.resetAlarm(c.motor);
 }
 
 void Machine::handleSetMotorEnabledCommand(const cmd::SetMotorEnabledCommand& c) {
+  requireOperationAllowed();
   _motorControl.setEnabled(c.motor, c.enabled);
+}
+
+void Machine::handleSetMotorFreeCommand(const cmd::SetMotorFreeCommand& c) {
+  requireOperationAllowed();
+  _motorControl.setFree(c.motor, c.enabled);
 }
 
 void Machine::handleSetAllMotorsEnabledCommand(
     const cmd::SetAllMotorsEnabledCommand& c) {
+  requireOperationAllowed();
   _motorControl.setAllEnabled(c.enabled);
 }
 
 void Machine::handleHomingCommand(const cmd::HomingCommand& c) {
+  requireOperationAllowed();
   if (!_axisHomingManager) {
     utl::throwRuntimeError("AxisHomingManager is not initialized.");
   }
@@ -731,13 +764,14 @@ void Machine::startHomingAxis(const cmd::HomingTarget axis,
         "Motor {} is disabled. Homing aborted.",
         utl::enumToStringView(config.motorId)));
   }
-  SPDLOG_INFO("Starting homing for {}: speed={} steps/s, accel={}, direction={}",
+  SPDLOG_INFO(
+      "Starting homing for {}: mode={}, speed={} steps/s, accel={}, direction={}",
               utl::enumToStringView(AxisHomingManager::axisFromTarget(axis)),
-              config.speedStepsPerSec, config.acceleration,
+              config.homeSeekingMode, config.speedStepsPerSec, config.acceleration,
               config.startingDirection);
-  _motorControl.configureHoming(config.motorId, 0, config.speedStepsPerSec,
-                                config.acceleration, config.speedStepsPerSec,
-                                config.startingDirection);
+  _motorControl.configureHoming(config.motorId, config.homeSeekingMode,
+                                config.speedStepsPerSec, config.acceleration,
+                                config.speedStepsPerSec, config.startingDirection);
   _motorControl.pulseHome(config.motorId);
   _homingRequested[config.motorId] = true;
 }
@@ -805,6 +839,7 @@ void Machine::handleEmergencyStopCommand(const cmd::EmergencyStopCommand&) {
 }
 
 void Machine::handleSafetyResetCommand(const cmd::SafetyResetCommand&) {
+  requireOperationAllowed();
   std::lock_guard<std::mutex> lock(_contecStateMutex);
   SPDLOG_INFO(
       "Safety reset requested. Resuming heartbeat, delaying {} ms, then pulsing "
@@ -850,7 +885,8 @@ void Machine::makeDummyStatus() {
                   {EMotorStatusFlags::Enabled, ELEDState::Off},
                   {EMotorStatusFlags::Warning, ELEDState::Off},
                   {EMotorStatusFlags::Alarm, ELEDState::Off},
-                  {EMotorStatusFlags::Homing, ELEDState::Off}}};
+                  {EMotorStatusFlags::Homing, ELEDState::Off},
+                  {EMotorStatusFlags::Free, ELEDState::Off}}};
   }
   _robotStatus.toolChangers[EArm::Left] = {
       .flags = {{EToolChangerStatusFlags::ProxSen, ELEDState::Off},
@@ -867,6 +903,8 @@ void Machine::makeDummyStatus() {
   _robotStatus.armStates = {{EArm::Left, EAxisState::Locked},
                             {EArm::Right, EAxisState::Locked},
                             {EArm::Gantry, EAxisState::Locked}};
+  _robotStatus.cpuOverride = false;
+  _cpuOverrideActive.store(false, std::memory_order_release);
   _robotStatus.homing = {};
 }
 

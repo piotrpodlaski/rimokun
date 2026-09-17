@@ -5,15 +5,20 @@
 TEST(JsonExtensionsTests, RobotStatusRoundTripPreservesSafetyOn) {
   utl::RobotStatus status;
   status.safetyOn = true;
+  status.cpuOverride = true;
   status.robotComponents[utl::ERobotComponent::Contec] = utl::ELEDState::On;
 
   const auto json = nlohmann::json(status);
   ASSERT_TRUE(json.contains("safetyOn"));
   EXPECT_TRUE(json.at("safetyOn").get<bool>());
+  ASSERT_TRUE(json.contains("cpuOverride"));
+  EXPECT_TRUE(json.at("cpuOverride").get<bool>());
 
   const auto roundTrip = json.get<utl::RobotStatus>();
   ASSERT_TRUE(roundTrip.safetyOn.has_value());
   EXPECT_TRUE(*roundTrip.safetyOn);
+  ASSERT_TRUE(roundTrip.cpuOverride.has_value());
+  EXPECT_TRUE(*roundTrip.cpuOverride);
 }
 
 TEST(JsonExtensionsTests, RobotStatusRoundTripPreservesHomingSession) {

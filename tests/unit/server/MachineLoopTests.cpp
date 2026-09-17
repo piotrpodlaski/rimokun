@@ -63,8 +63,8 @@ std::filesystem::path writeTempConfig() {
   out << "    loopIntervalMS: 10\n";
   out << "    updateIntervalMS: 50\n";
   out << "    inputMapping:\n";
-  out << "      button1: 0\n";
-  out << "      button2: 1\n";
+  out << "      localAUX1: 0\n";
+  out << "      localAUX2: 1\n";
   out << "    outputMapping:\n";
   out << "      toolChangerLeft: 0\n";
   out << "      toolChangerRight: 1\n";
@@ -124,8 +124,8 @@ std::filesystem::path writeTempConfigLegacyTiming() {
   out << "    loopSleepTimeMS: 20\n";
   out << "    statusPublishPeriodMS: 40\n";
   out << "    inputMapping:\n";
-  out << "      button1: 0\n";
-  out << "      button2: 1\n";
+  out << "      localAUX1: 0\n";
+  out << "      localAUX2: 1\n";
   out << "    outputMapping:\n";
   out << "      toolChangerLeft: 0\n";
   out << "      toolChangerRight: 1\n";
@@ -185,8 +185,8 @@ std::filesystem::path writeTempConfigNonPositiveTiming() {
   out << "    loopIntervalMS: 0\n";
   out << "    updateIntervalMS: -7\n";
   out << "    inputMapping:\n";
-  out << "      button1: 0\n";
-  out << "      button2: 1\n";
+  out << "      localAUX1: 0\n";
+  out << "      localAUX2: 1\n";
   out << "    outputMapping:\n";
   out << "      toolChangerLeft: 0\n";
   out << "      toolChangerRight: 1\n";

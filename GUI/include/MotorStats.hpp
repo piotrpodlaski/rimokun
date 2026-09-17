@@ -3,6 +3,7 @@
 #include <QString>
 #include <QWidget>
 
+#include "GuiCommand.hpp"
 #include "VMotorStats.hpp"
 
 class QMouseEvent;
@@ -32,16 +33,22 @@ class MotorStats : public QWidget, public VMotorStats {
 
  signals:
   void clicked(utl::EMotor motor);
+  void commandIssued(const GuiCommand& command);
 
  public slots:
   void handleUpdate(const utl::RobotStatus&);
+
+ private slots:
+  void handleFreeButtonClicked();
 
  protected:
   void mousePressEvent(QMouseEvent* event) override;
   bool eventFilter(QObject* watched, QEvent* event) override;
 
  private:
+  void setFreeStatus(bool isFree, bool isControllable);
   std::string _motorName;
   Ui::MotorStats* _ui;
   utl::EMotor _motorId;
+  bool _isFree{false};
 };

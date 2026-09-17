@@ -22,6 +22,7 @@ struct MotorRegisterMap {
   int configurationExecute{0x018C};
   int stopInputAction{0x0200};
   int stopInputPolarity{0x112C};
+  int homePOutputFunctionSelection{0x100C};
 
   int commandPosition{0x00C6};
   int commandSpeed{0x00C8};

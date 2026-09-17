@@ -1,12 +1,15 @@
 ﻿#include "MotorStats.hpp"
 #include "SpeedCommandBar.hpp"
 #include "EnumStrings.hpp"
+#include "StyledPopup.hpp"
 
 #include <format>
 #include <print>
 
 #include <QMouseEvent>
 #include <QEvent>
+#include <QMessageBox>
+#include <QPushButton>
 
 #include "spdlog/spdlog.h"
 #include "ui_motorstats.h"
@@ -45,6 +48,9 @@ MotorStats::MotorStats(QWidget* parent)
     child->installEventFilter(this);
     child->setCursor(Qt::PointingHandCursor);
   }
+  _ui->freeButton->setEnabled(false);
+  connect(_ui->freeButton, &QPushButton::clicked, this,
+          &MotorStats::handleFreeButtonClicked);
 }
 
 namespace {
@@ -100,6 +106,15 @@ void MotorStats::handleUpdate(const utl::RobotStatus& rs) {
   }
   const auto motData = rs.motors.at(_motorId);
   configure(motData);
+  const auto freeIt = motData.flags.find(utl::EMotorStatusFlags::Free);
+  setFreeStatus(freeIt != motData.flags.end() &&
+                    freeIt->second == utl::ELEDState::On,
+                motData.freeControllable);
+  if (_isFree) {
+    // setAxisState gives FREE visual precedence regardless of axis-mode data.
+    setAxisState(utl::EAxisState::Locked);
+    return;
+  }
 
   const auto arm = motorToArm(_motorId);
   if (arm.has_value() && rs.armStates.contains(*arm)) {
@@ -108,6 +123,13 @@ void MotorStats::handleUpdate(const utl::RobotStatus& rs) {
 }
 
 void MotorStats::setAxisState(const utl::EAxisState state) {
+  if (_isFree) {
+    _ui->axisStateLabel->setText("FREE");
+    _ui->axisStateLabel->setStyleSheet(
+        "QLabel { background-color: #c62828; color: #fff;"
+        " border-radius: 4px; padding: 1px 4px; font-weight: bold; }");
+    return;
+  }
   switch (state) {
     case utl::EAxisState::Locked:
       _ui->axisStateLabel->setText("LOCKED");
@@ -130,6 +152,28 @@ void MotorStats::setAxisState(const utl::EAxisState state) {
   }
 }
 
+void MotorStats::setFreeStatus(const bool isFree, const bool isControllable) {
+  _isFree = isFree;
+  _ui->freeButton->setText(_isFree ? "un-FREE" : "FREE");
+  _ui->freeButton->setEnabled(isControllable);
+}
+
+void MotorStats::handleFreeButtonClicked() {
+  if (!_isFree) {
+    const auto reply = StyledPopup::askQuestion(
+        "Confirmation", "Are you sure you want to free the motor?",
+        QMessageBox::Yes | QMessageBox::No, QMessageBox::No, this);
+    if (reply != QMessageBox::Yes) {
+      return;
+    }
+  }
+
+  GuiCommand command;
+  command.payload =
+      cmd::SetMotorFreeCommand{.motor = _motorId, .enabled = !_isFree};
+  emit commandIssued(command);
+}
+
 void MotorStats::mousePressEvent(QMouseEvent* event) {
   if (event && event->button() == Qt::LeftButton) {
     emit clicked(_motorId);
@@ -140,6 +184,9 @@ void MotorStats::mousePressEvent(QMouseEvent* event) {
 }
 
 bool MotorStats::eventFilter(QObject* watched, QEvent* event) {
+  if (watched == _ui->freeButton) {
+    return QWidget::eventFilter(watched, event);
+  }
   if (watched && event && event->type() == QEvent::MouseButtonPress) {
     const auto* mouseEvent = dynamic_cast<QMouseEvent*>(event);
     if (mouseEvent && mouseEvent->button() == Qt::LeftButton) {

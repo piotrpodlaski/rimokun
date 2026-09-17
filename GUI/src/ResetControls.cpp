@@ -1,4 +1,5 @@
 #include <ResetControls.hpp>
+#include <QLabel>
 #include "spdlog/spdlog.h"
 #include "ui_ResetControls.h"
 
@@ -22,6 +23,12 @@ ResetControls::ResetControls(QWidget* parent) : QWidget(parent), _ui(new Ui::Res
   _lMotorPowerLed = _ui->ledMotorPower;
   _lSafetyOnLed = _ui->ledSafetyOn;
   _bEmergencyStop = _ui->emergencyStop;
+  _warningLabel = new QLabel(this);
+  _warningLabel->setWordWrap(true);
+  _warningLabel->setAlignment(Qt::AlignCenter);
+  _warningLabel->setStyleSheet("color: #c40000; font-weight: 700;");
+  _warningLabel->hide();
+  _ui->verticalLayout->insertWidget(3, _warningLabel);
 
   _lServerLed->setState(ELEDState::Error);
   _bResetContec->setEnabled(false);
@@ -62,6 +69,8 @@ void ResetControls::applyViewModel(const ResetControlsViewModel& vm) const {
   _bEnableAllMotors->setEnabled(vm.enableAllMotorsEnabled);
   _bDisableAllMotors->setEnabled(vm.disableAllMotorsEnabled);
   _bHoming->setEnabled(vm.homingEnabled);
+  _warningLabel->setText(QString::fromStdString(vm.warningMessage));
+  _warningLabel->setVisible(!vm.warningMessage.empty());
 }
 
 void ResetControls::openHomingWindow() {

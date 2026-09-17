@@ -57,6 +57,7 @@ constexpr std::array kMotorStatusFlagEntries{
                                       "Warning"},
     EnumEntry<utl::EMotorStatusFlags>{utl::EMotorStatusFlags::Alarm, "Alarm"},
     EnumEntry<utl::EMotorStatusFlags>{utl::EMotorStatusFlags::Homing, "Homing"},
+    EnumEntry<utl::EMotorStatusFlags>{utl::EMotorStatusFlags::Free, "Free"},
 };
 
 constexpr std::array kArmEntries{
@@ -118,8 +119,13 @@ constexpr std::array kHomingStateEntries{
 constexpr std::array kInputSignalEntries{
     EnumEntry<utl::EInputSignal>{utl::EInputSignal::motorPower, "motorPower"},
     EnumEntry<utl::EInputSignal>{utl::EInputSignal::safetyON, "safetyON"},
-    EnumEntry<utl::EInputSignal>{utl::EInputSignal::button1, "button1"},
-    EnumEntry<utl::EInputSignal>{utl::EInputSignal::button2, "button2"},
+    EnumEntry<utl::EInputSignal>{utl::EInputSignal::robotAUX1, "robotAUX1"},
+    EnumEntry<utl::EInputSignal>{utl::EInputSignal::robotAUX2, "robotAUX2"},
+    EnumEntry<utl::EInputSignal>{utl::EInputSignal::localAUX1, "localAUX1"},
+    EnumEntry<utl::EInputSignal>{utl::EInputSignal::localAUX2, "localAUX2"},
+    EnumEntry<utl::EInputSignal>{utl::EInputSignal::localAUX3, "localAUX3"},
+    EnumEntry<utl::EInputSignal>{utl::EInputSignal::localAUX4, "localAUX4"},
+    EnumEntry<utl::EInputSignal>{utl::EInputSignal::localAUX5, "localAUX5"},
     EnumEntry<utl::EInputSignal>{utl::EInputSignal::tclProx, "tclProx"},
     EnumEntry<utl::EInputSignal>{utl::EInputSignal::tclOpen, "tclOpen"},
     EnumEntry<utl::EInputSignal>{utl::EInputSignal::tclClose, "tclClose"},
@@ -280,7 +286,7 @@ std::optional<EMotorStatusFlags> enumFromStringImpl(
   return enumFromString(kMotorStatusFlagEntries, text);
 }
 std::string_view knownEnumNamesImpl(const std::type_identity<EMotorStatusFlags>) {
-  return "BrakeApplied, Enabled, Warning, Alarm, Homing";
+  return "BrakeApplied, Enabled, Warning, Alarm, Homing, Free";
 }
 
 std::string_view enumToStringImpl(const EArm value) {
@@ -370,8 +376,9 @@ std::optional<EInputSignal> enumFromStringImpl(
   return enumFromString(kInputSignalEntries, text);
 }
 std::string_view knownEnumNamesImpl(const std::type_identity<EInputSignal>) {
-  return "motorPower, safetyON, button1, button2, tclProx, tclOpen, "
-         "tclClose, tcrProx, tcrOpen, tcrClose";
+  return "motorPower, safetyON, robotAUX1, robotAUX2, localAUX1, localAUX2, "
+         "localAUX3, localAUX4, localAUX5, tclProx, tclOpen, tclClose, "
+         "tcrProx, tcrOpen, tcrClose, cpuOverride";
 }
 
 std::string_view enumToStringImpl(const EOutputSignal value) {

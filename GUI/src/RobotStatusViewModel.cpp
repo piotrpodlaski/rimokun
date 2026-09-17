@@ -28,8 +28,11 @@ std::optional<ToolChangerViewModel> RobotStatusViewModel::toolChangerForArm(
       toolChangerFlagOrOff(tc, utl::EToolChangerStatusFlags::OpenValve);
   vm.closedValve =
       toolChangerFlagOrOff(tc, utl::EToolChangerStatusFlags::ClosedValve);
-  vm.openButtonEnabled = (vm.openValve != utl::ELEDState::On);
-  vm.closeButtonEnabled = (vm.closedValve != utl::ELEDState::On);
+  const bool operationSuspended = status.cpuOverride.value_or(false);
+  vm.openButtonEnabled =
+      !operationSuspended && (vm.openValve != utl::ELEDState::On);
+  vm.closeButtonEnabled =
+      !operationSuspended && (vm.closedValve != utl::ELEDState::On);
   return vm;
 }
 
@@ -51,6 +54,7 @@ ResetControlsViewModel RobotStatusViewModel::resetControlsForStatus(
   vm.contec = getComponent(utl::ERobotComponent::Contec);
   vm.motor = getComponent(utl::ERobotComponent::MotorControl);
   vm.controlPanel = getComponent(utl::ERobotComponent::ControlPanel);
+  const bool operationSuspended = status->cpuOverride.value_or(false);
   if (status->motorPower.has_value()) {
     vm.motorPower =
         *status->motorPower ? utl::ELEDState::On : utl::ELEDState::Off;
@@ -68,15 +72,24 @@ ResetControlsViewModel RobotStatusViewModel::resetControlsForStatus(
   } else {
     vm.safetyOn = utl::ELEDState::Off;
   }
+  if (operationSuspended) {
+    vm.safetyOn = utl::ELEDState::ErrorBlinking;
+    vm.warningMessage = utl::kCpuOverrideWarningMessage;
+  }
   vm.resetContecEnabled = (vm.contec == utl::ELEDState::Error);
-  vm.resetSafetyEnabled = (vm.safetyOn != utl::ELEDState::On);
-  vm.resetMotorEnabled = (vm.motor == utl::ELEDState::Error);
+  vm.resetSafetyEnabled =
+      !operationSuspended && (vm.safetyOn != utl::ELEDState::On);
+  vm.resetMotorEnabled =
+      !operationSuspended && (vm.motor == utl::ELEDState::Error);
   vm.resetControlPanelEnabled = (vm.controlPanel == utl::ELEDState::Error);
   vm.enableAllMotorsEnabled =
-      vm.motor == utl::ELEDState::On || vm.motor == utl::ELEDState::Warning;
+      !operationSuspended &&
+      (vm.motor == utl::ELEDState::On || vm.motor == utl::ELEDState::Warning);
   vm.disableAllMotorsEnabled =
-      vm.motor == utl::ELEDState::On || vm.motor == utl::ELEDState::Warning;
+      !operationSuspended &&
+      (vm.motor == utl::ELEDState::On || vm.motor == utl::ELEDState::Warning);
   vm.homingEnabled =
-      vm.motor == utl::ELEDState::On || vm.motor == utl::ELEDState::Warning;
+      !operationSuspended &&
+      (vm.motor == utl::ELEDState::On || vm.motor == utl::ELEDState::Warning);
   return vm;
 }

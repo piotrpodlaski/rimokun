@@ -37,7 +37,9 @@ TEST(MachineStatusBuilderTests, BuildsAndPublishesExpectedStatus) {
         return s;
       },
       []() -> std::optional<utl::SignalMap> {
-        return utl::SignalMap{{"button1", true}, {"button2", false}};
+        return utl::SignalMap{{"localAUX1", true},
+                              {"localAUX2", false},
+                              {"cpuOverride", true}};
       },
       []() -> std::optional<utl::SignalMap> {
         return utl::SignalMap{{"toolChangerLeft", true},
@@ -58,6 +60,8 @@ TEST(MachineStatusBuilderTests, BuildsAndPublishesExpectedStatus) {
   EXPECT_EQ(publishedStatus.toolChangers.at(utl::EArm::Right)
                 .flags.at(utl::EToolChangerStatusFlags::ProxSen),
             utl::ELEDState::Off);
+  ASSERT_TRUE(publishedStatus.cpuOverride.has_value());
+  EXPECT_TRUE(*publishedStatus.cpuOverride);
 }
 
 TEST(MachineStatusBuilderTests, MissingInputSnapshotSetsProximityFlagsToError) {
@@ -117,7 +121,7 @@ TEST(MachineStatusBuilderTests, WarningComponentMapsToWarningLed) {
         return s;
       },
       []() -> std::optional<utl::SignalMap> {
-        return utl::SignalMap{{"button1", false}, {"button2", false}};
+        return utl::SignalMap{{"localAUX1", false}, {"localAUX2", false}};
       },
       []() -> std::optional<utl::SignalMap> {
         return utl::SignalMap{{"toolChangerLeft", false},
@@ -170,7 +174,7 @@ TEST(MachineStatusBuilderTests, ContecErrorSetsAllToolChangerFlagsToError) {
         return s;
       },
       []() -> std::optional<utl::SignalMap> {
-        return utl::SignalMap{{"button1", true}, {"button2", true}};
+        return utl::SignalMap{{"localAUX1", true}, {"localAUX2", true}};
       },
       []() -> std::optional<utl::SignalMap> {
         return utl::SignalMap{{"toolChangerLeft", true},
@@ -220,7 +224,7 @@ TEST(MachineStatusBuilderTests, PartialOutputSnapshotSetsValveFlagsToError) {
         return s;
       },
       []() -> std::optional<utl::SignalMap> {
-        return utl::SignalMap{{"button1", false}, {"button2", true}};
+        return utl::SignalMap{{"localAUX1", false}, {"localAUX2", true}};
       },
       []() -> std::optional<utl::SignalMap> {
         return utl::SignalMap{{"toolChangerLeft", true}};
@@ -259,7 +263,7 @@ TEST(MachineStatusBuilderTests, MissingSnapshotAfterValidUpdateDoesNotLeaveStale
         return s;
       },
       []() -> std::optional<utl::SignalMap> {
-        return utl::SignalMap{{"button1", true}, {"button2", true}};
+        return utl::SignalMap{{"localAUX1", true}, {"localAUX2", true}};
       },
       []() -> std::optional<utl::SignalMap> {
         return utl::SignalMap{{"toolChangerLeft", true},

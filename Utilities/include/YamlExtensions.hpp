@@ -99,6 +99,7 @@ struct convert<utl::SingleMotorStatus> {
     node["warningDescription"] = rhs.warningDescription;
     node["alarmDescription"] = rhs.alarmDescription;
     node["flags"] = rhs.flags;
+    node["freeControllable"] = rhs.freeControllable;
     node["speedCommandPercent"] = rhs.speedCommandPercent;
     node["modeMaxLinearSpeedMmPerSec"] = rhs.modeMaxLinearSpeedMmPerSec;
     return node;
@@ -121,6 +122,8 @@ struct convert<utl::SingleMotorStatus> {
                                   : std::string{};
     rhs.flags =
         node["flags"].as<std::map<utl::EMotorStatusFlags, utl::ELEDState>>();
+    rhs.freeControllable =
+        node["freeControllable"] ? node["freeControllable"].as<bool>() : false;
     rhs.speedCommandPercent =
         node["speedCommandPercent"] ? node["speedCommandPercent"].as<double>() : 0.0;
     rhs.modeMaxLinearSpeedMmPerSec =
@@ -228,6 +231,9 @@ struct convert<utl::RobotStatus> {
     if (rhs.motorPower.has_value()) {
       node["motorPower"] = *rhs.motorPower;
     }
+    if (rhs.cpuOverride.has_value()) {
+      node["cpuOverride"] = *rhs.cpuOverride;
+    }
     if (rhs.heartBeatRunning.has_value()) {
       node["heartBeatRunning"] = *rhs.heartBeatRunning;
     }
@@ -265,6 +271,9 @@ struct convert<utl::RobotStatus> {
     }
     if (const auto motorPowerNode = node["motorPower"]; motorPowerNode) {
       rhs.motorPower = motorPowerNode.as<bool>();
+    }
+    if (const auto cpuOverrideNode = node["cpuOverride"]; cpuOverrideNode) {
+      rhs.cpuOverride = cpuOverrideNode.as<bool>();
     }
     if (const auto heartBeatRunningNode = node["heartBeatRunning"];
         heartBeatRunningNode) {

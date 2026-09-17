@@ -4,6 +4,7 @@
 #include <QHash>
 #include <QString>
 #include <array>
+#include <vector>
 
 #include "GuiCommand.hpp"
 
@@ -53,5 +54,7 @@ class HomingWindow final : public QDialog {
   QGridLayout* _statusGrid{nullptr};
   QTimer* _animationTimer{nullptr};
   int _spinnerIndex{0};
+  bool _operationSuspended{false};
+  std::vector<QPushButton*> _homingButtons;
   QHash<int, AxisRowWidgets> _axisRows;
 };

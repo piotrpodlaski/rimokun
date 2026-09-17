@@ -112,6 +112,7 @@ void MachineStatusBuilder::updateAndPublish(
       const auto configuredMotorIds = motorControl->configuredMotorIds();
       for (const auto motorId : configuredMotorIds) {
         auto& motorStatus = status.motors[motorId];
+        motorStatus.freeControllable = motorControl->isFreeControllable(motorId);
 
         if (componentState == MachineComponent::State::Error) {
           motorStatus.state = utl::ELEDState::Error;
@@ -122,6 +123,7 @@ void MachineStatusBuilder::updateAndPublish(
           motorStatus.flags[utl::EMotorStatusFlags::Warning] = utl::ELEDState::Off;
           motorStatus.flags[utl::EMotorStatusFlags::Alarm] = utl::ELEDState::Error;
           motorStatus.flags[utl::EMotorStatusFlags::Homing] = utl::ELEDState::Off;
+          motorStatus.flags[utl::EMotorStatusFlags::Free] = utl::ELEDState::Error;
           motorStatus.warningDescription.clear();
           motorStatus.alarmDescription =
               "MotorControl component is in error state";
@@ -138,6 +140,7 @@ void MachineStatusBuilder::updateAndPublish(
           motorStatus.flags[utl::EMotorStatusFlags::Warning] = utl::ELEDState::Off;
           motorStatus.flags[utl::EMotorStatusFlags::Alarm] = utl::ELEDState::Error;
           motorStatus.flags[utl::EMotorStatusFlags::Homing] = utl::ELEDState::Off;
+          motorStatus.flags[utl::EMotorStatusFlags::Free] = utl::ELEDState::Error;
           motorStatus.warningDescription.clear();
           motorStatus.alarmDescription =
               "Motor is configured but unavailable in runtime";
@@ -175,6 +178,10 @@ void MachineStatusBuilder::updateAndPublish(
                                                              MotorOutputFlag::Alarm);
           const bool homeComplete = Motor::isDriverOutputFlagSet(
               outputStatus.raw, MotorOutputFlag::HomeP);
+          // NET-OUT12 is configured as FREE_R, so bit 12 of 0x007F reflects
+          // whether the motor is currently in FREE state.
+          const bool isFree = Motor::isDriverOutputFlagSet(
+              outputStatus.raw, MotorOutputFlag::Free);
           const bool enableControllable =
               motorControl->isEnableControllable(motorId);
           const bool isEnabled =
@@ -196,6 +203,8 @@ void MachineStatusBuilder::updateAndPublish(
               hasAlarm ? utl::ELEDState::Error : utl::ELEDState::Off;
           motorStatus.flags[utl::EMotorStatusFlags::Homing] =
               homeComplete ? utl::ELEDState::On : utl::ELEDState::Off;
+          motorStatus.flags[utl::EMotorStatusFlags::Free] =
+              isFree ? utl::ELEDState::On : utl::ELEDState::Off;
           motorStatus.state = hasAlarm
                                   ? utl::ELEDState::Error
                                   : (hasWarning ? utl::ELEDState::Warning
@@ -229,6 +238,7 @@ void MachineStatusBuilder::updateAndPublish(
           motorStatus.flags[utl::EMotorStatusFlags::Warning] = utl::ELEDState::Off;
           motorStatus.flags[utl::EMotorStatusFlags::Alarm] = utl::ELEDState::Error;
           motorStatus.flags[utl::EMotorStatusFlags::Homing] = utl::ELEDState::Off;
+          motorStatus.flags[utl::EMotorStatusFlags::Free] = utl::ELEDState::Error;
           motorStatus.warningDescription.clear();
           motorStatus.alarmDescription = ex.what();
           hasAnyMotorWarningOrAlarm = true;
@@ -297,6 +307,7 @@ void MachineStatusBuilder::updateAndPublish(
 
   if (contecInError) {
     status.motorPower = false;
+    status.cpuOverride = false;
     status.safetyOn = false;
     setAllToolChangerFlags(utl::ELEDState::Error);
     publish(status);
@@ -310,6 +321,12 @@ void MachineStatusBuilder::updateAndPublish(
     status.motorPower = inputs->at("motorPower");
   } else {
     status.motorPower = false;
+  }
+
+  if (inputs && inputs->contains("cpuOverride")) {
+    status.cpuOverride = inputs->at("cpuOverride");
+  } else {
+    status.cpuOverride = false;
   }
 
   if (inputs && inputs->contains("safetyON")) {

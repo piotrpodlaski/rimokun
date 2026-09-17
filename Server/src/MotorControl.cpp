@@ -282,6 +282,24 @@ MotorControl::MotorControl() {
         .excessivePositionDeviationAlarm = excessivePositionDeviationAlarm,
         .motorRotationDirection = motorRotationDirection};
   }
+
+  _freeControllableMotors.clear();
+  if (const auto freeMotorsNode = motorCfg["freeControllableMotors"];
+      freeMotorsNode) {
+    if (!freeMotorsNode.IsSequence()) {
+      utl::throwRuntimeError(
+          "MotorControl.freeControllableMotors must be a list of motor names.");
+    }
+    for (const auto& motorNode : freeMotorsNode) {
+      const auto motorId = motorNode.as<utl::EMotor>();
+      if (!_motorConfigs.contains(motorId)) {
+        utl::throwRuntimeError(std::format(
+            "MotorControl.freeControllableMotors contains {} which is not configured.",
+            utl::enumToStringView(motorId)));
+      }
+      _freeControllableMotors.insert(motorId);
+    }
+  }
 }
 
 std::vector<utl::EMotor> MotorControl::configuredMotorIds() const {
@@ -291,6 +309,15 @@ std::vector<utl::EMotor> MotorControl::configuredMotorIds() const {
     ids.push_back(motorId);
   }
   return ids;
+}
+
+bool MotorControl::isGroupMember(const utl::EMotor motorId) const {
+  const auto it = _motorConfigs.find(motorId);
+  return it != _motorConfigs.end() && it->second.groupId.has_value();
+}
+
+bool MotorControl::isFreeControllable(const utl::EMotor motorId) const {
+  return _freeControllableMotors.contains(motorId);
 }
 
 void MotorControl::initialize() {
@@ -360,8 +387,8 @@ void MotorControl::initialize() {
       _runtime.emplace(motorId, MotorRuntimeState{});
       {
         std::lock_guard<std::mutex> lock(_busMutex);
-        it->second.initialize(*_bus);
         applyConfiguredParameters(it->second, motorCfg, *_bus);
+        it->second.initialize(*_bus);
         const auto inputRaw = it->second.readDriverInputCommandRaw(*_bus);
         const auto outputRaw = it->second.readDriverOutputStatusRaw(*_bus);
         const bool hasAlarm =
@@ -614,6 +641,18 @@ void MotorControl::setJogMinus(const utl::EMotor motorId, const bool enabled) {
       return;
     }
     motor.setJogMinus(bus, enabled);
+  });
+}
+
+void MotorControl::setFree(const utl::EMotor motorId, const bool enabled) {
+  if (!isFreeControllable(motorId)) {
+    utl::throwRuntimeError(std::format(
+        "Motor {} is not allowed to enter or leave FREE mode by configuration.",
+        utl::enumToStringView(motorId)));
+  }
+  withBus(motorId, [enabled](const Motor& motor, MotorRuntimeState&,
+                              ModbusClient& bus) {
+    motor.setFree(bus, enabled);
   });
 }
 
@@ -943,6 +982,9 @@ void MotorControl::preparePositionMode(const Motor& motor,
 void MotorControl::applyConfiguredParameters(const Motor& motor,
                                              const MotorConfig& config,
                                              ModbusClient& bus) const {
+  // NET-OUT12 reports FREE state (FREE_R, function code 16). This must be
+  // written before Motor::initialize reads assignments for GUI diagnostics.
+  motor.setNetOutputFunctionSelection(bus, 12, 16);
   if (config.groupId.has_value()) {
     motor.setGroupId(bus, *config.groupId);
   }

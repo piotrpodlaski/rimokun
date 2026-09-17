@@ -109,8 +109,12 @@ AxisHomingManager::loadAxisConfigs() {
   try {
     const auto machineCfg = utl::Config::instance().getClassConfig("Machine");
     const auto axesCfg = machineCfg["motion"]["axes"];
+    const auto modeCfg = machineCfg["homing"]["homeSeekingMode"];
     const auto directionCfg = machineCfg["homing"]["startingDirection"];
     if (!axesCfg || !axesCfg.IsMap()) {
+      return configs;
+    }
+    if (!modeCfg || !modeCfg.IsMap()) {
       return configs;
     }
     if (!directionCfg || !directionCfg.IsMap()) {
@@ -126,12 +130,19 @@ AxisHomingManager::loadAxisConfigs() {
         utl::throwRuntimeError(
             std::format("Missing Machine.motion.axes.{} config for homing.", axisKey));
       }
+      const auto modeNode = modeCfg[std::string(homingTargetName(axis))];
+      if (!modeNode) {
+        utl::throwRuntimeError(std::format(
+            "Missing Machine.homing.homeSeekingMode.{} config.",
+            homingTargetName(axis)));
+      }
       const auto directionNode = directionCfg[std::string(homingTargetName(axis))];
       if (!directionNode) {
         utl::throwRuntimeError(std::format(
             "Missing Machine.homing.startingDirection.{} config.",
             homingTargetName(axis)));
       }
+      const auto homeSeekingMode = modeNode.as<std::int32_t>();
       const auto startingDirection = directionNode.as<std::int32_t>();
       if (startingDirection != 0 && startingDirection != 1) {
         utl::throwRuntimeError(std::format(
@@ -146,6 +157,7 @@ AxisHomingManager::loadAxisConfigs() {
                                     std::llround(slowSpeedMmPerSec * stepsPerMm)),
                                 .acceleration =
                                     axisCfg["slowAcceleration001MsPerKHz"].as<std::int32_t>(),
+                                .homeSeekingMode = homeSeekingMode,
                                 .startingDirection = startingDirection,
                             });
     }

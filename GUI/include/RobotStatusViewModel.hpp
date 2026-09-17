@@ -1,6 +1,7 @@
 #pragma once
 
 #include <optional>
+#include <string>
 
 #include "CommonDefinitions.hpp"
 
@@ -28,6 +29,7 @@ struct ResetControlsViewModel {
   bool enableAllMotorsEnabled{false};
   bool disableAllMotorsEnabled{false};
   bool homingEnabled{false};
+  std::string warningMessage;
 };
 
 class RobotStatusViewModel {

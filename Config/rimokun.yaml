@@ -63,9 +63,34 @@ classes:
     responseTimeoutMS: 100
     connectTimeoutMS: 100
     interRequestDelayMS: 3
+    # Only motors in this allowlist can be put into FREE mode from the GUI.
+    # Keep the default empty; add explicit motor names (for example, XLeft).
+    freeControllableMotors:
+      - XLeft
+      - XRight
+      - ZLeft
+      - ZRight
     motors:
       XLeft:
         address: 1
+        runCurrent: 1000
+        stopCurrent: 500
+        startingSpeed: 10
+        overloadWarning: 10
+        overloadAlarm: 300
+        excessivePositionDeviationWarning: 500
+        excessivePositionDeviationAlarm: 700
+      XRight:
+        address: 2
+        runCurrent: 1000
+        stopCurrent: 500
+        startingSpeed: 10
+        overloadWarning: 10
+        overloadAlarm: 300
+        excessivePositionDeviationWarning: 500
+        excessivePositionDeviationAlarm: 700
+      YLeft:
+        address: 3
         runCurrent: 500
         stopCurrent: 500
         startingSpeed: 100
@@ -73,53 +98,35 @@ classes:
         overloadAlarm: 300
         excessivePositionDeviationWarning: 500
         excessivePositionDeviationAlarm: 700
-#      XRight:
-#        address: 2
-#        runCurrent: 500
-#        stopCurrent: 500
-#        startingSpeed: 100
-#        overloadWarning: 10
-#        overloadAlarm: 300
-#        excessivePositionDeviationWarning: 500
-#        excessivePositionDeviationAlarm: 700
-#      YLeft:
-#        address: 3
-#        runCurrent: 500
-#        stopCurrent: 500
-#        startingSpeed: 100
-#        overloadWarning: 10
-#        overloadAlarm: 300
-#        excessivePositionDeviationWarning: 500
-#        excessivePositionDeviationAlarm: 700
-#      YRight:
-#        address: 4
-#        runCurrent: 500
-#        stopCurrent: 500
-#        startingSpeed: 100
-#        overloadWarning: 10
-#        overloadAlarm: 300
-#        excessivePositionDeviationWarning: 500
-#        excessivePositionDeviationAlarm: 700
-#      ZLeft:
-#        address: 5
-#        runCurrent: 1000
-#        stopCurrent: 500
-#        startingSpeed: 10
-#        overloadWarning: 10
-#        overloadAlarm: 50
-#        excessivePositionDeviationWarning: 500
-#        excessivePositionDeviationAlarm: 700
-#      ZRight:
-#        motorRotationDirection: 0
-#        groupId: 1
-#        address: 6
-#        runCurrent: 1000
-#        stopCurrent: 500
-#        startingSpeed: 10
-#        overloadWarning: 10
-#        overloadAlarm: 50
-#        excessivePositionDeviationWarning: 500
-#        excessivePositionDeviationAlarm: 700
+      YRight:
+        address: 4
+        runCurrent: 500
+        stopCurrent: 500
+        startingSpeed: 100
+        overloadWarning: 10
+        overloadAlarm: 300
+        excessivePositionDeviationWarning: 500
+        excessivePositionDeviationAlarm: 700
+      ZLeft:
+        address: 5
+        runCurrent: 1000
+        stopCurrent: 500
+        startingSpeed: 10
+        overloadWarning: 10
+        overloadAlarm: 300
+        excessivePositionDeviationWarning: 500
+        excessivePositionDeviationAlarm: 700
+      ZRight:
+        motorRotationDirection: 0
+        groupId: 5
+        address: 6
+        runCurrent: 1000
+        stopCurrent: 500
+        startingSpeed: 10
+        overloadWarning: 10
+        overloadAlarm: 300
+        excessivePositionDeviationWarning: 500
+        excessivePositionDeviationAlarm: 700
   Machine:
     loopIntervalMS: 60
     updateIntervalMS: 200
@@ -133,11 +140,17 @@ classes:
         - XRight
         - Z
       startingDirection:
-        XLeft: 1
-        XRight: 0
-        YLeft: 0
-        YRight: 0
+        XLeft: 0
+        XRight: 1
+        YLeft: 1
+        YRight: 1
         Z: 1
+      homeSeekingMode:
+        XLeft: 2
+        XRight: 2
+        YLeft: 2
+        YRight: 2
+        Z: 2
     motion:
       stepsPerRevolution: 1000
       neutralAxisActivationThreshold: 0.05
@@ -146,8 +159,8 @@ classes:
       axes:
         leftArmX:
           invertAxis: true
-          slowMaxLinearSpeedMmPerSec: &slowSpeedX 50.0
-          fastMaxLinearSpeedMmPerSec: &fastSpeedX 350.0
+          slowMaxLinearSpeedMmPerSec: &slowSpeedX 20.0
+          fastMaxLinearSpeedMmPerSec: &fastSpeedX 100.0
           stepsPerMm: &stepsMmX 14.15
           slowAcceleration001MsPerKHz: &slowAccelX 300000
           slowDeceleration001MsPerKHz: &slowDeccelX 300000
@@ -156,7 +169,7 @@ classes:
         leftArmY:
           invertAxis: true
           slowMaxLinearSpeedMmPerSec: &slowSpeedY 10.0
-          fastMaxLinearSpeedMmPerSec: &fastSpeedY 60.0
+          fastMaxLinearSpeedMmPerSec: &fastSpeedY 40.0
           stepsPerMm: &stepsMmY 200
           slowAcceleration001MsPerKHz: &slowAccelY 100000
           slowDeceleration001MsPerKHz: &slowDeccelY 100000
@@ -182,8 +195,8 @@ classes:
           fastDeceleration001MsPerKHz: *fastDeccelY
         gantryZ:
           invertAxis: false
-          slowMaxLinearSpeedMmPerSec: 150.0
-          fastMaxLinearSpeedMmPerSec: 500.0
+          slowMaxLinearSpeedMmPerSec: 20.0
+          fastMaxLinearSpeedMmPerSec: 100.0
           stepsPerMm: *stepsMmX
           slowAcceleration001MsPerKHz: *slowAccelX
           slowDeceleration001MsPerKHz: *slowDeccelX
@@ -192,7 +205,6 @@ classes:
     inputMapping:
       motorPower: 9
       safetyON : 8
-      button1 : 11
       cpuOverride : 10
       tclProx : 0
       tclOpen : 1
@@ -200,6 +212,13 @@ classes:
       tcrProx: 3
       tcrOpen: 4
       tcrClose: 5
+      robotAUX1: 6
+      robotAUX2: 7
+      localAUX1: 11
+      localAUX2: 12
+      localAUX3: 13
+      localAUX4: 14
+      localAUX5: 15
     outputMapping:
       toolChangerLeft: 4
       toolChangerRight: 5

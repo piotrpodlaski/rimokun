@@ -96,8 +96,8 @@ ScopedConfig writeIntegrationConfig(
   out << "    loopIntervalMS: 10\n";
   out << "    updateIntervalMS: 50\n";
   out << "    inputMapping:\n";
-  out << "      button1: 0\n";
-  out << "      button2: 1\n";
+  out << "      localAUX1: 0\n";
+  out << "      localAUX2: 1\n";
   out << "    outputMapping:\n";
   out << "      toolChangerLeft: 0\n";
   out << "      toolChangerRight: 1\n";

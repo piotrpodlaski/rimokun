@@ -61,6 +61,7 @@ class Machine {
       const cmd::MotorDiagnosticsCommand& c);
   virtual void handleResetMotorAlarmCommand(const cmd::ResetMotorAlarmCommand& c);
   virtual void handleSetMotorEnabledCommand(const cmd::SetMotorEnabledCommand& c);
+  virtual void handleSetMotorFreeCommand(const cmd::SetMotorFreeCommand& c);
   virtual void handleSetAllMotorsEnabledCommand(
       const cmd::SetAllMotorsEnabledCommand& c);
   virtual void handleHomingCommand(const cmd::HomingCommand& c);
@@ -81,6 +82,8 @@ class Machine {
   void runContecCycle();
   void updateHeartBeatOutput(utl::SignalMap& desiredOutputs);
   void setDesiredOutputSignal(std::string_view signal, bool value);
+  [[nodiscard]] bool isCpuOverrideActive() const;
+  void requireOperationAllowed() const;
 
   void initializeComponents();
   std::string reconnectComponent(utl::ERobotComponent component);
@@ -106,6 +109,7 @@ class Machine {
   bool _heartBeatState{false};
   bool _heartBeatEnabled{true};
   std::atomic<bool> _motorAlarmActive{false};
+  std::atomic<bool> _cpuOverrideActive{false};
   std::optional<IClock::time_point> _safetyResetTurnOnAt;
   std::optional<IClock::time_point> _safetyResetTurnOffAt;
   std::shared_ptr<IClock> _clock;

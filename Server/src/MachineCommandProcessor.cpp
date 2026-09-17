@@ -162,6 +162,27 @@ nlohmann::json handleSetMotorEnabled(const nlohmann::json& command,
   return response;
 }
 
+nlohmann::json handleSetMotorFree(const nlohmann::json& command,
+                                  const cmd::DispatchFn& dispatch) {
+  if (!command.contains("motor") || !command.contains("enabled") ||
+      !command.at("enabled").is_boolean()) {
+    return errorResponse(
+        "setMotorFree command requires 'motor' and boolean 'enabled'.");
+  }
+  auto response = okResponse();
+  try {
+    cmd::Command c;
+    c.payload = cmd::SetMotorFreeCommand{
+        .motor = utl::enumFromJsonStringField<utl::EMotor>(command, "motor"),
+        .enabled = command.at("enabled").get<bool>()};
+    applyDispatchReply(response, dispatch(std::move(c), 2s));
+  } catch (const std::exception& e) {
+    response =
+        errorResponse(std::format("Invalid setMotorFree command: {}", e.what()));
+  }
+  return response;
+}
+
 nlohmann::json handleSetAllMotorsEnabled(const nlohmann::json& command,
                                          const cmd::DispatchFn& dispatch) {
   if (!command.contains("enabled") || !command.at("enabled").is_boolean()) {
@@ -253,6 +274,7 @@ const std::unordered_map<std::string, HandlerFn>& handlers() {
       {"resetMotorAlarm", handleResetMotorAlarm},
       {"contecDiagnostics", handleContecDiagnostics},
       {"setMotorEnabled", handleSetMotorEnabled},
+      {"setMotorFree", handleSetMotorFree},
       {"setAllMotorsEnabled", handleSetAllMotorsEnabled},
       {"homing", handleHoming},
       {"cancelHoming", handleCancelHoming},

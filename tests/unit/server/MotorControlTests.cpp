@@ -377,6 +377,11 @@ TEST(MotorControlTests, ConfigureHomingWritesHomeSeekingRegisters) {
   control.configureHoming(utl::EMotor::XLeft, 0, 1234, 5678, 1234, 1);
 
   const auto map = makeArKd2RegisterMap();
+  EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.homePOutputFunctionSelection),
+            0u);
+  EXPECT_EQ(
+      fake_modbus::getHoldingRegister(5, map.homePOutputFunctionSelection + 1),
+      1u);
   EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.homeSeekingMode), 0u);
   EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.homeSeekingMode + 1), 0u);
   EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.homeSeekingOperatingSpeed),

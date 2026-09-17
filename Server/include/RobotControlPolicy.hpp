@@ -87,6 +87,7 @@ class RimoKunControlPolicy final : public IRobotControlPolicy {
     bool motorControlUnavailable{false};
     bool controlPanelUnavailable{false};
     bool motorAlarmActive{false};
+    bool cpuOverrideActive{false};
     bool missingInputSignals{false};
   };
 

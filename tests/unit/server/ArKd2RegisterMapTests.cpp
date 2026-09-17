@@ -16,6 +16,7 @@ TEST(ArKd2RegisterMapTests, CoreAddressesMatchExpectedManualValues) {
   EXPECT_EQ(map.communicationErrorCode, 0x00AC);
   EXPECT_EQ(map.directIoAndBrakeStatus, 0x00D4);
   EXPECT_EQ(map.alarmResetCommand, 0x0180);
+  EXPECT_EQ(map.homePOutputFunctionSelection, 0x100C);
   EXPECT_EQ(map.startingSpeed, 0x0284);
   EXPECT_EQ(map.homeSeekingMode, 0x02C0);
   EXPECT_EQ(map.homeSeekingOperatingSpeed, 0x02C2);
@@ -71,6 +72,7 @@ TEST(ArKd2RegisterMapTests, CompactMapAddressesExistInFullRegisterMap) {
       map.communicationErrorCode,
       map.directIoAndBrakeStatus,
       map.alarmResetCommand,
+      map.homePOutputFunctionSelection,
       map.commandPosition,
       map.commandSpeed,
       map.actualPosition,

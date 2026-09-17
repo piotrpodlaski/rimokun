@@ -134,6 +134,7 @@ struct adl_serializer<utl::SingleMotorStatus> {
         {"warningDescription", v.warningDescription},
         {"alarmDescription", v.alarmDescription},
         {"flags", utl::enumKeyedMapToJson(v.flags)},
+        {"freeControllable", v.freeControllable},
         {"speedCommandPercent", v.speedCommandPercent},
         {"modeMaxLinearSpeedMmPerSec", v.modeMaxLinearSpeedMmPerSec},
     };
@@ -151,6 +152,7 @@ struct adl_serializer<utl::SingleMotorStatus> {
     v.alarmDescription = j.value("alarmDescription", std::string{});
     v.flags = utl::enumKeyedMapFromJson<utl::EMotorStatusFlags, utl::ELEDState>(
         j.at("flags"));
+    v.freeControllable = j.value("freeControllable", false);
     v.speedCommandPercent = j.value("speedCommandPercent", 0.0);
     v.modeMaxLinearSpeedMmPerSec = j.value("modeMaxLinearSpeedMmPerSec", 0.0);
   }
@@ -223,6 +225,9 @@ struct adl_serializer<utl::RobotStatus> {
     if (v.motorPower.has_value()) {
       j["motorPower"] = *v.motorPower;
     }
+    if (v.cpuOverride.has_value()) {
+      j["cpuOverride"] = *v.cpuOverride;
+    }
     if (v.heartBeatRunning.has_value()) {
       j["heartBeatRunning"] = *v.heartBeatRunning;
     }
@@ -245,6 +250,12 @@ struct adl_serializer<utl::RobotStatus> {
       v.motorPower = motorPowerIt->get<bool>();
     } else {
       v.motorPower = std::nullopt;
+    }
+    if (const auto cpuOverrideIt = j.find("cpuOverride");
+        cpuOverrideIt != j.end() && cpuOverrideIt->is_boolean()) {
+      v.cpuOverride = cpuOverrideIt->get<bool>();
+    } else {
+      v.cpuOverride = std::nullopt;
     }
     if (const auto heartBeatRunningIt = j.find("heartBeatRunning");
         heartBeatRunningIt != j.end() && heartBeatRunningIt->is_boolean()) {

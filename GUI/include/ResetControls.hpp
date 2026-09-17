@@ -13,6 +13,7 @@ class ResetControls;
 }
 
 class GuiStateStore;
+class QLabel;
 
 class ResetControls : public QWidget {
   Q_OBJECT
@@ -42,6 +43,7 @@ class ResetControls : public QWidget {
   LedIndicator* _lControlPanelLed;
   LedIndicator* _lMotorPowerLed;
   LedIndicator* _lSafetyOnLed;
+  QLabel* _warningLabel{nullptr};
   QPushButton* _bEmergencyStop;
   HomingWindow* _homingWindow{nullptr};
   GuiStateStore* _store{nullptr};

@@ -17,6 +17,7 @@ class AxisHomingManager {
     utl::EMotor motorId;
     std::int32_t speedStepsPerSec{0};
     std::int32_t acceleration{0};
+    std::int32_t homeSeekingMode{0};
     std::int32_t startingDirection{0};
   };
 

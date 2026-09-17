@@ -263,6 +263,29 @@ IRobotControlPolicy::ControlDecision RimoKunControlPolicy::decide(
 
   SignalMap ioOutputs;
 
+  bool cpuOverrideActive = robotStatus.cpuOverride.value_or(false);
+  if (inputs && inputs->contains("cpuOverride")) {
+    cpuOverrideActive = inputs->at("cpuOverride");
+  }
+  if (cpuOverrideActive) {
+    warnOnce(_warningState.cpuOverrideActive, utl::kCpuOverrideWarningMessage);
+    for (auto& [_, armState] : _armStates) {
+      armState = utl::EAxisState::Locked;
+    }
+    for (auto& [_, pressed] : _prevButtonState) {
+      pressed = false;
+    }
+    _lastMovementTime.clear();
+    _motorRuntime.clear();
+    return {.outputs = std::move(ioOutputs),
+            .motorIntents = {},
+            .setToolChangerErrorBlinking = false,
+            .armStates = _armStates,
+            .motorSpeedCommands = zeroMotorSpeedCommands(robotStatus)};
+  }
+  setWarningFlag(_warningState.cpuOverrideActive, false,
+                 "CPU OK signal override active");
+
   const bool motorControlAvailable = isComponentOperational(motorControlStatus);
   const bool controlPanelAvailable = isComponentOperational(controlPanelStatus);
 

@@ -101,7 +101,7 @@ TEST(RobotControlPolicyTests, RimoKunPolicyGeneratesMotorIntentsFromJoystick) {
   unlockArmForThisCycle(status, utl::EArm::Gantry);
 
   const auto decision = policy.decide(
-      IRobotControlPolicy::SignalMap{{"button1", true}, {"button2", false}},
+      IRobotControlPolicy::SignalMap{{"localAUX1", true}, {"localAUX2", false}},
       std::nullopt, MachineComponent::State::Normal, status);
 
   EXPECT_FALSE(decision.setToolChangerErrorBlinking);
@@ -133,7 +133,7 @@ TEST(RobotControlPolicyTests, RimoKunPolicyGantryUsesSingleAxisForBothZMotors) {
   unlockArmForThisCycle(status, utl::EArm::Gantry);
 
   const auto decision = policy.decide(
-      IRobotControlPolicy::SignalMap{{"button1", false}, {"button2", true}},
+      IRobotControlPolicy::SignalMap{{"localAUX1", false}, {"localAUX2", true}},
       std::nullopt, MachineComponent::State::Normal, status);
 
   const auto* zLeft = findIntent(decision.motorIntents, utl::EMotor::ZLeft);
@@ -166,7 +166,7 @@ TEST(RobotControlPolicyTests, RimoKunPolicyAppliesPerMotorSpeedLimits) {
   unlockArmForThisCycle(status, utl::EArm::Left);
 
   const auto decisionLeft = policy.decide(
-      IRobotControlPolicy::SignalMap{{"button1", false}, {"button2", false}},
+      IRobotControlPolicy::SignalMap{{"localAUX1", false}, {"localAUX2", false}},
       std::nullopt, MachineComponent::State::Normal, status);
 
   const auto* xLeft = findIntent(decisionLeft.motorIntents, utl::EMotor::XLeft);
@@ -183,7 +183,7 @@ TEST(RobotControlPolicyTests, RimoKunPolicyAppliesPerMotorSpeedLimits) {
   status.joystics[utl::EArm::Right] = {.x = 1.0, .y = 0.0, .btn = false};
   unlockArmForThisCycle(status, utl::EArm::Right);
   const auto decisionRight = policyRight.decide(
-      IRobotControlPolicy::SignalMap{{"button1", false}, {"button2", false}},
+      IRobotControlPolicy::SignalMap{{"localAUX1", false}, {"localAUX2", false}},
       std::nullopt, MachineComponent::State::Normal, status);
   const auto* xRight =
       findIntent(decisionRight.motorIntents, utl::EMotor::XRight);
@@ -209,7 +209,7 @@ TEST(RobotControlPolicyTests, RimoKunPolicyUsesCommonThresholdWithPerAxisOverrid
   unlockArmForThisCycle(status, utl::EArm::Gantry);
 
   const auto decision = policy.decide(
-      IRobotControlPolicy::SignalMap{{"button1", false}, {"button2", false}},
+      IRobotControlPolicy::SignalMap{{"localAUX1", false}, {"localAUX2", false}},
       std::nullopt, MachineComponent::State::Normal, status);
 
   const auto* leftX = findIntent(decision.motorIntents, utl::EMotor::XLeft);
@@ -234,7 +234,7 @@ TEST(RobotControlPolicyTests,
      RimoKunPolicyWithoutComponentStatusStaysFailSafeAndRequestsBlinking) {
   RimoKunControlPolicy policy;
   const auto decision = policy.decide(
-      IRobotControlPolicy::SignalMap{{"button1", true}, {"button2", false}},
+      IRobotControlPolicy::SignalMap{{"localAUX1", true}, {"localAUX2", false}},
       std::nullopt, MachineComponent::State::Normal, utl::RobotStatus{});
 
   EXPECT_TRUE(decision.setToolChangerErrorBlinking);
@@ -256,7 +256,7 @@ TEST(RobotControlPolicyTests, RimoKunPolicySkipsMotorCommandsWhenMotorControlDow
   status.joystics[utl::EArm::Gantry] = {.x = 0.0, .y = 0.8, .btn = false};
 
   const auto decision = policy.decide(
-      IRobotControlPolicy::SignalMap{{"button1", true}, {"button2", false}},
+      IRobotControlPolicy::SignalMap{{"localAUX1", true}, {"localAUX2", false}},
       std::nullopt, MachineComponent::State::Normal, status);
 
   EXPECT_FALSE(decision.setToolChangerErrorBlinking);
@@ -277,7 +277,7 @@ TEST(RobotControlPolicyTests,
   unlockArmForThisCycle(status, utl::EArm::Left);
 
   const auto unlocked = policy.decide(
-      IRobotControlPolicy::SignalMap{{"button1", false}, {"button2", false}},
+      IRobotControlPolicy::SignalMap{{"localAUX1", false}, {"localAUX2", false}},
       std::nullopt, MachineComponent::State::Normal, status);
   EXPECT_EQ(unlocked.armStates.at(utl::EArm::Left), utl::EAxisState::Slow);
 
@@ -285,13 +285,40 @@ TEST(RobotControlPolicyTests,
       utl::ELEDState::Error;
   status.joystics[utl::EArm::Left].btn = false;
   const auto unavailable = policy.decide(
-      IRobotControlPolicy::SignalMap{{"button1", false}, {"button2", false}},
+      IRobotControlPolicy::SignalMap{{"localAUX1", false}, {"localAUX2", false}},
       std::nullopt, MachineComponent::State::Normal, status);
 
   EXPECT_TRUE(unavailable.motorIntents.empty());
   EXPECT_EQ(unavailable.armStates.at(utl::EArm::Left), utl::EAxisState::Locked);
   EXPECT_EQ(unavailable.armStates.at(utl::EArm::Right), utl::EAxisState::Locked);
   EXPECT_EQ(unavailable.armStates.at(utl::EArm::Gantry), utl::EAxisState::Locked);
+}
+
+TEST(RobotControlPolicyTests,
+     RimoKunPolicySuspendsMotionAndLocksArmsDuringCpuOverride) {
+  RimoKunControlPolicy policy;
+  utl::RobotStatus status;
+  setAllComponentsOn(status);
+  status.cpuOverride = true;
+  status.motors[utl::EMotor::XLeft].state = utl::ELEDState::On;
+  status.joystics[utl::EArm::Left] = {.x = 0.9, .y = 0.0, .btn = true};
+  status.joystics[utl::EArm::Right] = {.x = 0.0, .y = 0.0, .btn = true};
+  status.joystics[utl::EArm::Gantry] = {.x = 0.0, .y = 0.9, .btn = true};
+
+  const auto decision = policy.decide(
+      IRobotControlPolicy::SignalMap{{"cpuOverride", true}},
+      std::nullopt, MachineComponent::State::Normal, status);
+
+  ASSERT_TRUE(decision.outputs.has_value());
+  EXPECT_TRUE(decision.outputs->empty());
+  EXPECT_TRUE(decision.motorIntents.empty());
+  EXPECT_EQ(decision.armStates.at(utl::EArm::Left), utl::EAxisState::Locked);
+  EXPECT_EQ(decision.armStates.at(utl::EArm::Right), utl::EAxisState::Locked);
+  EXPECT_EQ(decision.armStates.at(utl::EArm::Gantry), utl::EAxisState::Locked);
+  ASSERT_TRUE(decision.motorSpeedCommands.contains(utl::EMotor::XLeft));
+  EXPECT_DOUBLE_EQ(
+      decision.motorSpeedCommands.at(utl::EMotor::XLeft).speedCommandPercent,
+      0.0);
 }
 
 TEST(RobotControlPolicyTests,
@@ -309,7 +336,7 @@ TEST(RobotControlPolicyTests,
   unlockArmForThisCycle(status, utl::EArm::Left);
 
   const auto decision = policy.decide(
-      IRobotControlPolicy::SignalMap{{"button1", true}, {"button2", false}},
+      IRobotControlPolicy::SignalMap{{"localAUX1", true}, {"localAUX2", false}},
       std::nullopt, MachineComponent::State::Normal, status);
 
   EXPECT_FALSE(decision.setToolChangerErrorBlinking);
@@ -333,7 +360,7 @@ TEST(RobotControlPolicyTests, RimoKunPolicyStopsAllMotorsWhenAnyMotorIsInAlarm) 
   status.joystics[utl::EArm::Gantry] = {.x = 0.0, .y = 0.0, .btn = false};
 
   const auto decision = policy.decide(
-      IRobotControlPolicy::SignalMap{{"button1", true}, {"button2", false}},
+      IRobotControlPolicy::SignalMap{{"localAUX1", true}, {"localAUX2", false}},
       std::nullopt, MachineComponent::State::Normal, status);
 
   ASSERT_TRUE(decision.outputs.has_value());
@@ -369,7 +396,7 @@ TEST(RobotControlPolicyTests, RimoKunPolicyUpdatesSpeedOnlyAfterAxisDeltaThresho
   unlockArmForThisCycle(status, utl::EArm::Left);
 
   const auto first = policy.decide(
-      IRobotControlPolicy::SignalMap{{"button1", true}, {"button2", true}},
+      IRobotControlPolicy::SignalMap{{"localAUX1", true}, {"localAUX2", true}},
       std::nullopt, MachineComponent::State::Normal, status);
   const auto* firstX = findIntent(first.motorIntents, utl::EMotor::XLeft);
   ASSERT_NE(firstX, nullptr);
@@ -378,14 +405,14 @@ TEST(RobotControlPolicyTests, RimoKunPolicyUpdatesSpeedOnlyAfterAxisDeltaThresho
 
   status.joystics[utl::EArm::Left] = {.x = 0.51, .y = 0.0, .btn = false};  // delta 0.01 < 0.02
   const auto second = policy.decide(
-      IRobotControlPolicy::SignalMap{{"button1", true}, {"button2", true}},
+      IRobotControlPolicy::SignalMap{{"localAUX1", true}, {"localAUX2", true}},
       std::nullopt, MachineComponent::State::Normal, status);
   const auto* secondX = findIntent(second.motorIntents, utl::EMotor::XLeft);
   EXPECT_EQ(secondX, nullptr);
 
   status.joystics[utl::EArm::Left] = {.x = 0.54, .y = 0.0, .btn = false};  // delta 0.04 >= 0.02
   const auto third = policy.decide(
-      IRobotControlPolicy::SignalMap{{"button1", true}, {"button2", true}},
+      IRobotControlPolicy::SignalMap{{"localAUX1", true}, {"localAUX2", true}},
       std::nullopt, MachineComponent::State::Normal, status);
   const auto* thirdX = findIntent(third.motorIntents, utl::EMotor::XLeft);
   ASSERT_NE(thirdX, nullptr);

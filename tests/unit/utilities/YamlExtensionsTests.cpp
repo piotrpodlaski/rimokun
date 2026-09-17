@@ -23,6 +23,7 @@ TEST(YamlExtensionsTests, RobotStatusRoundTripWorks) {
   input.toolChangers[utl::EArm::Left] = {
       .flags = {{utl::EToolChangerStatusFlags::ProxSen, utl::ELEDState::On}}};
   input.robotComponents[utl::ERobotComponent::ControlPanel] = utl::ELEDState::Off;
+  input.cpuOverride = true;
   input.joystics[utl::EArm::Gantry] = {.x = 0.25, .y = -0.75, .btn = true};
 
   const auto encoded = YAML::convert<utl::RobotStatus>::encode(input);
@@ -37,6 +38,8 @@ TEST(YamlExtensionsTests, RobotStatusRoundTripWorks) {
             utl::ELEDState::Off);
   ASSERT_TRUE(decoded.joystics.contains(utl::EArm::Gantry));
   EXPECT_TRUE(decoded.joystics.at(utl::EArm::Gantry).btn);
+  ASSERT_TRUE(decoded.cpuOverride.has_value());
+  EXPECT_TRUE(*decoded.cpuOverride);
 }
 
 TEST(YamlExtensionsTests, RobotStatusDecodeWithoutJoysticsIsSupported) {

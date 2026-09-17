@@ -57,6 +57,9 @@ void MachineController::runControlLoopTasks() {
     _io.setOutputs(*decision.outputs);
   }
   for (const auto& intent : decision.motorIntents) {
+    if (_motorOps.isGroupMember && _motorOps.isGroupMember(intent.motorId)) {
+      continue;
+    }
     if (!_motorOps.isConfigured(intent.motorId)) {
       if (!_missingMotorWarned[intent.motorId]) {
         SPDLOG_WARN(

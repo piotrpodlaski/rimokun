@@ -23,6 +23,7 @@ MotorRegisterMap makeArKd2RegisterMap() {
   map.alarmResetCommand = 0x0180;
   map.configurationExecute = 0x018C;
   map.stopInputAction = 0x0200;
+  map.homePOutputFunctionSelection = 0x100C;
 
   // Monitor registers (32-bit)
   map.commandPosition = 0x00C6;

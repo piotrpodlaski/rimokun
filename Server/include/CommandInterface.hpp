@@ -44,6 +44,11 @@ struct SetMotorEnabledCommand {
   bool enabled;
 };
 
+struct SetMotorFreeCommand {
+  utl::EMotor motor;
+  bool enabled;
+};
+
 struct SetAllMotorsEnabledCommand {
   bool enabled;
 };
@@ -64,7 +69,8 @@ struct SafetyResetCommand {};
 
 using Payload = std::variant<ToolChangerCommand, ReconnectCommand,
                              MotorDiagnosticsCommand, ResetMotorAlarmCommand,
-                             SetMotorEnabledCommand, SetAllMotorsEnabledCommand,
+                             SetMotorEnabledCommand, SetMotorFreeCommand,
+                             SetAllMotorsEnabledCommand,
                              HomingCommand, CancelHomingCommand,
                              ContecDiagnosticsCommand,
                              EmergencyStopCommand, SafetyResetCommand>;

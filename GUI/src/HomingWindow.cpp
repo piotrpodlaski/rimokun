@@ -150,6 +150,7 @@ HomingWindow::HomingWindow(GuiStateStore* store, QWidget* parent)
 
   for (const auto& spec : kAxisButtons) {
     auto* button = makeHomingButton(spec, this);
+    _homingButtons.push_back(button);
     buttonsGrid->addWidget(button, spec.row, spec.column, spec.rowSpan,
                            spec.columnSpan);
     connect(button, &QPushButton::clicked, this, [this, spec] {
@@ -239,12 +240,22 @@ bool HomingWindow::confirmHomeAll() const {
 }
 
 void HomingWindow::handleStatusUpdated(const utl::RobotStatus& status) {
+  _operationSuspended = status.cpuOverride.value_or(false);
   ensureAxisRows(status.homing);
   updateSummary(status.homing);
   for (const auto& axisStatus : status.homing.axes) {
     updateAxisRow(axisStatus);
   }
   setSpinnerForState(status.homing.state);
+  for (auto* button : _homingButtons) {
+    button->setEnabled(!_operationSuspended);
+  }
+  if (_operationSuspended) {
+    const auto failedVisual = visualState(utl::EHomingState::Failed);
+    _summaryLabel->setText("Operation suspended");
+    _summaryLabel->setStyleSheet(makeSummaryStyle(failedVisual.foreground));
+    _detailLabel->setText(QString::fromUtf8(utl::kCpuOverrideWarningMessage));
+  }
   _cancelButton->setEnabled(status.homing.state == utl::EHomingState::Pending ||
                             status.homing.state == utl::EHomingState::Running);
 }
@@ -260,6 +271,9 @@ void HomingWindow::handleConnectionChanged(const bool connected) {
   _summaryLabel->setStyleSheet(makeSummaryStyle(failedVisual.foreground));
   _detailLabel->setText("Server connection lost.");
   _cancelButton->setEnabled(false);
+  for (auto* button : _homingButtons) {
+    button->setEnabled(false);
+  }
 }
 
 void HomingWindow::ensureAxisRows(const utl::HomingSessionStatus& session) {
@@ -354,6 +368,9 @@ QString HomingWindow::stateText(const utl::HomingAxisStatus& axisStatus) {
 }
 
 void HomingWindow::emitHomingCommand(const cmd::HomingTarget target) const {
+  if (_operationSuspended) {
+    return;
+  }
   GuiCommand command;
   command.payload = cmd::HomingCommand{.target = target};
   emit commandIssued(command);

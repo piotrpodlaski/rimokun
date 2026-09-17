@@ -69,6 +69,7 @@ enum class MotorOutputFlag : std::uint16_t {
   Area2 = 1u << 10,
   Area3 = 1u << 11,
   Tim = 1u << 12,
+  Free = 1u << 12,
   Move = 1u << 13,
   End = 1u << 14,
   Tlc = 1u << 15,
@@ -173,7 +174,7 @@ inline constexpr std::array<MotorIoAssignmentDefault, 16> netOutput{{
     {"NET-OUT9", "AREA1", 73},
     {"NET-OUT10", "AREA2", 74},
     {"NET-OUT11", "AREA3", 75},
-    {"NET-OUT12", "TIM", 72},
+    {"NET-OUT12", "FREE_R", 16},
     {"NET-OUT13", "MOVE", 68},
     {"NET-OUT14", "END", 69},
     {"NET-OUT15", "TLC", 71},
@@ -245,6 +246,7 @@ class Motor {
   void setReverse(ModbusClient& bus, bool enabled) const;
   void setJogPlus(ModbusClient& bus, bool enabled) const;
   void setJogMinus(ModbusClient& bus, bool enabled) const;
+  void setFree(ModbusClient& bus, bool enabled) const;
   void setEnabled(ModbusClient& bus, bool enabled) const;
   void invalidateDriverInputCommandCache() const noexcept;
   [[nodiscard]] static std::uint8_t decodeOperationIdFromInputRaw(
@@ -267,6 +269,10 @@ class Motor {
   void setStopCurrent(ModbusClient& bus, std::int32_t current) const;
   void setStopInputAction(ModbusClient& bus, std::int32_t value) const;
   void setStopInputPolarity(ModbusClient& bus, std::int32_t value) const;
+  void setNetOutputFunctionSelection(ModbusClient& bus, std::uint8_t channel,
+                                     std::uint16_t functionCode) const;
+  void setHomePOutputFunctionSelection(ModbusClient& bus,
+                                       std::int32_t value) const;
   void setStartingSpeed(ModbusClient& bus, std::int32_t speed) const;
   void configureHoming(ModbusClient& bus, std::int32_t mode,
                        std::int32_t operatingSpeed,

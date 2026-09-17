@@ -569,6 +569,11 @@ void Motor::setJogMinus(ModbusClient& bus, const bool enabled) const {
   setDriverInputFlag(bus, MotorInputFlag::MinusJog, enabled);
 }
 
+void Motor::setFree(ModbusClient& bus, const bool enabled) const {
+  // FREE is NET-IN6, i.e. bit 6 of the 16-bit driver input command (0x007D).
+  setDriverInputFlag(bus, MotorInputFlag::Free, enabled);
+}
+
 void Motor::setEnabled(ModbusClient& bus, const bool enabled) const {
   auto raw = _driverInputCommandRawCache.has_value()
                  ? *_driverInputCommandRawCache
@@ -694,6 +699,25 @@ void Motor::setStopInputPolarity(ModbusClient& bus, const std::int32_t value) co
   writeInt32(bus, _map.stopInputPolarity, value, SlaveTarget::Device);
 }
 
+void Motor::setNetOutputFunctionSelection(ModbusClient& bus,
+                                          const std::uint8_t channel,
+                                          const std::uint16_t functionCode) const {
+  constexpr std::uint8_t kNetOutputChannelCount = 16;
+  constexpr int kWordsPerChannel = 2;
+  if (channel >= kNetOutputChannelCount) {
+    utl::throwRuntimeError(std::format(
+        "Invalid NET-OUT channel {} (allowed 0..{})", channel,
+        kNetOutputChannelCount - 1));
+  }
+  writeInt32(bus, _map.netOutputFunctionSelectBase + kWordsPerChannel * channel,
+             functionCode, SlaveTarget::Device);
+}
+
+void Motor::setHomePOutputFunctionSelection(
+    ModbusClient& bus, const std::int32_t value) const {
+  writeInt32(bus, _map.homePOutputFunctionSelection, value, SlaveTarget::Device);
+}
+
 void Motor::setStartingSpeed(ModbusClient& bus, const std::int32_t speed) const {
   writeInt32(bus, _map.startingSpeed, speed, SlaveTarget::Device);
 }
@@ -703,6 +727,8 @@ void Motor::configureHoming(ModbusClient& bus, const std::int32_t mode,
                             const std::int32_t acceleration,
                             const std::int32_t startingSpeed,
                             const std::int32_t startingDirection) const {
+  // HOME-P output must represent home-seeking completion during homing.
+  setHomePOutputFunctionSelection(bus, 1);
   writeInt32(bus, _map.homeSeekingMode, mode, SlaveTarget::Device);
   writeInt32(bus, _map.homeSeekingOperatingSpeed, operatingSpeed,
              SlaveTarget::Device);

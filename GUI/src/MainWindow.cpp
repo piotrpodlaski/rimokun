@@ -34,6 +34,8 @@ MainWindow::MainWindow(QWidget* parent)
         motorStatsWidget, eMot, &_stateStore, this));
     connect(motorStatsWidget, &MotorStats::clicked, this,
             &MainWindow::openMotorPanelForMotor);
+    connect(motorStatsWidget, &MotorStats::commandIssued, &_updater,
+            &Updater::sendCommand);
   }
   const auto leftChanger = _ui->leftChanger;
   const auto rightChanger = _ui->rightChanger;

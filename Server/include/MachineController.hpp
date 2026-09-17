@@ -31,6 +31,9 @@ class MachineController {
     std::function<void(utl::EMotor)> start;
     std::function<void(utl::EMotor)> stop;
     std::function<bool(utl::EMotor)> isConfigured;
+    // Group-member drives receive the parent drive's commands through the
+    // motor-controller group mechanism and must not be addressed directly.
+    std::function<bool(utl::EMotor)> isGroupMember;
     std::function<void(utl::EMotor)> onAlarmCleared;
   };
 

@@ -15,6 +15,7 @@ include(GoogleTest)
 gtest_discover_tests(utilities_unit_tests PROPERTIES LABELS "unit")
 
 add_executable(server_unit_tests
+        server/AxisHomingManagerTests.cpp
         server/ControlLoopRunnerTests.cpp
         server/MachineControllerTests.cpp
         server/RobotControlPolicyTests.cpp

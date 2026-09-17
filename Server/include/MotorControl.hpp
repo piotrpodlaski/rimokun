@@ -6,6 +6,7 @@
 #include <map>
 #include <mutex>
 #include <optional>
+#include <set>
 #include <string_view>
 #include <string>
 #include <vector>
@@ -33,6 +34,9 @@ class MotorControl final : public MachineComponent {
     return _motors;
   }
   [[nodiscard]] std::vector<utl::EMotor> configuredMotorIds() const;
+  // A configured group ID makes this drive a child: runtime commands are sent
+  // to its parent drive, whose address is the group ID.
+  [[nodiscard]] bool isGroupMember(utl::EMotor motorId) const;
 
   void setMode(utl::EMotor motorId, MotorControlMode mode);
   void setSpeed(utl::EMotor motorId, std::int32_t speed);
@@ -50,6 +54,7 @@ class MotorControl final : public MachineComponent {
   void setReverse(utl::EMotor motorId, bool enabled);
   void setJogPlus(utl::EMotor motorId, bool enabled);
   void setJogMinus(utl::EMotor motorId, bool enabled);
+  void setFree(utl::EMotor motorId, bool enabled);
   void setEnabled(utl::EMotor motorId, bool enabled);
   void setAllEnabled(bool enabled);
   // Call when a motor transitions out of alarm state. Forces C-ON=0 on hardware
@@ -57,6 +62,7 @@ class MotorControl final : public MachineComponent {
   void onAlarmCleared(utl::EMotor motorId);
   [[nodiscard]] bool isEnabled(utl::EMotor motorId) const;
   [[nodiscard]] bool isEnableControllable(utl::EMotor motorId) const;
+  [[nodiscard]] bool isFreeControllable(utl::EMotor motorId) const;
   [[nodiscard]] std::uint8_t readSelectedOperationId(utl::EMotor motorId);
   void resetAlarm(utl::EMotor motorId);
   void setSelectedOperationId(utl::EMotor motorId, std::uint8_t opId);
@@ -125,6 +131,7 @@ class MotorControl final : public MachineComponent {
   MotorRtuConfig _rtuConfig;
   MotorRawTcpConfig _rawTcpConfig;
   MotorRegisterMap _registerMap;
+  std::set<utl::EMotor> _freeControllableMotors;
   std::map<utl::EMotor, MotorConfig> _motorConfigs;
   std::map<utl::EMotor, Motor> _motors;
 

@@ -91,5 +91,12 @@ ResetControlsViewModel RobotStatusViewModel::resetControlsForStatus(
   vm.homingEnabled =
       !operationSuspended &&
       (vm.motor == utl::ELEDState::On || vm.motor == utl::ELEDState::Warning);
+  vm.xModeChecked = status->armAxisMode == utl::EArmAxisMode::X;
+  vm.yModeChecked = !vm.xModeChecked;
+  vm.armAxisModeEnabled = !operationSuspended &&
+      (vm.motor == utl::ELEDState::On || vm.motor == utl::ELEDState::Warning);
+  vm.armAxisModeText = vm.xModeChecked
+      ? "Active: X — joystick drives X; Y movement commands are stopped"
+      : "Active: Y — joystick drives Y; X movement commands are stopped";
   return vm;
 }

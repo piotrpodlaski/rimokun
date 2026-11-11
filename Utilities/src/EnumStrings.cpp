@@ -98,6 +98,11 @@ constexpr std::array kAxisStateEntries{
     EnumEntry<utl::EAxisState>{utl::EAxisState::Fast, "Fast"},
 };
 
+constexpr std::array kArmAxisModeEntries{
+    EnumEntry<utl::EArmAxisMode>{utl::EArmAxisMode::X, "X"},
+    EnumEntry<utl::EArmAxisMode>{utl::EArmAxisMode::Y, "Y"},
+};
+
 constexpr std::array kHomingAxisEntries{
     EnumEntry<utl::EHomingAxis>{utl::EHomingAxis::XLeft, "XLeft"},
     EnumEntry<utl::EHomingAxis>{utl::EHomingAxis::YLeft, "YLeft"},
@@ -344,6 +349,17 @@ std::optional<EAxisState> enumFromStringImpl(const std::type_identity<EAxisState
 }
 std::string_view knownEnumNamesImpl(const std::type_identity<EAxisState>) {
   return "Locked, Slow, Fast";
+}
+
+std::string_view enumToStringImpl(const EArmAxisMode value) {
+  return enumToString(kArmAxisModeEntries, value);
+}
+std::optional<EArmAxisMode> enumFromStringImpl(
+    const std::type_identity<EArmAxisMode>, const std::string_view text) {
+  return enumFromString(kArmAxisModeEntries, text);
+}
+std::string_view knownEnumNamesImpl(const std::type_identity<EArmAxisMode>) {
+  return "X, Y";
 }
 
 std::string_view enumToStringImpl(const EHomingAxis value) {

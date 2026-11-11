@@ -81,6 +81,15 @@ TEST(GuiCommandJsonAdapterTests, SetAllMotorsEnabledCommandMapsToJson) {
   EXPECT_TRUE(json["enabled"].get<bool>());
 }
 
+TEST(GuiCommandJsonAdapterTests, SetArmAxisModeCommandMapsToJson) {
+  GuiCommand command;
+  command.payload = cmd::SetArmAxisModeCommand{.mode = utl::EArmAxisMode::Y};
+
+  const auto json = GuiCommandJsonAdapter::toJson(command);
+  EXPECT_EQ(json["type"].get<std::string>(), "setArmAxisMode");
+  EXPECT_EQ(json["mode"].get<std::string>(), "Y");
+}
+
 TEST(GuiCommandJsonAdapterTests, HomingCommandMapsToJson) {
   GuiCommand command;
   command.payload = cmd::HomingCommand{.target = cmd::HomingTarget::Z};

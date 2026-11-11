@@ -29,6 +29,10 @@ struct ResetControlsViewModel {
   bool enableAllMotorsEnabled{false};
   bool disableAllMotorsEnabled{false};
   bool homingEnabled{false};
+  bool xModeChecked{true};
+  bool yModeChecked{false};
+  bool armAxisModeEnabled{false};
+  std::string armAxisModeText;
   std::string warningMessage;
 };
 

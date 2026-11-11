@@ -393,6 +393,25 @@ TEST(MachineCommandProcessorTests, SetAllMotorsEnabledCommandParsesAndDispatches
   EXPECT_EQ(response["status"].get<std::string>(), "OK");
 }
 
+TEST(MachineCommandProcessorTests, SetArmAxisModeCommandParsesAndDispatches) {
+  nlohmann::json command{{"type", "setArmAxisMode"}, {"mode", "Y"}};
+  bool dispatched = false;
+  const auto response = cmd::processCommand(
+      command, [&](cmd::Command c, const std::chrono::milliseconds timeout) {
+        dispatched = true;
+        EXPECT_EQ(timeout, 2s);
+        EXPECT_TRUE(std::holds_alternative<cmd::SetArmAxisModeCommand>(c.payload));
+        if (std::holds_alternative<cmd::SetArmAxisModeCommand>(c.payload)) {
+          EXPECT_EQ(std::get<cmd::SetArmAxisModeCommand>(c.payload).mode,
+                    utl::EArmAxisMode::Y);
+        }
+        return std::string{};
+      });
+
+  EXPECT_TRUE(dispatched);
+  EXPECT_EQ(response["status"].get<std::string>(), "OK");
+}
+
 TEST(MachineCommandProcessorTests, HomingCommandParsesAndDispatches) {
   nlohmann::json command{
       {"type", "homing"},

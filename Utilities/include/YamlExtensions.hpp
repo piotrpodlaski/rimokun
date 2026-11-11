@@ -62,6 +62,9 @@ template <>
 struct convert<utl::EAxisState> : convert_enum<utl::EAxisState> {};
 
 template <>
+struct convert<utl::EArmAxisMode> : convert_enum<utl::EArmAxisMode> {};
+
+template <>
 struct convert<utl::EHomingAxis> : convert_enum<utl::EHomingAxis> {};
 
 template <>
@@ -246,6 +249,7 @@ struct convert<utl::RobotStatus> {
     for (const auto& [arm, state] : rhs.armStates) {
       node["armStates"][convert<utl::EArm>::encode(arm)] = state;
     }
+    node["armAxisMode"] = rhs.armAxisMode;
     node["homing"] = rhs.homing;
     return node;
   }
@@ -297,6 +301,9 @@ struct convert<utl::RobotStatus> {
         if (!convert<utl::EArm>::decode(kv.first, arm)) return false;
         rhs.armStates[arm] = kv.second.as<utl::EAxisState>();
       }
+    }
+    if (const auto armAxisModeNode = node["armAxisMode"]; armAxisModeNode) {
+      rhs.armAxisMode = armAxisModeNode.as<utl::EArmAxisMode>();
     }
     if (const auto homingNode = node["homing"]; homingNode) {
       rhs.homing = homingNode.as<utl::HomingSessionStatus>();

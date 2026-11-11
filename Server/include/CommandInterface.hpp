@@ -53,6 +53,10 @@ struct SetAllMotorsEnabledCommand {
   bool enabled;
 };
 
+struct SetArmAxisModeCommand {
+  utl::EArmAxisMode mode;
+};
+
 enum class HomingTarget { All, XLeft, YLeft, XRight, YRight, Z };
 
 struct HomingCommand {
@@ -71,6 +75,7 @@ using Payload = std::variant<ToolChangerCommand, ReconnectCommand,
                              MotorDiagnosticsCommand, ResetMotorAlarmCommand,
                              SetMotorEnabledCommand, SetMotorFreeCommand,
                              SetAllMotorsEnabledCommand,
+                             SetArmAxisModeCommand,
                              HomingCommand, CancelHomingCommand,
                              ContecDiagnosticsCommand,
                              EmergencyStopCommand, SafetyResetCommand>;

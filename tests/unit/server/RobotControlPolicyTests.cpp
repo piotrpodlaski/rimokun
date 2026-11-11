@@ -108,7 +108,7 @@ TEST(RobotControlPolicyTests, RimoKunPolicyGeneratesMotorIntentsFromJoystick) {
   ASSERT_TRUE(decision.outputs.has_value());
   EXPECT_TRUE(decision.outputs->at("light1"));
   EXPECT_FALSE(decision.outputs->at("light2"));
-  EXPECT_EQ(decision.motorIntents.size(), 6u);  // first active cycle emits all intents
+  EXPECT_EQ(decision.motorIntents.size(), 4u);  // X pair plus both gantry motors
 
   for (const auto& intent : decision.motorIntents) {
     ASSERT_TRUE(intent.mode.has_value());
@@ -118,6 +118,26 @@ TEST(RobotControlPolicyTests, RimoKunPolicyGeneratesMotorIntentsFromJoystick) {
     EXPECT_EQ(*intent.acceleration, 24575);
     EXPECT_EQ(*intent.deceleration, 24575);
   }
+  std::filesystem::remove(configPath);
+}
+
+TEST(RobotControlPolicyTests, RimoKunPolicyOnlyDrivesTheSelectedArmAxisMode) {
+  const auto configPath = writePolicyConfigLowThreshold();
+  utl::Config::instance().setConfigPath(configPath.string());
+  RimoKunControlPolicy policy;
+  utl::RobotStatus status;
+  setAllComponentsOn(status);
+  status.armAxisMode = utl::EArmAxisMode::Y;
+  status.joystics[utl::EArm::Left] = {.x = 0.8, .y = 0.6, .btn = true};
+  status.joystics[utl::EArm::Right] = {.x = -0.7, .y = -0.5, .btn = true};
+
+  const auto decision = policy.decide(std::nullopt, std::nullopt,
+                                      MachineComponent::State::Normal, status);
+
+  EXPECT_EQ(findIntent(decision.motorIntents, utl::EMotor::XLeft), nullptr);
+  EXPECT_EQ(findIntent(decision.motorIntents, utl::EMotor::XRight), nullptr);
+  EXPECT_NE(findIntent(decision.motorIntents, utl::EMotor::YLeft), nullptr);
+  EXPECT_NE(findIntent(decision.motorIntents, utl::EMotor::YRight), nullptr);
   std::filesystem::remove(configPath);
 }
 

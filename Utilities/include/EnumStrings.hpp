@@ -55,6 +55,11 @@ std::optional<EAxisState> enumFromStringImpl(std::type_identity<EAxisState>,
                                              std::string_view text);
 std::string_view knownEnumNamesImpl(std::type_identity<EAxisState>);
 
+std::string_view enumToStringImpl(EArmAxisMode value);
+std::optional<EArmAxisMode> enumFromStringImpl(std::type_identity<EArmAxisMode>,
+                                                std::string_view text);
+std::string_view knownEnumNamesImpl(std::type_identity<EArmAxisMode>);
+
 std::string_view enumToStringImpl(EHomingAxis value);
 std::optional<EHomingAxis> enumFromStringImpl(std::type_identity<EHomingAxis>,
                                               std::string_view text);

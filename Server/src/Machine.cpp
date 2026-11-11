@@ -130,6 +130,11 @@ Machine::Machine(std::shared_ptr<IClock> clock) : _clock(std::move(clock)) {
       cfg.getOptional<int>("Machine", "contecLoopIntervalMS", loopIntervalMS);
   _statusUpdatesEnabled =
       cfg.getOptional<bool>("Machine", "statusUpdatesEnabled", true);
+  const auto motionConfig = cfg.getClassConfig("Machine")["motion"];
+  if (motionConfig && motionConfig["disableUnusedArmAxisMotors"]) {
+    _disableUnusedArmAxisMotors =
+        motionConfig["disableUnusedArmAxisMotors"].as<bool>();
+  }
   _heartBeatPrescaleCycles = static_cast<std::size_t>(std::max(
       0, cfg.getOptional<int>("Machine", "heartBeatPrescaleCycles", 0)));
 
@@ -296,6 +301,9 @@ void Machine::runOneCycle(LoopState& state) {
                                     [this](
                                         const cmd::SetAllMotorsEnabledCommand& c) {
                                       handleSetAllMotorsEnabledCommand(c);
+                                    },
+                                    [this](const cmd::SetArmAxisModeCommand& c) {
+                                      handleSetArmAxisModeCommand(c);
                                     },
                                     [this](const cmd::HomingCommand& c) {
                                       handleHomingCommand(c);
@@ -594,6 +602,9 @@ void Machine::initializeComponents() {
                    utl::enumToStringView(componentType), e.what());
     }
   }
+  if (_motorControl.state() != MachineComponent::State::Error) {
+    applyArmAxisMode(_robotStatus.armAxisMode);
+  }
 }
 
 std::string Machine::reconnectComponent(const utl::ERobotComponent component) {
@@ -620,6 +631,9 @@ std::string Machine::reconnectComponent(const utl::ERobotComponent component) {
   if (comp->state() == MachineComponent::State::Error) {
     return std::format("Resetting '{}' was unsuccessful!",
                        utl::enumToStringView(component));
+  }
+  if (component == utl::ERobotComponent::MotorControl) {
+    applyArmAxisMode(_robotStatus.armAxisMode);
   }
   return "";
 }
@@ -723,6 +737,9 @@ void Machine::handleResetMotorAlarmCommand(const cmd::ResetMotorAlarmCommand& c)
 
 void Machine::handleSetMotorEnabledCommand(const cmd::SetMotorEnabledCommand& c) {
   requireOperationAllowed();
+  if (c.enabled && _disableUnusedArmAxisMotors && isInactiveArmAxisMotor(c.motor)) {
+    utl::throwRuntimeError("Cannot enable a motor disabled by the active arm axis mode.");
+  }
   _motorControl.setEnabled(c.motor, c.enabled);
 }
 
@@ -734,11 +751,77 @@ void Machine::handleSetMotorFreeCommand(const cmd::SetMotorFreeCommand& c) {
 void Machine::handleSetAllMotorsEnabledCommand(
     const cmd::SetAllMotorsEnabledCommand& c) {
   requireOperationAllowed();
-  _motorControl.setAllEnabled(c.enabled);
+  if (!c.enabled) {
+    _motorControl.setAllEnabled(false);
+    return;
+  }
+  if (!_disableUnusedArmAxisMotors) {
+    _motorControl.setAllEnabled(true);
+    return;
+  }
+  _motorControl.setEnabled(utl::EMotor::ZLeft, true);
+  _motorControl.setEnabled(utl::EMotor::ZRight, true);
+  applyArmAxisMode(_robotStatus.armAxisMode);
+}
+
+void Machine::handleSetArmAxisModeCommand(const cmd::SetArmAxisModeCommand& c) {
+  requireOperationAllowed();
+  applyArmAxisMode(c.mode);
+}
+
+bool Machine::isInactiveArmAxisMotor(const utl::EMotor motor) const {
+  const bool xMode = _robotStatus.armAxisMode == utl::EArmAxisMode::X;
+  return xMode ? (motor == utl::EMotor::YLeft || motor == utl::EMotor::YRight)
+               : (motor == utl::EMotor::XLeft || motor == utl::EMotor::XRight);
+}
+
+void Machine::applyArmAxisMode(const utl::EArmAxisMode mode) {
+  const std::array active = mode == utl::EArmAxisMode::X
+      ? std::array{utl::EMotor::XLeft, utl::EMotor::XRight}
+      : std::array{utl::EMotor::YLeft, utl::EMotor::YRight};
+  const std::array inactive = mode == utl::EArmAxisMode::X
+      ? std::array{utl::EMotor::YLeft, utl::EMotor::YRight}
+      : std::array{utl::EMotor::XLeft, utl::EMotor::XRight};
+  if (_disableUnusedArmAxisMotors) {
+    for (const auto motor : active) {
+      if (!_motorControl.motors().contains(motor) ||
+          !_motorControl.isEnableControllable(motor)) {
+        utl::throwRuntimeError(
+            "Arm axis mode requires C-ON enable control for every X/Y motor.");
+      }
+    }
+    for (const auto motor : inactive) {
+      if (!_motorControl.motors().contains(motor) ||
+          !_motorControl.isEnableControllable(motor)) {
+        utl::throwRuntimeError(
+            "Arm axis mode requires C-ON enable control for every X/Y motor.");
+      }
+    }
+  }
+  for (const auto motor : {utl::EMotor::XLeft, utl::EMotor::XRight,
+                           utl::EMotor::YLeft, utl::EMotor::YRight}) {
+    _motorControl.stopMovement(motor);
+  }
+  if (_disableUnusedArmAxisMotors) {
+    for (const auto motor : inactive) _motorControl.setEnabled(motor, false);
+    for (const auto motor : active) _motorControl.setEnabled(motor, true);
+  }
+  _robotStatus.armAxisMode = mode;
 }
 
 void Machine::handleHomingCommand(const cmd::HomingCommand& c) {
   requireOperationAllowed();
+  const bool xMode = _robotStatus.armAxisMode == utl::EArmAxisMode::X;
+  const bool requestsInactiveDirection =
+      c.target == cmd::HomingTarget::All ||
+      (xMode && (c.target == cmd::HomingTarget::YLeft ||
+                 c.target == cmd::HomingTarget::YRight)) ||
+      (!xMode && (c.target == cmd::HomingTarget::XLeft ||
+                  c.target == cmd::HomingTarget::XRight));
+  if (_disableUnusedArmAxisMotors && requestsInactiveDirection) {
+    utl::throwRuntimeError(
+        "Homing the inactive arm direction is blocked by the active arm axis mode.");
+  }
   if (!_axisHomingManager) {
     utl::throwRuntimeError("AxisHomingManager is not initialized.");
   }
@@ -903,6 +986,11 @@ void Machine::makeDummyStatus() {
   _robotStatus.armStates = {{EArm::Left, EAxisState::Locked},
                             {EArm::Right, EAxisState::Locked},
                             {EArm::Gantry, EAxisState::Locked}};
+  const auto motionConfig = utl::Config::instance().getClassConfig("Machine")["motion"];
+  const auto configuredMode = motionConfig && motionConfig["armAxisMode"]
+                                  ? motionConfig["armAxisMode"].as<std::string>()
+                                  : "X";
+  _robotStatus.armAxisMode = utl::stringToEnum<utl::EArmAxisMode>(configuredMode);
   _robotStatus.cpuOverride = false;
   _cpuOverrideActive.store(false, std::memory_order_release);
   _robotStatus.homing = {};

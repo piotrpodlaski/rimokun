@@ -202,6 +202,23 @@ nlohmann::json handleSetAllMotorsEnabled(const nlohmann::json& command,
   return response;
 }
 
+nlohmann::json handleSetArmAxisMode(const nlohmann::json& command,
+                                    const cmd::DispatchFn& dispatch) {
+  if (!command.contains("mode") || !command.at("mode").is_string()) {
+    return errorResponse("setArmAxisMode command requires a string 'mode'.");
+  }
+  auto response = okResponse();
+  try {
+    cmd::Command c;
+    c.payload = cmd::SetArmAxisModeCommand{
+        .mode = utl::enumFromJsonStringField<utl::EArmAxisMode>(command, "mode")};
+    applyDispatchReply(response, dispatch(std::move(c), 2s));
+  } catch (const std::exception& e) {
+    response = errorResponse(std::format("Invalid setArmAxisMode command: {}", e.what()));
+  }
+  return response;
+}
+
 nlohmann::json handleHoming(const nlohmann::json& command,
                             const cmd::DispatchFn& dispatch) {
   if (!command.contains("target") || !command.at("target").is_string()) {
@@ -276,6 +293,7 @@ const std::unordered_map<std::string, HandlerFn>& handlers() {
       {"setMotorEnabled", handleSetMotorEnabled},
       {"setMotorFree", handleSetMotorFree},
       {"setAllMotorsEnabled", handleSetAllMotorsEnabled},
+      {"setArmAxisMode", handleSetArmAxisMode},
       {"homing", handleHoming},
       {"cancelHoming", handleCancelHoming},
       {"emergencyStop", handleEmergencyStop},

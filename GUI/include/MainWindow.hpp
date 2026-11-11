@@ -25,6 +25,8 @@ class MainWindow;
 }
 QT_END_NAMESPACE
 
+class QButtonGroup;
+
 class MainWindow : public QMainWindow {
   Q_OBJECT
 
@@ -56,5 +58,6 @@ class MainWindow : public QMainWindow {
   QPointer<MotorPanelWindow> motorPanel;
   QPointer<ContecPanelWindow> contecPanel;
   QPointer<HomingWindow> homingPanel;
+  QButtonGroup* _armAxisModeGroup{nullptr};
 
 };

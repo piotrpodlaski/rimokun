@@ -58,6 +58,11 @@ nlohmann::json GuiCommandJsonAdapter::toJson(const GuiCommand& command) {
               {"type", "setAllMotorsEnabled"},
               {"enabled", payload.enabled},
           };
+        } else if constexpr (std::is_same_v<CmdT, cmd::SetArmAxisModeCommand>) {
+          return nlohmann::json{
+              {"type", "setArmAxisMode"},
+              {"mode", utl::enumToString(payload.mode)},
+          };
         } else if constexpr (std::is_same_v<CmdT, cmd::HomingCommand>) {
           return nlohmann::json{
               {"type", "homing"},

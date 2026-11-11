@@ -2,6 +2,9 @@
 
 #include <Logger.hpp>
 
+#include <QButtonGroup>
+#include <QSignalBlocker>
+
 #include "LedIndicator.hpp"
 #include "QtLogSink.hpp"
 #include "TitleBar.hpp"
@@ -41,6 +44,21 @@ MainWindow::MainWindow(QWidget* parent)
   const auto rightChanger = _ui->rightChanger;
   const auto robotVis = _ui->robotVis;
   _ui->resetControls->setStateStore(&_stateStore);
+  _armAxisModeGroup = new QButtonGroup(this);
+  _armAxisModeGroup->setExclusive(true);
+  _armAxisModeGroup->addButton(_ui->xMode);
+  _armAxisModeGroup->addButton(_ui->yMode);
+  _ui->xMode->setEnabled(false);
+  _ui->yMode->setEnabled(false);
+  const auto sendArmAxisMode = [this](const utl::EArmAxisMode mode) {
+    GuiCommand command;
+    command.payload = cmd::SetArmAxisModeCommand{.mode = mode};
+    _updater.sendCommand(command);
+  };
+  connect(_ui->xMode, &QPushButton::clicked, this,
+          [sendArmAxisMode] { sendArmAxisMode(utl::EArmAxisMode::X); });
+  connect(_ui->yMode, &QPushButton::clicked, this,
+          [sendArmAxisMode] { sendArmAxisMode(utl::EArmAxisMode::Y); });
 
   _leftToolChangerPresenter = std::make_unique<ToolChangerPresenter>(
       leftChanger, utl::EArm::Left, &_stateStore, this);
@@ -163,6 +181,14 @@ void MainWindow::openHomingPanel() {
 }
 
 void MainWindow::onRobotStatusUpdate(const utl::RobotStatus& status) {
+  const auto modeVm = RobotStatusViewModel::resetControlsForStatus(status);
+  _ui->xMode->setEnabled(modeVm.armAxisModeEnabled);
+  _ui->yMode->setEnabled(modeVm.armAxisModeEnabled);
+  const QSignalBlocker blockX(_ui->xMode);
+  const QSignalBlocker blockY(_ui->yMode);
+  _ui->xMode->setChecked(modeVm.xModeChecked);
+  _ui->yMode->setChecked(modeVm.yModeChecked);
+  _ui->armAxisModeStatus->setText(QString::fromStdString(modeVm.armAxisModeText));
   if (motorPanel) {
     motorPanel->setRobotStatus(status);
   }

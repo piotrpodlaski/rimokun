@@ -491,11 +491,16 @@ IRobotControlPolicy::ControlDecision RimoKunControlPolicy::decide(
     }
   };
 
-  // One joystick per arm: left joystick drives left X/Y, right joystick drives right X/Y.
-  appendSpeedIntent(utl::EMotor::XLeft, leftJs.x, _motion.leftArmX, utl::EArm::Left);
-  appendSpeedIntent(utl::EMotor::YLeft, leftJs.y, _motion.leftArmY, utl::EArm::Left);
-  appendSpeedIntent(utl::EMotor::XRight, rightJs.x, _motion.rightArmX, utl::EArm::Right);
-  appendSpeedIntent(utl::EMotor::YRight, rightJs.y, _motion.rightArmY, utl::EArm::Right);
+  // The selected mode is a server-side interlock: only one arm direction can move.
+  const bool xMode = robotStatus.armAxisMode == utl::EArmAxisMode::X;
+  appendSpeedIntent(utl::EMotor::XLeft, xMode ? leftJs.x : 0.0,
+                    _motion.leftArmX, utl::EArm::Left);
+  appendSpeedIntent(utl::EMotor::YLeft, xMode ? 0.0 : leftJs.y,
+                    _motion.leftArmY, utl::EArm::Left);
+  appendSpeedIntent(utl::EMotor::XRight, xMode ? rightJs.x : 0.0,
+                    _motion.rightArmX, utl::EArm::Right);
+  appendSpeedIntent(utl::EMotor::YRight, xMode ? 0.0 : rightJs.y,
+                    _motion.rightArmY, utl::EArm::Right);
 
   // Gantry Z: single gantry joystick axis drives both Z motors with identical commands.
   appendSpeedIntent(utl::EMotor::ZLeft, gantryJs.y, _motion.gantryZ, utl::EArm::Gantry);

@@ -252,7 +252,9 @@
         <property name="title">
          <string>Tool changers</string>
         </property>
-        <layout class="QHBoxLayout" name="horizontalLayout_7">
+        <layout class="QVBoxLayout" name="toolChangersLayout">
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_7">
          <item>
           <widget class="QGroupBox" name="groupBox_5">
            <property name="title">
@@ -282,6 +284,43 @@
             </item>
            </layout>
           </widget>
+         </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QVBoxLayout" name="armAxisModeLayout">
+           <item>
+            <widget class="QLabel" name="labelArmAxisMode">
+             <property name="text"><string>Arm drive direction</string></property>
+             <property name="alignment"><set>Qt::AlignCenter</set></property>
+            </widget>
+           </item>
+           <item>
+            <layout class="QHBoxLayout" name="armAxisModeButtonsLayout">
+             <item>
+              <widget class="QPushButton" name="xMode">
+               <property name="checkable"><bool>true</bool></property>
+               <property name="text"><string>X mode</string></property>
+               <property name="styleSheet"><string notr="true">QPushButton:checked { background-color: #2878c8; color: white; font-weight: bold; }</string></property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="yMode">
+               <property name="checkable"><bool>true</bool></property>
+               <property name="text"><string>Y mode</string></property>
+               <property name="styleSheet"><string notr="true">QPushButton:checked { background-color: #2878c8; color: white; font-weight: bold; }</string></property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <widget class="QLabel" name="armAxisModeStatus">
+             <property name="text"><string>Waiting for server status</string></property>
+             <property name="alignment"><set>Qt::AlignCenter</set></property>
+             <property name="wordWrap"><bool>true</bool></property>
+            </widget>
+           </item>
+          </layout>
          </item>
         </layout>
        </widget>

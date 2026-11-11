@@ -64,6 +64,7 @@ class Machine {
   virtual void handleSetMotorFreeCommand(const cmd::SetMotorFreeCommand& c);
   virtual void handleSetAllMotorsEnabledCommand(
       const cmd::SetAllMotorsEnabledCommand& c);
+  virtual void handleSetArmAxisModeCommand(const cmd::SetArmAxisModeCommand& c);
   virtual void handleHomingCommand(const cmd::HomingCommand& c);
   virtual void handleCancelHomingCommand(const cmd::CancelHomingCommand& c);
   virtual nlohmann::json handleContecDiagnosticsCommand(
@@ -88,6 +89,8 @@ class Machine {
   void initializeComponents();
   std::string reconnectComponent(utl::ERobotComponent component);
   void startHomingAxis(cmd::HomingTarget axis, const AxisHomingManager::AxisConfig& config);
+  void applyArmAxisMode(utl::EArmAxisMode mode);
+  [[nodiscard]] bool isInactiveArmAxisMotor(utl::EMotor motor) const;
 
   void makeDummyStatus();
 
@@ -104,6 +107,7 @@ class Machine {
   std::chrono::milliseconds _contecLoopInterval{10};
   std::chrono::milliseconds _updateInterval{50};
   bool _statusUpdatesEnabled{true};
+  bool _disableUnusedArmAxisMotors{true};
   std::size_t _heartBeatPrescaleCycles{0};
   std::size_t _heartBeatCycleCounter{0};
   bool _heartBeatState{false};

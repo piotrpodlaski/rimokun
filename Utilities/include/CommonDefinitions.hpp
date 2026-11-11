@@ -31,6 +31,8 @@ enum class EToolChangerAction { Open, Close };
 enum class ERobotComponent {Contec, MotorControl, ControlPanel};
 
 enum class EAxisState { Locked, Slow, Fast };
+// Selects the only horizontal/vertical direction which may be driven on arms.
+enum class EArmAxisMode { X, Y };
 enum class EHomingAxis { XLeft, YLeft, XRight, YRight, Z };
 enum class EHomingState {
   Idle,
@@ -128,6 +130,7 @@ struct RobotStatus {
   std::optional<bool> heartBeatRunning;
   std::optional<bool> safetyOn;
   std::map<EArm, EAxisState> armStates;
+  EArmAxisMode armAxisMode{EArmAxisMode::X};
   HomingSessionStatus homing;
 };
 

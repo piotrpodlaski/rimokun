@@ -55,6 +55,20 @@ TEST(RobotStatusViewModelTests, ResetControlsMapsServerAndComponentStates) {
   EXPECT_TRUE(vm.homingEnabled);
 }
 
+TEST(RobotStatusViewModelTests, ResetControlsExposeTheActiveArmAxisMode) {
+  utl::RobotStatus status;
+  status.robotComponents[utl::ERobotComponent::MotorControl] = utl::ELEDState::On;
+  status.armAxisMode = utl::EArmAxisMode::Y;
+
+  const auto vm =
+      RobotStatusViewModel::resetControlsForStatus(std::make_optional(status));
+
+  EXPECT_FALSE(vm.xModeChecked);
+  EXPECT_TRUE(vm.yModeChecked);
+  EXPECT_TRUE(vm.armAxisModeEnabled);
+  EXPECT_NE(vm.armAxisModeText.find("joystick drives Y"), std::string::npos);
+}
+
 TEST(RobotStatusViewModelTests, CpuOverrideBlinksSafetyAndSuspendsOperations) {
   utl::RobotStatus status;
   status.cpuOverride = true;

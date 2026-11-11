@@ -152,6 +152,11 @@ classes:
         YRight: 2
         Z: 2
     motion:
+      armAxisMode: Y
+      # When true, switching X/Y mode also changes C-ON: the unused pair is
+      # disabled and the selected pair is enabled. When false, both pairs keep
+      # their current enable state; the server only suppresses unused movement.
+      disableUnusedArmAxisMotors: true
       stepsPerRevolution: 1000
       neutralAxisActivationThreshold: 0.05
       speedUpdateAxisDeltaThreshold: 0.02

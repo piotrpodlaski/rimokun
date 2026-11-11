@@ -106,6 +106,14 @@ struct adl_serializer<utl::EAxisState> {
 };
 
 template <>
+struct adl_serializer<utl::EArmAxisMode> {
+  static void to_json(json& j, const utl::EArmAxisMode& v) { j = utl::enumToString(v); }
+  static void from_json(const json& j, utl::EArmAxisMode& v) {
+    v = utl::stringToEnum<utl::EArmAxisMode>(j.get<std::string>());
+  }
+};
+
+template <>
 struct adl_serializer<utl::EHomingAxis> {
   static void to_json(json& j, const utl::EHomingAxis& v) { j = utl::enumToString(v); }
   static void from_json(const json& j, utl::EHomingAxis& v) {
@@ -220,6 +228,7 @@ struct adl_serializer<utl::RobotStatus> {
         {"robotComponents", utl::enumKeyedMapToJson(v.robotComponents)},
         {"joystics", utl::enumKeyedMapToJson(v.joystics)},
         {"armStates", utl::enumKeyedMapToJson(v.armStates)},
+        {"armAxisMode", v.armAxisMode},
         {"homing", v.homing},
     };
     if (v.motorPower.has_value()) {
@@ -275,6 +284,9 @@ struct adl_serializer<utl::RobotStatus> {
       v.armStates = utl::enumKeyedMapFromJson<utl::EArm, utl::EAxisState>(
           j.at("armStates"));
     }
+    v.armAxisMode = j.contains("armAxisMode")
+                        ? j.at("armAxisMode").get<utl::EArmAxisMode>()
+                        : utl::EArmAxisMode::X;
     if (j.contains("homing")) {
       v.homing = j.at("homing").get<utl::HomingSessionStatus>();
     } else {

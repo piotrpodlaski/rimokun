@@ -55,6 +55,9 @@ class MotorControl final : public MachineComponent {
   void setJogPlus(utl::EMotor motorId, bool enabled);
   void setJogMinus(utl::EMotor motorId, bool enabled);
   void setFree(utl::EMotor motorId, bool enabled);
+  void setFloat(utl::EMotor motorId, bool enabled,
+                std::optional<std::int32_t> runCurrent = std::nullopt,
+                std::optional<std::int32_t> stopCurrent = std::nullopt);
   void setEnabled(utl::EMotor motorId, bool enabled);
   void setAllEnabled(bool enabled);
   // Call when a motor transitions out of alarm state. Forces C-ON=0 on hardware
@@ -63,6 +66,11 @@ class MotorControl final : public MachineComponent {
   [[nodiscard]] bool isEnabled(utl::EMotor motorId) const;
   [[nodiscard]] bool isEnableControllable(utl::EMotor motorId) const;
   [[nodiscard]] bool isFreeControllable(utl::EMotor motorId) const;
+  [[nodiscard]] bool isFloatControllable(utl::EMotor motorId) const;
+  [[nodiscard]] bool isFloating(utl::EMotor motorId) const;
+  [[nodiscard]] bool isMotionActive(utl::EMotor motorId) const;
+  [[nodiscard]] std::optional<std::pair<std::int32_t, std::int32_t>>
+  configuredFloatCurrents(utl::EMotor motorId) const;
   [[nodiscard]] std::uint8_t readSelectedOperationId(utl::EMotor motorId);
   void resetAlarm(utl::EMotor motorId);
   void setSelectedOperationId(utl::EMotor motorId, std::uint8_t opId);
@@ -119,6 +127,8 @@ class MotorControl final : public MachineComponent {
     std::optional<bool> forceFunction10ForSingleRegisterWrites;
     std::int32_t runCurrent{1000};
     std::int32_t stopCurrent{500};
+    std::optional<std::int32_t> floatRunCurrent;
+    std::optional<std::int32_t> floatStopCurrent;
     std::optional<std::int32_t> startingSpeed;
     std::optional<std::int32_t> overloadWarning;
     std::optional<std::int32_t> overloadAlarm;
@@ -132,6 +142,7 @@ class MotorControl final : public MachineComponent {
   MotorRawTcpConfig _rawTcpConfig;
   MotorRegisterMap _registerMap;
   std::set<utl::EMotor> _freeControllableMotors;
+  std::set<utl::EMotor> _floatControllableMotors;
   std::map<utl::EMotor, MotorConfig> _motorConfigs;
   std::map<utl::EMotor, Motor> _motors;
 
@@ -145,6 +156,8 @@ class MotorControl final : public MachineComponent {
     bool speedPairPrepared{false};
     bool positionPrepared{false};
     bool enabled{true};
+    bool floating{false};
+    bool motionActive{false};
     bool enableControllable{false};
     bool wasInAlarm{false};
   };

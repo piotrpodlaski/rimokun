@@ -175,6 +175,8 @@ MotorControl::MotorControl() {
         entry["runCurrent"].as<std::int32_t>(kDefaultRunCurrent);
     const auto stopCurrent =
         entry["stopCurrent"].as<std::int32_t>(kDefaultStopCurrent);
+    const auto floatRunCurrentNode = entry["floatRunCurrent"];
+    const auto floatStopCurrentNode = entry["floatStopCurrent"];
     const auto startingSpeedNode = entry["startingSpeed"];
     const auto overloadWarningNode = entry["overloadWarning"];
     const auto overloadAlarmNode = entry["overloadAlarm"];
@@ -193,6 +195,8 @@ MotorControl::MotorControl() {
           utl::enumToStringView(motorId), stopCurrent, runCurrent);
     }
     std::optional<std::int32_t> groupId;
+    std::optional<std::int32_t> floatRunCurrent;
+    std::optional<std::int32_t> floatStopCurrent;
     std::optional<bool> forceFunction10ForSingleRegisterWrites;
     if (groupIdNode) {
       groupId = groupIdNode.as<std::int32_t>();
@@ -208,6 +212,14 @@ MotorControl::MotorControl() {
     std::optional<std::int32_t> excessivePositionDeviationAlarm;
     std::optional<std::int32_t> motorRotationDirection;
     const auto motorName = utl::enumToStringView(motorId);
+    if (floatRunCurrentNode) {
+      floatRunCurrent = floatRunCurrentNode.as<std::int32_t>();
+      validateCurrentRange(*floatRunCurrent, "floatRunCurrent", motorName);
+    }
+    if (floatStopCurrentNode) {
+      floatStopCurrent = floatStopCurrentNode.as<std::int32_t>();
+      validateCurrentRange(*floatStopCurrent, "floatStopCurrent", motorName);
+    }
     if (startingSpeedNode) {
       startingSpeed = startingSpeedNode.as<std::int32_t>();
       if (*startingSpeed < 0) {
@@ -275,12 +287,39 @@ MotorControl::MotorControl() {
                 .value_or(globalForceFunction10ForSingleRegisterWrites),
         .runCurrent = runCurrent,
         .stopCurrent = stopCurrent,
+        .floatRunCurrent = floatRunCurrent,
+        .floatStopCurrent = floatStopCurrent,
         .startingSpeed = startingSpeed,
         .overloadWarning = overloadWarning,
         .overloadAlarm = overloadAlarm,
         .excessivePositionDeviationWarning = excessivePositionDeviationWarning,
         .excessivePositionDeviationAlarm = excessivePositionDeviationAlarm,
         .motorRotationDirection = motorRotationDirection};
+  }
+
+  _floatControllableMotors.clear();
+  if (const auto floatMotorsNode = motorCfg["floatControllableMotors"];
+      floatMotorsNode) {
+    if (!floatMotorsNode.IsSequence()) {
+      utl::throwRuntimeError(
+          "MotorControl.floatControllableMotors must be a list of motor names.");
+    }
+    for (const auto& motorNode : floatMotorsNode) {
+      const auto motorId = motorNode.as<utl::EMotor>();
+      const auto configIt = _motorConfigs.find(motorId);
+      if (configIt == _motorConfigs.end()) {
+        utl::throwRuntimeError(std::format(
+            "MotorControl.floatControllableMotors contains {} which is not configured.",
+            utl::enumToStringView(motorId)));
+      }
+      if (!configIt->second.floatRunCurrent || !configIt->second.floatStopCurrent) {
+        utl::throwRuntimeError(std::format(
+            "MotorControl.motors.{} requires floatRunCurrent and floatStopCurrent "
+            "when listed in floatControllableMotors.",
+            utl::enumToStringView(motorId)));
+      }
+      _floatControllableMotors.insert(motorId);
+    }
   }
 
   _freeControllableMotors.clear();
@@ -318,6 +357,31 @@ bool MotorControl::isGroupMember(const utl::EMotor motorId) const {
 
 bool MotorControl::isFreeControllable(const utl::EMotor motorId) const {
   return _freeControllableMotors.contains(motorId);
+}
+
+bool MotorControl::isFloatControllable(const utl::EMotor motorId) const {
+  return _floatControllableMotors.contains(motorId);
+}
+
+bool MotorControl::isFloating(const utl::EMotor motorId) const {
+  const auto it = _runtime.find(motorId);
+  return it != _runtime.end() && it->second.floating;
+}
+
+bool MotorControl::isMotionActive(const utl::EMotor motorId) const {
+  const auto it = _runtime.find(motorId);
+  return it != _runtime.end() && it->second.motionActive;
+}
+
+std::optional<std::pair<std::int32_t, std::int32_t>>
+MotorControl::configuredFloatCurrents(const utl::EMotor motorId) const {
+  if (!isFloatControllable(motorId)) return std::nullopt;
+  const auto it = _motorConfigs.find(motorId);
+  if (it == _motorConfigs.end() || !it->second.floatRunCurrent ||
+      !it->second.floatStopCurrent) {
+    return std::nullopt;
+  }
+  return std::pair{*it->second.floatRunCurrent, *it->second.floatStopCurrent};
 }
 
 void MotorControl::initialize() {
@@ -543,6 +607,7 @@ void MotorControl::startMovement(const utl::EMotor motorId) {
         motor.setForward(bus, false);
         motor.setReverse(bus, true);
       }
+      runtime.motionActive = true;
       return;
     } else {
       preparePositionMode(motor, runtime, bus);
@@ -550,6 +615,7 @@ void MotorControl::startMovement(const utl::EMotor motorId) {
       motor.setSelectedOperationId(bus, 2);
     }
     motor.pulseStart(bus);
+    runtime.motionActive = true;
   });
 }
 
@@ -562,9 +628,11 @@ void MotorControl::stopMovement(const utl::EMotor motorId) {
       // Do not clear the whole register because that would overwrite C-ON and other inputs.
       motor.setForward(bus, false);
       motor.setReverse(bus, false);
+      runtime.motionActive = false;
       return;
     }
     motor.pulseStop(bus);
+    runtime.motionActive = false;
   });
 }
 
@@ -653,6 +721,46 @@ void MotorControl::setFree(const utl::EMotor motorId, const bool enabled) {
   withBus(motorId, [enabled](const Motor& motor, MotorRuntimeState&,
                               ModbusClient& bus) {
     motor.setFree(bus, enabled);
+  });
+}
+
+void MotorControl::setFloat(const utl::EMotor motorId, const bool enabled,
+                            const std::optional<std::int32_t> runCurrent,
+                            const std::optional<std::int32_t> stopCurrent) {
+  if (!isFloatControllable(motorId)) {
+    utl::throwRuntimeError(std::format(
+        "Motor {} is not allowed to enter or leave FLOAT mode by configuration.",
+        utl::enumToStringView(motorId)));
+  }
+  if (runCurrent.has_value() != stopCurrent.has_value()) {
+    utl::throwRuntimeError(
+        "FLOAT mode requires both runCurrent and stopCurrent when overriding defaults.");
+  }
+  if (runCurrent) {
+    validateCurrentRange(*runCurrent, "floatRunCurrent", utl::enumToStringView(motorId));
+    validateCurrentRange(*stopCurrent, "floatStopCurrent", utl::enumToStringView(motorId));
+  }
+  withBus(motorId, [this, motorId, enabled, runCurrent, stopCurrent](
+                          const Motor& motor, MotorRuntimeState& runtime,
+                          ModbusClient& bus) {
+    if (runtime.motionActive) {
+      utl::throwRuntimeError(std::format(
+          "Motor {} is moving; FLOAT mode can only be changed while stopped.",
+          utl::enumToStringView(motorId)));
+    }
+    if (runtime.floating == enabled) return;
+    const auto configIt = _motorConfigs.find(motorId);
+    if (configIt == _motorConfigs.end()) {
+      utl::throwRuntimeError("Float configuration is unavailable for motor.");
+    }
+    const auto& config = configIt->second;
+    const auto targetRun = enabled ? runCurrent.value_or(*config.floatRunCurrent)
+                                   : config.runCurrent;
+    const auto targetStop = enabled ? stopCurrent.value_or(*config.floatStopCurrent)
+                                    : config.stopCurrent;
+    motor.setRunCurrent(bus, targetRun);
+    motor.setStopCurrent(bus, targetStop);
+    runtime.floating = enabled;
   });
 }
 

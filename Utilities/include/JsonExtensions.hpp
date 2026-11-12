@@ -143,6 +143,11 @@ struct adl_serializer<utl::SingleMotorStatus> {
         {"alarmDescription", v.alarmDescription},
         {"flags", utl::enumKeyedMapToJson(v.flags)},
         {"freeControllable", v.freeControllable},
+        {"floatControllable", v.floatControllable},
+        {"floating", v.floating},
+        {"motionActive", v.motionActive},
+        {"floatRunCurrent", v.floatRunCurrent},
+        {"floatStopCurrent", v.floatStopCurrent},
         {"speedCommandPercent", v.speedCommandPercent},
         {"modeMaxLinearSpeedMmPerSec", v.modeMaxLinearSpeedMmPerSec},
     };
@@ -161,6 +166,11 @@ struct adl_serializer<utl::SingleMotorStatus> {
     v.flags = utl::enumKeyedMapFromJson<utl::EMotorStatusFlags, utl::ELEDState>(
         j.at("flags"));
     v.freeControllable = j.value("freeControllable", false);
+    v.floatControllable = j.value("floatControllable", false);
+    v.floating = j.value("floating", false);
+    v.motionActive = j.value("motionActive", false);
+    v.floatRunCurrent = j.value("floatRunCurrent", 0);
+    v.floatStopCurrent = j.value("floatStopCurrent", 0);
     v.speedCommandPercent = j.value("speedCommandPercent", 0.0);
     v.modeMaxLinearSpeedMmPerSec = j.value("modeMaxLinearSpeedMmPerSec", 0.0);
   }

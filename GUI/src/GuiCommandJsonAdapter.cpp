@@ -53,6 +53,17 @@ nlohmann::json GuiCommandJsonAdapter::toJson(const GuiCommand& command) {
               {"motor", utl::enumToString(payload.motor)},
               {"enabled", payload.enabled},
           };
+        } else if constexpr (std::is_same_v<CmdT, cmd::SetMotorFloatCommand>) {
+          auto json = nlohmann::json{
+              {"type", "setMotorFloat"},
+              {"motor", utl::enumToString(payload.motor)},
+              {"enabled", payload.enabled},
+          };
+          if (payload.runCurrent && payload.stopCurrent) {
+            json["runCurrent"] = *payload.runCurrent;
+            json["stopCurrent"] = *payload.stopCurrent;
+          }
+          return json;
         } else if constexpr (std::is_same_v<CmdT, cmd::SetAllMotorsEnabledCommand>) {
           return nlohmann::json{
               {"type", "setAllMotorsEnabled"},

@@ -70,6 +70,13 @@ classes:
       - XRight
       - ZLeft
       - ZRight
+    # Motors explicitly allowed to use FLOAT. Each listed motor must define
+    # floatRunCurrent and floatStopCurrent in its motor configuration.
+    # Keep empty until the safe float-current values are commissioned.
+    #floatControllableMotors: []
+    floatControllableMotors:
+      - YLeft
+      - YRight
     motors:
       XLeft:
         address: 1
@@ -80,6 +87,8 @@ classes:
         overloadAlarm: 300
         excessivePositionDeviationWarning: 500
         excessivePositionDeviationAlarm: 700
+        # floatRunCurrent: 0
+        # floatStopCurrent: 0
       XRight:
         address: 2
         runCurrent: 1000
@@ -93,20 +102,24 @@ classes:
         address: 3
         runCurrent: 500
         stopCurrent: 500
+        floatRunCurrent: 100
+        floatStopCurrent: 100
         startingSpeed: 50
         overloadWarning: 10
         overloadAlarm: 300
         excessivePositionDeviationWarning: 500
-        excessivePositionDeviationAlarm: 700
+        excessivePositionDeviationAlarm: 30000
       YRight:
         address: 4
         runCurrent: 500
         stopCurrent: 500
+        floatRunCurrent: 100
+        floatStopCurrent: 100
         startingSpeed: 50
         overloadWarning: 10
         overloadAlarm: 300
         excessivePositionDeviationWarning: 500
-        excessivePositionDeviationAlarm: 700
+        excessivePositionDeviationAlarm: 30000
       ZLeft:
         address: 5
         runCurrent: 1000

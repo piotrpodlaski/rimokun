@@ -62,6 +62,7 @@ class Machine {
   virtual void handleResetMotorAlarmCommand(const cmd::ResetMotorAlarmCommand& c);
   virtual void handleSetMotorEnabledCommand(const cmd::SetMotorEnabledCommand& c);
   virtual void handleSetMotorFreeCommand(const cmd::SetMotorFreeCommand& c);
+  virtual void handleSetMotorFloatCommand(const cmd::SetMotorFloatCommand& c);
   virtual void handleSetAllMotorsEnabledCommand(
       const cmd::SetAllMotorsEnabledCommand& c);
   virtual void handleSetArmAxisModeCommand(const cmd::SetArmAxisModeCommand& c);

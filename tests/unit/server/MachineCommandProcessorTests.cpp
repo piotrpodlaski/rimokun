@@ -368,6 +368,25 @@ TEST(MachineCommandProcessorTests, SetMotorEnabledCommandParsesAndDispatches) {
   EXPECT_EQ(response["status"].get<std::string>(), "OK");
 }
 
+TEST(MachineCommandProcessorTests, SetMotorFloatCommandParsesAndDispatches) {
+  nlohmann::json command{{"type", "setMotorFloat"},
+                         {"motor", "YRight"}, {"enabled", true}};
+  bool dispatched = false;
+  const auto response = cmd::processCommand(
+      command, [&](cmd::Command c, const std::chrono::milliseconds) {
+        dispatched = true;
+        EXPECT_TRUE(std::holds_alternative<cmd::SetMotorFloatCommand>(c.payload));
+        if (std::holds_alternative<cmd::SetMotorFloatCommand>(c.payload)) {
+          const auto payload = std::get<cmd::SetMotorFloatCommand>(c.payload);
+          EXPECT_EQ(payload.motor, utl::EMotor::YRight);
+          EXPECT_TRUE(payload.enabled);
+        }
+        return std::string{};
+      });
+  EXPECT_TRUE(dispatched);
+  EXPECT_EQ(response["status"].get<std::string>(), "OK");
+}
+
 TEST(MachineCommandProcessorTests, SetAllMotorsEnabledCommandParsesAndDispatches) {
   
   nlohmann::json command{

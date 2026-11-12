@@ -71,6 +71,17 @@ TEST(GuiCommandJsonAdapterTests, SetMotorEnabledCommandMapsToJson) {
   EXPECT_FALSE(json["enabled"].get<bool>());
 }
 
+TEST(GuiCommandJsonAdapterTests, SetMotorFloatCommandMapsToJson) {
+  GuiCommand command;
+  command.payload =
+      cmd::SetMotorFloatCommand{.motor = utl::EMotor::XLeft, .enabled = true};
+
+  const auto json = GuiCommandJsonAdapter::toJson(command);
+  EXPECT_EQ(json["type"].get<std::string>(), "setMotorFloat");
+  EXPECT_EQ(json["motor"].get<std::string>(), "XLeft");
+  EXPECT_TRUE(json["enabled"].get<bool>());
+}
+
 TEST(GuiCommandJsonAdapterTests, SetAllMotorsEnabledCommandMapsToJson) {
   GuiCommand command;
   command.payload = cmd::SetAllMotorsEnabledCommand{.enabled = true};

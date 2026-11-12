@@ -298,6 +298,9 @@ void Machine::runOneCycle(LoopState& state) {
                                     [this](const cmd::SetMotorFreeCommand& c) {
                                       handleSetMotorFreeCommand(c);
                                     },
+                                    [this](const cmd::SetMotorFloatCommand& c) {
+                                      handleSetMotorFloatCommand(c);
+                                    },
                                     [this](
                                         const cmd::SetAllMotorsEnabledCommand& c) {
                                       handleSetAllMotorsEnabledCommand(c);
@@ -746,6 +749,11 @@ void Machine::handleSetMotorEnabledCommand(const cmd::SetMotorEnabledCommand& c)
 void Machine::handleSetMotorFreeCommand(const cmd::SetMotorFreeCommand& c) {
   requireOperationAllowed();
   _motorControl.setFree(c.motor, c.enabled);
+}
+
+void Machine::handleSetMotorFloatCommand(const cmd::SetMotorFloatCommand& c) {
+  requireOperationAllowed();
+  _motorControl.setFloat(c.motor, c.enabled, c.runCurrent, c.stopCurrent);
 }
 
 void Machine::handleSetAllMotorsEnabledCommand(

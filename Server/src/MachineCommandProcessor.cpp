@@ -183,6 +183,40 @@ nlohmann::json handleSetMotorFree(const nlohmann::json& command,
   return response;
 }
 
+nlohmann::json handleSetMotorFloat(const nlohmann::json& command,
+                                   const cmd::DispatchFn& dispatch) {
+  if (!command.contains("motor") || !command.contains("enabled") ||
+      !command.at("enabled").is_boolean()) {
+    return errorResponse(
+        "setMotorFloat command requires 'motor' and boolean 'enabled'.");
+  }
+  const bool hasRunCurrent = command.contains("runCurrent");
+  const bool hasStopCurrent = command.contains("stopCurrent");
+  if (hasRunCurrent != hasStopCurrent ||
+      (hasRunCurrent && (!command.at("runCurrent").is_number_integer() ||
+                         !command.at("stopCurrent").is_number_integer()))) {
+    return errorResponse(
+        "setMotorFloat current override requires integer runCurrent and stopCurrent.");
+  }
+  auto response = okResponse();
+  try {
+    cmd::Command c;
+    c.payload = cmd::SetMotorFloatCommand{
+        .motor = utl::enumFromJsonStringField<utl::EMotor>(command, "motor"),
+        .enabled = command.at("enabled").get<bool>(),
+        .runCurrent = hasRunCurrent
+                          ? std::optional{command.at("runCurrent").get<std::int32_t>()}
+                          : std::nullopt,
+        .stopCurrent = hasStopCurrent
+                           ? std::optional{command.at("stopCurrent").get<std::int32_t>()}
+                           : std::nullopt};
+    applyDispatchReply(response, dispatch(std::move(c), 2s));
+  } catch (const std::exception& e) {
+    response = errorResponse(std::format("Invalid setMotorFloat command: {}", e.what()));
+  }
+  return response;
+}
+
 nlohmann::json handleSetAllMotorsEnabled(const nlohmann::json& command,
                                          const cmd::DispatchFn& dispatch) {
   if (!command.contains("enabled") || !command.at("enabled").is_boolean()) {
@@ -292,6 +326,7 @@ const std::unordered_map<std::string, HandlerFn>& handlers() {
       {"contecDiagnostics", handleContecDiagnostics},
       {"setMotorEnabled", handleSetMotorEnabled},
       {"setMotorFree", handleSetMotorFree},
+      {"setMotorFloat", handleSetMotorFloat},
       {"setAllMotorsEnabled", handleSetAllMotorsEnabled},
       {"setArmAxisMode", handleSetArmAxisMode},
       {"homing", handleHoming},

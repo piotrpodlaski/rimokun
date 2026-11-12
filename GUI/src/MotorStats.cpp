@@ -8,8 +8,12 @@
 
 #include <QMouseEvent>
 #include <QEvent>
+#include <QDialog>
+#include <QDialogButtonBox>
+#include <QFormLayout>
 #include <QMessageBox>
 #include <QPushButton>
+#include <QSpinBox>
 
 #include "spdlog/spdlog.h"
 #include "ui_motorstats.h"
@@ -49,8 +53,11 @@ MotorStats::MotorStats(QWidget* parent)
     child->setCursor(Qt::PointingHandCursor);
   }
   _ui->freeButton->setEnabled(false);
+  _ui->floatButton->setEnabled(false);
   connect(_ui->freeButton, &QPushButton::clicked, this,
           &MotorStats::handleFreeButtonClicked);
+  connect(_ui->floatButton, &QPushButton::clicked, this,
+          &MotorStats::handleFloatButtonClicked);
 }
 
 namespace {
@@ -110,6 +117,10 @@ void MotorStats::handleUpdate(const utl::RobotStatus& rs) {
   setFreeStatus(freeIt != motData.flags.end() &&
                     freeIt->second == utl::ELEDState::On,
                 motData.freeControllable);
+  setFloatStatus(motData.floating, motData.floatControllable,
+                 motData.motionActive);
+  _floatRunCurrent = motData.floatRunCurrent;
+  _floatStopCurrent = motData.floatStopCurrent;
   if (_isFree) {
     // setAxisState gives FREE visual precedence regardless of axis-mode data.
     setAxisState(utl::EAxisState::Locked);
@@ -174,6 +185,48 @@ void MotorStats::handleFreeButtonClicked() {
   emit commandIssued(command);
 }
 
+void MotorStats::setFloatStatus(const bool floating, const bool controllable,
+                                const bool motionActive) {
+  _isFloating = floating;
+  _ui->floatButton->setText(_isFloating ? "un-FLOAT" : "FLOAT");
+  _ui->floatButton->setEnabled(controllable && !motionActive);
+}
+
+void MotorStats::handleFloatButtonClicked() {
+  if (!_isFloating) {
+    QDialog dialog(this);
+    dialog.setWindowTitle("Set FLOAT currents");
+    auto* form = new QFormLayout(&dialog);
+    auto* runCurrent = new QSpinBox(&dialog);
+    auto* stopCurrent = new QSpinBox(&dialog);
+    runCurrent->setRange(0, 1000);
+    stopCurrent->setRange(0, 1000);
+    runCurrent->setValue(_floatRunCurrent);
+    stopCurrent->setValue(_floatStopCurrent);
+    form->addRow("FLOAT run current:", runCurrent);
+    form->addRow("FLOAT stop current:", stopCurrent);
+    auto* buttons = new QDialogButtonBox(
+        QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+    form->addWidget(buttons);
+    connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    if (dialog.exec() != QDialog::Accepted) return;
+
+    GuiCommand command;
+    command.payload = cmd::SetMotorFloatCommand{
+        .motor = _motorId,
+        .enabled = true,
+        .runCurrent = static_cast<std::int32_t>(runCurrent->value()),
+        .stopCurrent = static_cast<std::int32_t>(stopCurrent->value())};
+    emit commandIssued(command);
+    return;
+  }
+  GuiCommand command;
+  command.payload =
+      cmd::SetMotorFloatCommand{.motor = _motorId, .enabled = !_isFloating};
+  emit commandIssued(command);
+}
+
 void MotorStats::mousePressEvent(QMouseEvent* event) {
   if (event && event->button() == Qt::LeftButton) {
     emit clicked(_motorId);
@@ -184,7 +237,7 @@ void MotorStats::mousePressEvent(QMouseEvent* event) {
 }
 
 bool MotorStats::eventFilter(QObject* watched, QEvent* event) {
-  if (watched == _ui->freeButton) {
+  if (watched == _ui->freeButton || watched == _ui->floatButton) {
     return QWidget::eventFilter(watched, event);
   }
   if (watched && event && event->type() == QEvent::MouseButtonPress) {

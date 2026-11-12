@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <cstdint>
 #include <map>
 #include <optional>
 #include <string>
@@ -93,6 +94,11 @@ struct SingleMotorStatus {
   std::string alarmDescription;
   std::map<EMotorStatusFlags, ELEDState> flags;
   bool freeControllable{false};
+  bool floatControllable{false};
+  bool floating{false};
+  bool motionActive{false};
+  std::int32_t floatRunCurrent{0};
+  std::int32_t floatStopCurrent{0};
   double speedCommandPercent{0};         // [-100, 100]; 0 when locked/idle
   double modeMaxLinearSpeedMmPerSec{0};  // max speed for the current mode
 };

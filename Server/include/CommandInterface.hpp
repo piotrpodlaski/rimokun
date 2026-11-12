@@ -49,6 +49,13 @@ struct SetMotorFreeCommand {
   bool enabled;
 };
 
+struct SetMotorFloatCommand {
+  utl::EMotor motor;
+  bool enabled;
+  std::optional<std::int32_t> runCurrent;
+  std::optional<std::int32_t> stopCurrent;
+};
+
 struct SetAllMotorsEnabledCommand {
   bool enabled;
 };
@@ -74,6 +81,7 @@ struct SafetyResetCommand {};
 using Payload = std::variant<ToolChangerCommand, ReconnectCommand,
                              MotorDiagnosticsCommand, ResetMotorAlarmCommand,
                              SetMotorEnabledCommand, SetMotorFreeCommand,
+                             SetMotorFloatCommand,
                              SetAllMotorsEnabledCommand,
                              SetArmAxisModeCommand,
                              HomingCommand, CancelHomingCommand,

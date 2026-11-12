@@ -103,6 +103,11 @@ struct convert<utl::SingleMotorStatus> {
     node["alarmDescription"] = rhs.alarmDescription;
     node["flags"] = rhs.flags;
     node["freeControllable"] = rhs.freeControllable;
+    node["floatControllable"] = rhs.floatControllable;
+    node["floating"] = rhs.floating;
+    node["motionActive"] = rhs.motionActive;
+    node["floatRunCurrent"] = rhs.floatRunCurrent;
+    node["floatStopCurrent"] = rhs.floatStopCurrent;
     node["speedCommandPercent"] = rhs.speedCommandPercent;
     node["modeMaxLinearSpeedMmPerSec"] = rhs.modeMaxLinearSpeedMmPerSec;
     return node;
@@ -127,6 +132,15 @@ struct convert<utl::SingleMotorStatus> {
         node["flags"].as<std::map<utl::EMotorStatusFlags, utl::ELEDState>>();
     rhs.freeControllable =
         node["freeControllable"] ? node["freeControllable"].as<bool>() : false;
+    rhs.floatControllable =
+        node["floatControllable"] ? node["floatControllable"].as<bool>() : false;
+    rhs.floating = node["floating"] ? node["floating"].as<bool>() : false;
+    rhs.motionActive =
+        node["motionActive"] ? node["motionActive"].as<bool>() : false;
+    rhs.floatRunCurrent =
+        node["floatRunCurrent"] ? node["floatRunCurrent"].as<std::int32_t>() : 0;
+    rhs.floatStopCurrent =
+        node["floatStopCurrent"] ? node["floatStopCurrent"].as<std::int32_t>() : 0;
     rhs.speedCommandPercent =
         node["speedCommandPercent"] ? node["speedCommandPercent"].as<double>() : 0.0;
     rhs.modeMaxLinearSpeedMmPerSec =

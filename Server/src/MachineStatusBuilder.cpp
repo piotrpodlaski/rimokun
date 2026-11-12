@@ -113,6 +113,13 @@ void MachineStatusBuilder::updateAndPublish(
       for (const auto motorId : configuredMotorIds) {
         auto& motorStatus = status.motors[motorId];
         motorStatus.freeControllable = motorControl->isFreeControllable(motorId);
+        motorStatus.floatControllable = motorControl->isFloatControllable(motorId);
+        motorStatus.floating = motorControl->isFloating(motorId);
+        motorStatus.motionActive = motorControl->isMotionActive(motorId);
+        if (const auto currents = motorControl->configuredFloatCurrents(motorId)) {
+          motorStatus.floatRunCurrent = currents->first;
+          motorStatus.floatStopCurrent = currents->second;
+        }
 
         if (componentState == MachineComponent::State::Error) {
           motorStatus.state = utl::ELEDState::Error;

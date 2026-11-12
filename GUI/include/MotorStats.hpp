@@ -3,6 +3,8 @@
 #include <QString>
 #include <QWidget>
 
+#include <cstdint>
+
 #include "GuiCommand.hpp"
 #include "VMotorStats.hpp"
 
@@ -40,6 +42,7 @@ class MotorStats : public QWidget, public VMotorStats {
 
  private slots:
   void handleFreeButtonClicked();
+  void handleFloatButtonClicked();
 
  protected:
   void mousePressEvent(QMouseEvent* event) override;
@@ -47,8 +50,12 @@ class MotorStats : public QWidget, public VMotorStats {
 
  private:
   void setFreeStatus(bool isFree, bool isControllable);
+  void setFloatStatus(bool floating, bool controllable, bool motionActive);
   std::string _motorName;
   Ui::MotorStats* _ui;
   utl::EMotor _motorId;
   bool _isFree{false};
+  bool _isFloating{false};
+  std::int32_t _floatRunCurrent{0};
+  std::int32_t _floatStopCurrent{0};
 };

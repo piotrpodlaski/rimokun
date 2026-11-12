@@ -73,6 +73,26 @@ std::filesystem::path writeMotorControlConfigWithCurrents(
   return path;
 }
 
+std::filesystem::path writeMotorControlConfigWithFloatCurrents() {
+  const auto stamp =
+      std::chrono::high_resolution_clock::now().time_since_epoch().count();
+  const auto path = std::filesystem::temp_directory_path() /
+      ("rimokun_motor_control_float_" + std::to_string(stamp) + ".yaml");
+  std::ofstream out(path);
+  out << "classes:\n";
+  out << "  MotorControl:\n";
+  out << "    model: \"AR-KD2\"\n";
+  out << "    transport:\n      type: \"serialRtu\"\n      serial:\n";
+  out << "        device: \"/dev/fake\"\n        baud: 115200\n";
+  out << "        parity: \"N\"\n        dataBits: 8\n        stopBits: 1\n";
+  out << "    floatControllableMotors: [XLeft]\n";
+  out << "    motors:\n      XLeft:\n        address: 5\n";
+  out << "        runCurrent: 900\n        stopCurrent: 700\n";
+  out << "        floatRunCurrent: 300\n        floatStopCurrent: 100\n";
+  out.close();
+  return path;
+}
+
 std::filesystem::path writeMotorControlConfigWithStartingSpeed(
     const std::string& motorAddressValue, const int startingSpeed) {
   const auto stamp =
@@ -467,6 +487,44 @@ TEST(MotorControlTests, InitializeAppliesConfiguredPerMotorCurrents) {
   EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.stopCurrent + 1),
             static_cast<std::uint16_t>(700u & 0xFFFFu));
 
+  std::filesystem::remove(configPath);
+}
+
+TEST(MotorControlTests, FloatAppliesAndRestoresBothConfiguredCurrents) {
+  fake_modbus::reset();
+  const auto configPath = writeMotorControlConfigWithFloatCurrents();
+  utl::Config::instance().setConfigPath(configPath.string());
+  MotorControl control;
+  control.initialize();
+
+  ASSERT_TRUE(control.isFloatControllable(utl::EMotor::XLeft));
+  control.setFloat(utl::EMotor::XLeft, true);
+  const auto map = makeArKd2RegisterMap();
+  EXPECT_TRUE(control.isFloating(utl::EMotor::XLeft));
+  EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.runCurrent), 0u);
+  EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.runCurrent + 1), 300u);
+  EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.stopCurrent), 0u);
+  EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.stopCurrent + 1), 100u);
+
+  control.setFloat(utl::EMotor::XLeft, false);
+  EXPECT_FALSE(control.isFloating(utl::EMotor::XLeft));
+  EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.runCurrent + 1), 900u);
+  EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.stopCurrent + 1), 700u);
+  std::filesystem::remove(configPath);
+}
+
+TEST(MotorControlTests, FloatIsRejectedWhileMotionIsActive) {
+  fake_modbus::reset();
+  const auto configPath = writeMotorControlConfigWithFloatCurrents();
+  utl::Config::instance().setConfigPath(configPath.string());
+  MotorControl control;
+  control.initialize();
+  control.startMovement(utl::EMotor::XLeft);
+
+  EXPECT_TRUE(control.isMotionActive(utl::EMotor::XLeft));
+  EXPECT_THROW(control.setFloat(utl::EMotor::XLeft, true), std::runtime_error);
+  control.stopMovement(utl::EMotor::XLeft);
+  EXPECT_NO_THROW(control.setFloat(utl::EMotor::XLeft, true));
   std::filesystem::remove(configPath);
 }
 

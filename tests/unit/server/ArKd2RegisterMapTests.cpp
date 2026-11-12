@@ -30,8 +30,10 @@ TEST(ArKd2RegisterMapTests, CoreAddressesMatchExpectedManualValues) {
   EXPECT_EQ(map.positionNo0, 0x0400);
   EXPECT_EQ(map.speedNo0, 0x0480);
   EXPECT_EQ(map.operationModeNo0, 0x0500);
+  EXPECT_EQ(map.operationFunctionNo0, 0x0580);
   EXPECT_EQ(map.accelerationNo0, 0x0600);
   EXPECT_EQ(map.decelerationNo0, 0x0680);
+  EXPECT_EQ(map.pushCurrentNo0, 0x0700);
 }
 
 TEST(ArKd2RegisterMapTests, FullRegisterMapIsSortedAndUnique) {
@@ -90,8 +92,10 @@ TEST(ArKd2RegisterMapTests, CompactMapAddressesExistInFullRegisterMap) {
       map.positionNo0,
       map.speedNo0,
       map.operationModeNo0,
+      map.operationFunctionNo0,
       map.accelerationNo0,
       map.decelerationNo0,
+      map.pushCurrentNo0,
   };
 
   for (const auto addr : addresses) {

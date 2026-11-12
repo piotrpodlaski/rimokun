@@ -658,9 +658,13 @@ void Motor::setOperationMode(ModbusClient& bus, const std::uint8_t opId,
 
 void Motor::setOperationFunction(ModbusClient& bus, const std::uint8_t opId,
                                  const MotorOperationFunction function) const {
-  // Operation function starts at 0x0580 and is contiguous.
-  writeInt32(bus, operationAddr(_map.operationModeNo0 + 0x80, opId),
+  writeInt32(bus, operationAddr(_map.operationFunctionNo0, opId),
              static_cast<std::int32_t>(function));
+}
+
+void Motor::setOperationPushCurrent(ModbusClient& bus, const std::uint8_t opId,
+                                    const std::int32_t current) const {
+  writeInt32(bus, operationAddr(_map.pushCurrentNo0, opId), current);
 }
 
 void Motor::setOperationPosition(ModbusClient& bus, const std::uint8_t opId,

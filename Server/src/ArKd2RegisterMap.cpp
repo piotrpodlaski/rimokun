@@ -43,8 +43,10 @@ MotorRegisterMap makeArKd2RegisterMap() {
   map.positionNo0 = 0x0400;
   map.speedNo0 = 0x0480;
   map.operationModeNo0 = 0x0500;
+  map.operationFunctionNo0 = 0x0580;
   map.accelerationNo0 = 0x0600;
   map.decelerationNo0 = 0x0680;
+  map.pushCurrentNo0 = 0x0700;
 
   return map;
 }

@@ -2,7 +2,7 @@
 #include <array>
 
 namespace {
-constexpr std::array<ArKd2RegisterEntry, 382> kRegisters{{
+constexpr std::array<ArKd2RegisterEntry, 386> kRegisters{{
     ArKd2RegisterEntry{0x0030, "Group (upper)"}, // 48
     ArKd2RegisterEntry{0x0031, "Group (lower)"}, // 49
     ArKd2RegisterEntry{0x007C, "Driver input command (upper)"}, // 124
@@ -233,10 +233,14 @@ constexpr std::array<ArKd2RegisterEntry, 382> kRegisters{{
     ArKd2RegisterEntry{0x0481, "Operation data No.0 speed (lower)"}, // 1153
     ArKd2RegisterEntry{0x0500, "Operation data No.0 mode (upper)"}, // 1280
     ArKd2RegisterEntry{0x0501, "Operation data No.0 mode (lower)"}, // 1281
+    ArKd2RegisterEntry{0x0580, "Operation data No.0 function (upper)"}, // 1408
+    ArKd2RegisterEntry{0x0581, "Operation data No.0 function (lower)"}, // 1409
     ArKd2RegisterEntry{0x0600, "Operation data No.0 acceleration (upper)"}, // 1536
     ArKd2RegisterEntry{0x0601, "Operation data No.0 acceleration (lower)"}, // 1537
     ArKd2RegisterEntry{0x0680, "Operation data No.0 deceleration (upper)"}, // 1664
     ArKd2RegisterEntry{0x0681, "Operation data No.0 deceleration (lower)"}, // 1665
+    ArKd2RegisterEntry{0x0700, "Operation data No.0 push current (upper)"}, // 1792
+    ArKd2RegisterEntry{0x0701, "Operation data No.0 push current (lower)"}, // 1793
     ArKd2RegisterEntry{0x1000, "MS0 operation No. selection (upper)"}, // 4096
     ArKd2RegisterEntry{0x1001, "MS0 operation No. selection (lower)"}, // 4097
     ArKd2RegisterEntry{0x1002, "MS1 operation No. selection (upper)"}, // 4098

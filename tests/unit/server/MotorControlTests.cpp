@@ -4,6 +4,7 @@
 #include <Config.hpp>
 #include <MotorControl.hpp>
 
+#include <algorithm>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
@@ -505,11 +506,28 @@ TEST(MotorControlTests, FloatAppliesAndRestoresBothConfiguredCurrents) {
   EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.runCurrent + 1), 300u);
   EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.stopCurrent), 0u);
   EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.stopCurrent + 1), 100u);
+  EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.operationModeNo0 + 0x80), 0u);
+  EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.operationModeNo0 + 0x81), 0u);
+  EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.operationModeNo0 + 0x82), 0u);
+  EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.operationModeNo0 + 0x83), 0u);
+  EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.operationModeNo0 + 0x84), 0u);
+  EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.operationModeNo0 + 0x85), 3u);
+  EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.pushCurrentNo0 + 4), 0u);
+  EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.pushCurrentNo0 + 5), 300u);
+  const auto startBit = static_cast<std::uint16_t>(MotorInputFlag::Start);
+  const auto startWasPulsed = std::ranges::any_of(
+      fake_modbus::writes(), [map, startBit](const fake_modbus::WriteRecord& write) {
+        return write.slave == 5 && write.addr == map.driverInputCommandLower &&
+               !write.values.empty() && (write.values.back() & startBit) != 0;
+      });
+  EXPECT_TRUE(startWasPulsed);
 
   control.setFloat(utl::EMotor::XLeft, false);
   EXPECT_FALSE(control.isFloating(utl::EMotor::XLeft));
   EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.runCurrent + 1), 900u);
   EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.stopCurrent + 1), 700u);
+  EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.operationModeNo0 + 0x85), 0u);
+  EXPECT_EQ(fake_modbus::getHoldingRegister(5, map.pushCurrentNo0 + 5), 900u);
   std::filesystem::remove(configPath);
 }
 
@@ -525,6 +543,22 @@ TEST(MotorControlTests, FloatIsRejectedWhileMotionIsActive) {
   EXPECT_THROW(control.setFloat(utl::EMotor::XLeft, true), std::runtime_error);
   control.stopMovement(utl::EMotor::XLeft);
   EXPECT_NO_THROW(control.setFloat(utl::EMotor::XLeft, true));
+  std::filesystem::remove(configPath);
+}
+
+TEST(MotorControlTests, FloatBlocksSubsequentJoystickStyleMovementCommands) {
+  fake_modbus::reset();
+  const auto configPath = writeMotorControlConfigWithFloatCurrents();
+  utl::Config::instance().setConfigPath(configPath.string());
+  MotorControl control;
+  control.initialize();
+  control.setFloat(utl::EMotor::XLeft, true);
+
+  control.setMode(utl::EMotor::XLeft, MotorControlMode::Speed);
+  control.setDirection(utl::EMotor::XLeft, MotorControlDirection::Forward);
+  control.startMovement(utl::EMotor::XLeft);
+
+  EXPECT_FALSE(control.isMotionActive(utl::EMotor::XLeft));
   std::filesystem::remove(configPath);
 }
 

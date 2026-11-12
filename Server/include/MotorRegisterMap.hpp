@@ -46,6 +46,8 @@ struct MotorRegisterMap {
   int positionNo0{0x0400};
   int speedNo0{0x0480};
   int operationModeNo0{0x0500};
+  int operationFunctionNo0{0x0580};
   int accelerationNo0{0x0600};
   int decelerationNo0{0x0680};
+  int pushCurrentNo0{0x0700};
 };

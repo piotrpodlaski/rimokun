@@ -501,6 +501,7 @@ void MotorControl::setMode(const utl::EMotor motorId, const MotorControlMode mod
   RIMO_TIMED_SCOPE("MotorControl::setMode");
   withBus(motorId, [this, mode](const Motor& motor, MotorRuntimeState& runtime,
                                 ModbusClient& bus) {
+    if (runtime.floating) return;
     runtime.mode = mode;
     if (mode == MotorControlMode::Speed) {
       prepareSpeedMode(motor, runtime, bus);
@@ -514,6 +515,7 @@ void MotorControl::setSpeed(const utl::EMotor motorId, const std::int32_t speed)
   RIMO_TIMED_SCOPE("MotorControl::setSpeed");
   withBus(motorId, [this, speed](const Motor& motor, MotorRuntimeState& runtime,
                                  ModbusClient& bus) {
+    if (runtime.floating) return;
     runtime.speed = std::abs(speed);
     if (runtime.mode == MotorControlMode::Speed) {
       if (runtime.speedPairPrepared) {
@@ -577,6 +579,7 @@ void MotorControl::setDirection(const utl::EMotor motorId,
   RIMO_TIMED_SCOPE("MotorControl::setDirection");
   withBus(motorId, [direction](const Motor& motor, MotorRuntimeState& runtime,
                                ModbusClient& bus) {
+    if (runtime.floating) return;
     runtime.direction = direction;
     if (direction == MotorControlDirection::Forward) {
       motor.setReverse(bus, false);
@@ -595,6 +598,11 @@ void MotorControl::startMovement(const utl::EMotor motorId) {
                                    ModbusClient& bus) {
     if (!runtime.enabled) {
       SPDLOG_WARN("Ignoring startMovement for disabled motor {}",
+                  utl::enumToStringView(motorId));
+      return;
+    }
+    if (runtime.floating) {
+      SPDLOG_WARN("Ignoring startMovement for FLOAT motor {}",
                   utl::enumToStringView(motorId));
       return;
     }
@@ -758,9 +766,29 @@ void MotorControl::setFloat(const utl::EMotor motorId, const bool enabled,
                                    : config.runCurrent;
     const auto targetStop = enabled ? stopCurrent.value_or(*config.floatStopCurrent)
                                     : config.stopCurrent;
+    if (!enabled) {
+      // A FLOAT motor may be in a Push motion even though joystick movement is
+      // intentionally not tracked as normal motion. Stop it before restoring
+      // the normal operation data.
+      motor.pulseStop(bus);
+    }
     motor.setRunCurrent(bus, targetRun);
     motor.setStopCurrent(bus, targetStop);
+    // Operation records 0 and 1 belong to normal joystick speed control.
+    // FLOAT uses the dedicated position-mode record 2 instead.
+    motor.setOperationFunction(bus, 2,
+                               enabled ? MotorOperationFunction::Push
+                                       : MotorOperationFunction::SingleMotion);
+    // Push current is operation-data specific; configure only FLOAT's record.
+    motor.setOperationPushCurrent(bus, 2, targetRun);
+    motor.setOperationPosition(bus, 2, 1000000);
+    motor.setSelectedOperationId(bus, enabled ? 2 : 0);
+    if (enabled) {
+      motor.pulseStart(bus);
+    }
     runtime.floating = enabled;
+    // Re-entering normal control must rebuild the speed-mode operation pair.
+    runtime.speedPairPrepared = false;
   });
 }
 

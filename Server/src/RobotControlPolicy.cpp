@@ -395,6 +395,19 @@ IRobotControlPolicy::ControlDecision RimoKunControlPolicy::decide(
     const auto armState = _armStates[arm];
 
     auto& runtime = _motorRuntime[motorId];
+    const auto motorStatusIt = robotStatus.motors.find(motorId);
+    if (motorStatusIt != robotStatus.motors.end() && motorStatusIt->second.floating) {
+      motorSpeedCommands[motorId] = {.speedCommandPercent = 0.0,
+                                     .modeMaxLinearSpeedMmPerSec = 0.0};
+      runtime.hasLastAxis = false;
+      runtime.lastDirection.reset();
+      if (runtime.wasActive) {
+        runtime.wasActive = false;
+        motorIntents.push_back(
+            {.motorId = motorId, .stopMovement = true});
+      }
+      return;
+    }
     const auto clampedAxis = clampAxis(axisValue);
     const auto active =
         std::abs(clampedAxis) >= axisCfg.neutralAxisActivationThreshold;

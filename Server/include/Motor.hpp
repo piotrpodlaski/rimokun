@@ -257,6 +257,8 @@ class Motor {
                         MotorOperationMode mode) const;
   void setOperationFunction(ModbusClient& bus, std::uint8_t opId,
                             MotorOperationFunction function) const;
+  void setOperationPushCurrent(ModbusClient& bus, std::uint8_t opId,
+                               std::int32_t current) const;
   void setOperationPosition(ModbusClient& bus, std::uint8_t opId,
                             std::int32_t position) const;
   void setOperationSpeed(ModbusClient& bus, std::uint8_t opId,
